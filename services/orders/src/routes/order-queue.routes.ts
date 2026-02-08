@@ -209,7 +209,12 @@ orderQueueRouter.post('/create-po', async (req: AuthRequest, res, next) => {
         completedCycles: kanbanCards.completedCycles,
       })
       .from(kanbanCards)
-      .where(inArray(kanbanCards.id, cardIds))
+      .where(
+        and(
+          inArray(kanbanCards.id, cardIds),
+          eq(kanbanCards.tenantId, tenantId),
+        )
+      )
       .execute();
 
     // Validate all cards belong to tenant and are triggered
@@ -236,7 +241,12 @@ orderQueueRouter.post('/create-po', async (req: AuthRequest, res, next) => {
         orderQuantity: kanbanLoops.orderQuantity,
       })
       .from(kanbanLoops)
-      .where(inArray(kanbanLoops.id, cards.map((c) => c.loopId)))
+      .where(
+        and(
+          inArray(kanbanLoops.id, cards.map((c) => c.loopId)),
+          eq(kanbanLoops.tenantId, tenantId),
+        )
+      )
       .execute();
 
     // Validate all loops are procurement type
@@ -303,7 +313,7 @@ orderQueueRouter.post('/create-po', async (req: AuthRequest, res, next) => {
             currentStageEnteredAt: new Date(),
             updatedAt: new Date(),
           })
-          .where(eq(kanbanCards.id, cardDetail.id))
+          .where(and(eq(kanbanCards.id, cardDetail.id), eq(kanbanCards.tenantId, tenantId)))
           .execute();
 
         // Insert stage transition
@@ -369,7 +379,12 @@ orderQueueRouter.post('/create-wo', async (req: AuthRequest, res, next) => {
       })
       .from(kanbanCards)
       .innerJoin(kanbanLoops, eq(kanbanCards.loopId, kanbanLoops.id))
-      .where(eq(kanbanCards.id, cardId))
+      .where(
+        and(
+          eq(kanbanCards.id, cardId),
+          eq(kanbanCards.tenantId, tenantId),
+        )
+      )
       .execute();
 
     if (cardResult.length === 0) {
@@ -445,7 +460,7 @@ orderQueueRouter.post('/create-wo', async (req: AuthRequest, res, next) => {
           currentStageEnteredAt: new Date(),
           updatedAt: new Date(),
         })
-        .where(eq(kanbanCards.id, cardId))
+        .where(and(eq(kanbanCards.id, cardId), eq(kanbanCards.tenantId, tenantId)))
         .execute();
 
       // Insert stage transition
@@ -511,7 +526,12 @@ orderQueueRouter.post('/create-to', async (req: AuthRequest, res, next) => {
       })
       .from(kanbanCards)
       .innerJoin(kanbanLoops, eq(kanbanCards.loopId, kanbanLoops.id))
-      .where(inArray(kanbanCards.id, cardIds))
+      .where(
+        and(
+          inArray(kanbanCards.id, cardIds),
+          eq(kanbanCards.tenantId, tenantId),
+        )
+      )
       .execute();
 
     // Validate all cards found
@@ -581,7 +601,7 @@ orderQueueRouter.post('/create-to', async (req: AuthRequest, res, next) => {
             currentStageEnteredAt: new Date(),
             updatedAt: new Date(),
           })
-          .where(eq(kanbanCards.id, card.id))
+          .where(and(eq(kanbanCards.id, card.id), eq(kanbanCards.tenantId, tenantId)))
           .execute();
 
         // Insert stage transition
