@@ -1,0 +1,28 @@
+{
+  "name": "@arda/notifications-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@arda/config": "*",
+    "@arda/db": "*",
+    "@arda/auth-utils": "*",
+    "@arda/events": "*",
+    "express": "^4.21.0",
+    "cors": "^2.8.5",
+    "helmet": "^8.0.0",
+    "zod": "^3.23.8",
+    "drizzle-orm": "^0.39.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/cors": "^2.8.17",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

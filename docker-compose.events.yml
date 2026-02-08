@@ -1,0 +1,57 @@
+# Docker Compose for Arda V2 Real-Time Events Stack
+# Usage: docker-compose -f docker-compose.events.yml up
+
+version: '3.9'
+
+services:
+  # Redis for pub/sub and caching
+  redis:
+    image: redis:7-alpine
+    container_name: arda-redis
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # NotificationService WebSocket server
+  notification-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.notification-service
+    container_name: arda-notification-service
+    environment:
+      REDIS_URL: redis://redis:6379
+      WS_PORT: 3001
+      NODE_ENV: development
+    ports:
+      - '3001:3001'
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./packages/notification-service/src:/app/src
+    command: npm run dev
+
+  # Redis Commander for debugging
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: arda-redis-commander
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - '8081:8081'
+    depends_on:
+      - redis
+
+volumes:
+  redis_data:
+
+networks:
+  default:
+    name: arda-network
