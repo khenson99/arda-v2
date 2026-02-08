@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, gt } from 'drizzle-orm';
 import { db, schema } from '@arda/db';
 import type { AuthRequest } from '@arda/auth-utils';
 import { AppError } from '../middleware/error-handler.js';
@@ -197,13 +197,16 @@ loopsRouter.patch('/:id/parameters', async (req: AuthRequest, res, next) => {
         }
         // If reducing, we deactivate excess cards (don't delete — preserve history)
         if (input.numberOfCards < existingLoop.numberOfCards) {
-          // Deactivate cards with number > new count
-          await tx.execute(
-            sql`UPDATE kanban.kanban_cards
-                SET is_active = false, updated_at = now()
-                WHERE loop_id = ${req.params.id as string}
-                AND card_number > ${input.numberOfCards}`
-          );
+          await tx
+            .update(kanbanCards)
+            .set({ isActive: false, updatedAt: new Date() })
+            .where(
+              and(
+                eq(kanbanCards.loopId, req.params.id as string),
+                eq(kanbanCards.tenantId, tenantId),
+                gt(kanbanCards.cardNumber, input.numberOfCards)
+              )
+            );
         }
       }
     });

@@ -81,20 +81,15 @@ authRouter.post('/refresh', async (req, res, next) => {
 });
 
 // ─── POST /auth/google ────────────────────────────────────────────────
-// In production, this receives a Google OAuth authorization code,
-// exchanges it for tokens, fetches the Google profile, then calls
-// handleGoogleOAuth. For now, we accept the profile directly (the
-// frontend handles the OAuth flow and sends us the profile data).
+// Receives a Google ID token from the frontend, verifies it server-side
+// using google-auth-library, and creates/logs in the user.
 authRouter.post('/google', async (req, res, next) => {
   try {
-    const googleProfileSchema = z.object({
-      googleId: z.string(),
-      email: z.string().email(),
-      firstName: z.string(),
-      lastName: z.string(),
-      avatarUrl: z.string().optional(),
+    const googleTokenSchema = z.object({
+      idToken: z.string().min(1, 'Google ID token is required'),
     });
-    const profile = googleProfileSchema.parse(req.body);
+    const { idToken } = googleTokenSchema.parse(req.body);
+    const profile = await authService.verifyGoogleIdToken(idToken);
     const result = await authService.handleGoogleOAuth(profile);
     res.json(result);
   } catch (err) {

@@ -8,6 +8,8 @@ import {
   verifyRefreshToken,
 } from '@arda/auth-utils';
 import { AppError } from '../middleware/error-handler.js';
+import { OAuth2Client } from 'google-auth-library';
+import { config } from '@arda/config';
 import crypto from 'crypto';
 
 const { users, tenants, refreshTokens, oauthAccounts } = schema;
@@ -225,6 +227,42 @@ export async function refreshAccessToken(token: string): Promise<TokenPair> {
   });
 
   return newTokens;
+}
+
+// ─── Google ID Token Verification ────────────────────────────────────
+export async function verifyGoogleIdToken(idToken: string): Promise<{
+  googleId: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  avatarUrl?: string;
+}> {
+  if (!config.GOOGLE_CLIENT_ID) {
+    throw new AppError(500, 'Google OAuth is not configured (missing GOOGLE_CLIENT_ID)', 'GOOGLE_NOT_CONFIGURED');
+  }
+
+  const client = new OAuth2Client(config.GOOGLE_CLIENT_ID);
+  try {
+    const ticket = await client.verifyIdToken({
+      idToken,
+      audience: config.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    if (!payload || !payload.sub || !payload.email) {
+      throw new AppError(401, 'Invalid Google ID token payload', 'INVALID_GOOGLE_TOKEN');
+    }
+
+    return {
+      googleId: payload.sub,
+      email: payload.email,
+      firstName: payload.given_name || '',
+      lastName: payload.family_name || '',
+      avatarUrl: payload.picture,
+    };
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw new AppError(401, 'Failed to verify Google ID token', 'INVALID_GOOGLE_TOKEN');
+  }
 }
 
 // ─── Google OAuth Callback ────────────────────────────────────────────

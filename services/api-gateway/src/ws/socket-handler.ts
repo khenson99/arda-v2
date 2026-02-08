@@ -2,6 +2,8 @@ import { Server as HttpServer } from 'http';
 import { Server as SocketServer } from 'socket.io';
 import { verifyAccessToken } from '@arda/auth-utils';
 import { getEventBus, type ArdaEvent } from '@arda/events';
+import { db, schema } from '@arda/db';
+import { eq, and } from 'drizzle-orm';
 
 export function setupWebSocket(httpServer: HttpServer, redisUrl: string): SocketServer {
   const io = new SocketServer(httpServer, {
@@ -46,9 +48,24 @@ export function setupWebSocket(httpServer: HttpServer, redisUrl: string): Socket
 
     eventBus.subscribeTenant(tenantId, handler);
 
-    // Client can request specific event subscriptions
-    socket.on('subscribe:loop', (loopId: string) => {
-      socket.join(`loop:${loopId}`);
+    // Client can request specific event subscriptions (verify tenant ownership)
+    socket.on('subscribe:loop', async (loopId: string) => {
+      try {
+        const loop = await db.query.kanbanLoops.findFirst({
+          where: and(
+            eq(schema.kanbanLoops.id, loopId),
+            eq(schema.kanbanLoops.tenantId, tenantId)
+          ),
+          columns: { id: true },
+        });
+        if (!loop) {
+          socket.emit('error', { message: 'Loop not found or access denied' });
+          return;
+        }
+        socket.join(`loop:${loopId}`);
+      } catch {
+        socket.emit('error', { message: 'Failed to subscribe to loop' });
+      }
     });
 
     socket.on('unsubscribe:loop', (loopId: string) => {

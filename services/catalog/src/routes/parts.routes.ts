@@ -8,6 +8,11 @@ import { AppError } from '../middleware/error-handler.js';
 export const partsRouter = Router();
 const { parts, partCategories, supplierParts } = schema;
 
+/** Escape LIKE/ILIKE metacharacters so user input is treated literally. */
+function escapeLike(str: string): string {
+  return str.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
+
 // ─── Validation ───────────────────────────────────────────────────────
 const createPartSchema = z.object({
   partNumber: z.string().min(1).max(100),
@@ -47,8 +52,9 @@ partsRouter.get('/', async (req: AuthRequest, res, next) => {
 
     const conditions = [eq(parts.tenantId, tenantId)];
     if (query.search) {
+      const escaped = escapeLike(query.search);
       conditions.push(
-        sql`(${ilike(parts.partNumber, `%${query.search}%`)} OR ${ilike(parts.name, `%${query.search}%`)})`
+        sql`(${ilike(parts.partNumber, `%${escaped}%`)} OR ${ilike(parts.name, `%${escaped}%`)})`
       );
     }
     if (query.categoryId) conditions.push(eq(parts.categoryId, query.categoryId));

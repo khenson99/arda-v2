@@ -48,13 +48,6 @@ app.get('/health', (_req, res) => {
     status: 'ok',
     service: 'api-gateway',
     timestamp: new Date().toISOString(),
-    upstreamServices: {
-      auth: serviceUrls.auth,
-      catalog: serviceUrls.catalog,
-      kanban: serviceUrls.kanban,
-      orders: serviceUrls.orders,
-      notifications: serviceUrls.notifications,
-    },
   });
 });
 

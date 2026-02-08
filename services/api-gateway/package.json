@@ -19,6 +19,7 @@
     "socket.io": "^4.8.1",
     "@arda/config": "*",
     "@arda/auth-utils": "*",
+    "@arda/db": "*",
     "@arda/events": "*"
   },
   "devDependencies": {
