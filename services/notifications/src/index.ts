@@ -103,7 +103,17 @@ async function shutdown(signal: string) {
   process.exit(0);
 }
 
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => {
+  void shutdown('SIGTERM').catch((err) => {
+    log.error({ err }, 'Graceful shutdown failed');
+    process.exit(1);
+  });
+});
+process.on('SIGINT', () => {
+  void shutdown('SIGINT').catch((err) => {
+    log.error({ err }, 'Graceful shutdown failed');
+    process.exit(1);
+  });
+});
 
 export default app;

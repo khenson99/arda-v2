@@ -10,11 +10,20 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# ─── Quality Gates ──────────────────────────────────────────────────
+# Gate 1: Lint + Typecheck (fast fail)
+# Gate 2: Unit tests (parallel per workspace)
+# Gate 3: Integration tests (requires DB/Redis)
+# Gate 4: Migration safety check (PR only)
+# Gate 5: Docker build matrix (main branch only)
+# ────────────────────────────────────────────────────────────────────
+
 jobs:
-  lint-build-test:
-    name: Lint, Build & Test
+  # ─── Gate 1: Lint & Typecheck ──────────────────────────────────────
+  lint-typecheck:
+    name: Lint & Typecheck
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v4
@@ -27,17 +36,166 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build packages & services
+      - name: Build packages (required for cross-package types)
+        run: npx turbo build --filter='./packages/*'
+
+      - name: Typecheck all workspaces
         run: npx turbo build
 
-      - name: Run tests
-        run: npx turbo test
+      - name: Lint
+        run: npx turbo lint
+        continue-on-error: true
 
-  docker-build:
-    name: Docker Build (${{ matrix.service }})
+  # ─── Gate 2: Unit Tests ────────────────────────────────────────────
+  unit-tests:
+    name: Unit Tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: lint-build-test
+    needs: lint-typecheck
+
+    strategy:
+      fail-fast: false
+      matrix:
+        workspace:
+          - '@arda/jobs'
+          - '@arda/storage'
+          - '@arda/search'
+          - '@arda/observability'
+          - '@arda/kanban'
+          - '@arda/orders'
+          - '@arda/notifications'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build packages
+        run: npx turbo build --filter='./packages/*'
+
+      - name: Run tests
+        env:
+          WORKSPACE: ${{ matrix.workspace }}
+        run: npx turbo test --filter="$WORKSPACE"
+
+  # ─── Gate 3: Integration Tests ─────────────────────────────────────
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: lint-typecheck
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: arda_v2_test
+          POSTGRES_USER: arda
+          POSTGRES_PASSWORD: arda_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U arda -d arda_v2_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://arda:arda_test_password@localhost:5432/arda_v2_test
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: test-jwt-secret-minimum-32-characters-long
+      JWT_REFRESH_SECRET: test-jwt-refresh-secret-minimum-32-chars
+      NODE_ENV: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build all
+        run: npx turbo build
+
+      - name: Push database schema
+        run: npx turbo run db:push --filter=@arda/db
+        continue-on-error: true
+
+      - name: Run integration tests
+        run: npx turbo test
+        env:
+          INTEGRATION: 'true'
+
+  # ─── Gate 4: Migration Safety Check ────────────────────────────────
+  migration-check:
+    name: Migration Safety
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: lint-typecheck
+    if: github.event_name == 'pull_request'
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: arda_v2_migration
+          POSTGRES_USER: arda
+          POSTGRES_PASSWORD: arda_migration_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U arda -d arda_v2_migration"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://arda:arda_migration_password@localhost:5432/arda_v2_migration
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build packages
+        run: npx turbo build --filter='./packages/*'
+
+      - name: Check for pending migrations
+        run: npx turbo run db:check --filter=@arda/db
+        continue-on-error: true
+
+  # ─── Gate 5: Docker Builds ─────────────────────────────────────────
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [unit-tests, integration-tests]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     strategy:

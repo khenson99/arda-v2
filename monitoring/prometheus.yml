@@ -1,0 +1,53 @@
+# Arda V2 — Prometheus Configuration
+#
+# Scrapes metrics from all Arda services at their /metrics endpoints.
+# Start with: docker compose --profile monitoring up -d
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # ─── Arda Application Services ──────────────────────────────────────
+
+  - job_name: 'arda-api-gateway'
+    static_configs:
+      - targets: ['api-gateway:3000']
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  - job_name: 'arda-auth'
+    static_configs:
+      - targets: ['auth:3000']
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  - job_name: 'arda-catalog'
+    static_configs:
+      - targets: ['catalog:3000']
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  - job_name: 'arda-kanban'
+    static_configs:
+      - targets: ['kanban:3000']
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  - job_name: 'arda-orders'
+    static_configs:
+      - targets: ['orders:3000']
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  - job_name: 'arda-notifications'
+    static_configs:
+      - targets: ['notifications:3000']
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  # ─── Infrastructure ─────────────────────────────────────────────────
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

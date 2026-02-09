@@ -12,12 +12,15 @@ x-service-defaults: &service-defaults
     NODE_ENV: production
     DATABASE_URL: postgresql://arda:arda_dev_password@postgres:5432/arda_v2
     REDIS_URL: redis://redis:6379
+    ELASTICSEARCH_URL: http://elasticsearch:9200
     JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-change-in-production}
     JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev-jwt-refresh-secret-change-in-production}
     JWT_EXPIRY: ${JWT_EXPIRY:-15m}
     JWT_REFRESH_EXPIRY: ${JWT_REFRESH_EXPIRY:-7d}
     GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
     APP_URL: ${APP_URL:-http://localhost:5173}
+    AWS_S3_BUCKET: ${AWS_S3_BUCKET:-arda-v2-dev}
+    AWS_REGION: ${AWS_REGION:-us-east-1}
 
 services:
   # ─── Infrastructure ──────────────────────────────────────────────────
@@ -53,6 +56,84 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  # ─── Object Storage (S3-compatible) ─────────────────────────────────
+
+  minio:
+    image: minio/minio
+    container_name: arda-minio
+    profiles:
+      - storage
+      - full
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Search Engine ──────────────────────────────────────────────────
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+    container_name: arda-elasticsearch
+    profiles:
+      - search
+      - full
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - '9200:9200'
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -fsSL http://localhost:9200/_cluster/health | grep -q ''"status":"green"\|"status":"yellow"''']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ─── Monitoring ─────────────────────────────────────────────────────
+
+  prometheus:
+    image: prom/prometheus:v2.50.0
+    container_name: arda-prometheus
+    profiles:
+      - monitoring
+      - full
+    ports:
+      - '9090:9090'
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=7d'
+
+  grafana:
+    image: grafana/grafana:10.3.0
+    container_name: arda-grafana
+    profiles:
+      - monitoring
+      - full
+    ports:
+      - '3100:3000'
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+    volumes:
+      - grafana_data:/var/lib/grafana
 
   # ─── Application Services ────────────────────────────────────────────
 
@@ -138,3 +219,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  minio_data:
+  elasticsearch_data:
+  prometheus_data:
+  grafana_data:

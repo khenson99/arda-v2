@@ -31,8 +31,12 @@ const mockWorkerInstance = {
 };
 
 vi.mock('bullmq', () => ({
-  Queue: vi.fn().mockImplementation(() => mockQueueInstance),
-  Worker: vi.fn().mockImplementation(() => mockWorkerInstance),
+  Queue: vi.fn(function QueueMock() {
+    return mockQueueInstance;
+  }),
+  Worker: vi.fn(function WorkerMock() {
+    return mockWorkerInstance;
+  }),
 }));
 
 // ─── Imports (after mocks) ──────────────────────────────────────────
