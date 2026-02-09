@@ -21,7 +21,7 @@ import { startQueueRiskScheduler } from './services/queue-risk-scheduler.service
 const app = express();
 
 app.use(helmet());
-app.use(cors({ origin: config.APP_URL, credentials: true }));
+app.use(cors({ origin: getCorsOrigins(), credentials: true }));
 app.use(express.json({ limit: '5mb' }));
 
 // ─── Health Check ─────────────────────────────────────────────────────
