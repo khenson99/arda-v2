@@ -189,6 +189,21 @@ export type CardFormat =
   | 'bin_label'
   | '1x1_label';
 
+// ─── Print Job Types ────────────────────────────────────────────────
+export type PrintJobStatus = 'pending' | 'printing' | 'completed' | 'failed' | 'cancelled';
+
+export interface PrintJobSummary {
+  id: string;
+  status: PrintJobStatus;
+  format: CardFormat;
+  printerClass: 'standard' | 'thermal';
+  cardCount: number;
+  isReprint: boolean;
+  requestedByUserId?: string;
+  createdAt: string;
+  completedAt?: string;
+}
+
 // ─── Billing ──────────────────────────────────────────────────────────
 export type PlanId = 'free' | 'starter' | 'pro' | 'enterprise';
 
@@ -205,6 +220,82 @@ export interface PlanFeatures {
   prioritySupport: boolean;
 }
 
+// ─── Production Types ────────────────────────────────────────────────
+export type WOHoldReason =
+  | 'material_shortage'
+  | 'equipment_failure'
+  | 'quality_hold'
+  | 'labor_unavailable'
+  | 'other';
+
+export type RoutingStepStatus =
+  | 'pending'
+  | 'in_progress'
+  | 'complete'
+  | 'on_hold'
+  | 'skipped';
+
+export type ProductionOperationType =
+  | 'start_step'
+  | 'complete_step'
+  | 'skip_step'
+  | 'report_quantity'
+  | 'hold'
+  | 'resume'
+  | 'expedite'
+  | 'split'
+  | 'rework';
+
+export interface ProductionQueueItem {
+  id: string;
+  workOrderId: string;
+  woNumber: string;
+  partId: string;
+  facilityId: string;
+  status: string;
+  priorityScore: number;
+  manualPriority: number;
+  isExpedited: boolean;
+  totalSteps: number;
+  completedSteps: number;
+  enteredQueueAt: string;
+  startedAt: string | null;
+}
+
+export interface RoutingTemplateInput {
+  name: string;
+  description?: string;
+  partId?: string;
+  steps: RoutingTemplateStepInput[];
+}
+
+export interface RoutingTemplateStepInput {
+  workCenterId: string;
+  stepNumber: number;
+  operationName: string;
+  estimatedMinutes?: number;
+  instructions?: string;
+}
+
+// ─── WO Status Transitions ──────────────────────────────────────────
+export const WO_VALID_TRANSITIONS: Record<WOStatus, WOStatus[]> = {
+  draft: ['scheduled', 'cancelled'],
+  scheduled: ['in_progress', 'cancelled'],
+  in_progress: ['on_hold', 'completed', 'cancelled'],
+  on_hold: ['in_progress', 'cancelled'],
+  completed: [],
+  cancelled: [],
+};
+
+// ─── Routing Step Transitions ───────────────────────────────────────
+export const ROUTING_STEP_VALID_TRANSITIONS: Record<RoutingStepStatus, RoutingStepStatus[]> = {
+  pending: ['in_progress', 'skipped'],
+  in_progress: ['complete', 'on_hold', 'skipped'],
+  complete: [],
+  on_hold: ['in_progress'],
+  skipped: [],
+};
+
 // ─── WebSocket Events ────────────────────────────────────────────────
 export type WSEventType =
   | 'card:stage_changed'
@@ -214,7 +305,12 @@ export type WSEventType =
   | 'transfer:status_changed'
   | 'inventory:updated'
   | 'notification:new'
-  | 'relowisa:recommendation';
+  | 'relowisa:recommendation'
+  | 'wo:step_completed'
+  | 'wo:quantity_reported'
+  | 'wo:expedited'
+  | 'wo:held'
+  | 'wo:resumed';
 
 export interface WSEvent<T = unknown> {
   type: WSEventType;

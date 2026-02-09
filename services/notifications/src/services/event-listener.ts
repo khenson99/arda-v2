@@ -3,9 +3,38 @@ import { db, schema } from '@arda/db';
 import { and, eq } from 'drizzle-orm';
 
 type OrderStatusChangedEvent = Extract<ArdaEvent, { type: 'order.status_changed' }>;
+type CardTransitionNotificationEvent =
+  | Extract<ArdaEvent, { type: 'card.transition' }>
+  | Extract<ArdaEvent, { type: 'lifecycle.transition' }>;
 
 function formatStatus(status: string): string {
   return status.replace(/_/g, ' ');
+}
+
+function formatExceptionType(type: string): string {
+  const labels: Record<string, string> = {
+    short_shipment: 'Short Shipment',
+    damaged: 'Damaged Goods',
+    quality_reject: 'Quality Rejection',
+    wrong_item: 'Wrong Item',
+    overage: 'Overage',
+  };
+  return labels[type] || formatStatus(type);
+}
+
+function formatResolutionType(type: string): string {
+  const labels: Record<string, string> = {
+    follow_up_po: 'Follow-up Purchase Order',
+    replacement_card: 'Kanban Card Replacement',
+    return_to_supplier: 'Return to Supplier',
+    credit: 'Supplier Credit',
+    accept_as_is: 'Accept As Is',
+  };
+  return labels[type] || formatStatus(type);
+}
+
+function shouldNotifyCardStage(toStage: string): boolean {
+  return ['triggered', 'received', 'restocked'].includes(toStage);
 }
 
 function buildOrderStatusNotification(event: OrderStatusChangedEvent): {
@@ -88,15 +117,22 @@ export async function startEventListener(redisUrl: string): Promise<void> {
     try {
       switch (event.type) {
         case 'card.transition':
+        case 'lifecycle.transition':
           // Create notification for relevant users when cards move to key stages
-          if (['triggered', 'received', 'restocked'].includes(event.toStage)) {
+          if (shouldNotifyCardStage(event.toStage)) {
+            const transitionEvent = event as CardTransitionNotificationEvent;
             await createNotification(eventBus, {
-              tenantId: event.tenantId,
+              tenantId: transitionEvent.tenantId,
               type: 'card_triggered',
-              title: `Kanban card moved to ${event.toStage}`,
-              body: `Card ${event.cardId} transitioned from ${event.fromStage || 'initial'} to ${event.toStage}`,
-              actionUrl: `/loops/${event.loopId}/cards/${event.cardId}`,
-              metadata: { cardId: event.cardId, loopId: event.loopId, stage: event.toStage },
+              title: `Kanban card moved to ${transitionEvent.toStage}`,
+              body: `Card ${transitionEvent.cardId} transitioned from ${transitionEvent.fromStage || 'initial'} to ${transitionEvent.toStage}`,
+              actionUrl: `/loops/${transitionEvent.loopId}/cards/${transitionEvent.cardId}`,
+              metadata: {
+                cardId: transitionEvent.cardId,
+                loopId: transitionEvent.loopId,
+                stage: transitionEvent.toStage,
+                eventType: transitionEvent.type,
+              },
             });
           }
           break;
@@ -180,6 +216,67 @@ export async function startEventListener(redisUrl: string): Promise<void> {
               loopId: event.loopId,
               changeType: event.changeType,
               reason: event.reason,
+            },
+          });
+          break;
+
+        case 'receiving.completed': {
+          const hasExceptions = event.exceptionsCreated > 0;
+          await createNotification(eventBus, {
+            tenantId: event.tenantId,
+            type: hasExceptions ? 'exception_alert' : 'po_received',
+            title: hasExceptions
+              ? `Receiving completed with ${event.exceptionsCreated} exception(s)`
+              : 'Receiving completed successfully',
+            body: `Receipt ${event.receiptNumber}: ${event.totalAccepted} accepted, ${event.totalDamaged} damaged, ${event.totalRejected} rejected.${hasExceptions ? ` ${event.exceptionsCreated} exception(s) created.` : ''}`,
+            actionUrl: `/receiving/${event.receiptId}`,
+            metadata: {
+              receiptId: event.receiptId,
+              receiptNumber: event.receiptNumber,
+              orderId: event.orderId,
+              orderType: event.orderType,
+              status: event.status,
+              totalAccepted: event.totalAccepted,
+              totalDamaged: event.totalDamaged,
+              totalRejected: event.totalRejected,
+              exceptionsCreated: event.exceptionsCreated,
+            },
+          });
+          break;
+        }
+
+        case 'receiving.exception_created':
+          await createNotification(eventBus, {
+            tenantId: event.tenantId,
+            type: 'exception_alert',
+            title: `${formatExceptionType(event.exceptionType)} — ${event.severity} severity`,
+            body: `${formatExceptionType(event.exceptionType)}: ${event.quantityAffected} units affected on receipt ${event.receiptId.slice(0, 8)}...`,
+            actionUrl: `/receiving/exceptions/${event.exceptionId}`,
+            metadata: {
+              exceptionId: event.exceptionId,
+              receiptId: event.receiptId,
+              exceptionType: event.exceptionType,
+              severity: event.severity,
+              quantityAffected: event.quantityAffected,
+              orderId: event.orderId,
+              orderType: event.orderType,
+            },
+          });
+          break;
+
+        case 'receiving.exception_resolved':
+          await createNotification(eventBus, {
+            tenantId: event.tenantId,
+            type: 'system_alert',
+            title: `Exception resolved — ${formatResolutionType(event.resolutionType)}`,
+            body: `${formatExceptionType(event.exceptionType)} exception resolved via ${formatResolutionType(event.resolutionType)}${event.followUpOrderId ? ' (follow-up order created)' : ''}`,
+            actionUrl: `/receiving/exceptions/${event.exceptionId}`,
+            metadata: {
+              exceptionId: event.exceptionId,
+              receiptId: event.receiptId,
+              exceptionType: event.exceptionType,
+              resolutionType: event.resolutionType,
+              followUpOrderId: event.followUpOrderId,
             },
           });
           break;

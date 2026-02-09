@@ -8,6 +8,13 @@
       "when": 1770620990529,
       "tag": "0000_warm_leader",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1770629746412,
+      "tag": "0001_brown_titanium_man",
+      "breakpoints": true
     }
   ]
 }

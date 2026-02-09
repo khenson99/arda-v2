@@ -42,6 +42,7 @@ export interface ScoredQueueItem extends QueueItemInput {
 export interface ConsolidationGroup {
   supplierId: string;
   supplierName: string | null;
+  facilityId: string;
   items: ScoredQueueItem[];
   totalLineValue: number;
   highestCriticality: CriticalityLevel;
@@ -174,6 +175,7 @@ export function consolidateBySupplier(items: ScoredQueueItem[]): ConsolidationGr
       orphans.push({
         supplierId: `unassigned-${item.cardId}`,
         supplierName: null,
+        facilityId: item.facilityId,
         items: [item],
         totalLineValue: item.estimatedLineValue,
         highestCriticality: item.criticality,
@@ -182,7 +184,8 @@ export function consolidateBySupplier(items: ScoredQueueItem[]): ConsolidationGr
       continue;
     }
 
-    const existing = groups.get(item.supplierId);
+    const groupKey = `${item.supplierId}:${item.facilityId}`;
+    const existing = groups.get(groupKey);
     if (existing) {
       existing.items.push(item);
       existing.totalLineValue += item.estimatedLineValue;
@@ -193,9 +196,10 @@ export function consolidateBySupplier(items: ScoredQueueItem[]): ConsolidationGr
         existing.maxPriorityScore = item.priorityScore;
       }
     } else {
-      groups.set(item.supplierId, {
+      groups.set(groupKey, {
         supplierId: item.supplierId,
         supplierName: item.supplierName,
+        facilityId: item.facilityId,
         items: [item],
         totalLineValue: item.estimatedLineValue,
         highestCriticality: item.criticality,

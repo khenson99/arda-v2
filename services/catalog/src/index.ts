@@ -11,6 +11,7 @@ import { partsRouter } from './routes/parts.routes.js';
 import { suppliersRouter } from './routes/suppliers.routes.js';
 import { bomRouter } from './routes/bom.routes.js';
 import { categoriesRouter } from './routes/categories.routes.js';
+import { supplierPerformanceRouter } from './routes/supplier-performance.routes.js';
 import { errorHandler } from './middleware/error-handler.js';
 
 const app = express();
@@ -46,6 +47,7 @@ app.use('/parts', partsRouter);
 app.use('/suppliers', suppliersRouter);
 app.use('/bom', bomRouter);
 app.use('/categories', categoriesRouter);
+app.use('/supplier-performance', supplierPerformanceRouter);
 
 app.use(errorHandler);
 

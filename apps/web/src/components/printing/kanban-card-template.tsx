@@ -28,7 +28,6 @@ function FieldRow({
 
 export function KanbanCardTemplate({ data, format, config }: PrintTemplateProps) {
   const isBusinessCard = format === 'business_card';
-  const is4x6 = format === '4x6_card';
 
   // Dynamic font sizes based on format
   const partNumberSize = isBusinessCard ? 'text-[11px]' : 'text-[14px]';

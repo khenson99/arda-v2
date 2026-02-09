@@ -1,4 +1,4 @@
-import { eq, and, sql, desc, asc, inArray } from 'drizzle-orm';
+import { eq, and, sql, desc, asc } from 'drizzle-orm';
 import { db, schema } from '@arda/db';
 import { getEventBus } from '@arda/events';
 import { config } from '@arda/config';
@@ -138,54 +138,37 @@ export function isMethodAllowed(from: CardStage, to: CardStage, method: string):
   return rule ? rule.allowedMethods.includes(method as 'qr_scan' | 'manual' | 'system') : false;
 }
 
-// ─── Idempotency Cache ───────────────────────────────────────────────
-// In-memory cache for idempotency keys. In production this would be Redis.
-const idempotencyCache = new Map<string, { result: unknown; expiresAt: number }>();
-const IDEMPOTENCY_TTL_MS = 5 * 60 * 1000; // 5 minutes
-
-function checkIdempotency(key: string): unknown | null {
-  const entry = idempotencyCache.get(key);
-  if (!entry) return null;
-  if (Date.now() > entry.expiresAt) {
-    idempotencyCache.delete(key);
-    return null;
-  }
-  return entry.result;
-}
-
-function setIdempotency(key: string, result: unknown): void {
-  idempotencyCache.set(key, { result, expiresAt: Date.now() + IDEMPOTENCY_TTL_MS });
-}
-
-// Periodic cleanup (runs lazily, not on a timer)
-function cleanupIdempotencyCache(): void {
-  const now = Date.now();
-  for (const [key, entry] of idempotencyCache) {
-    if (now > entry.expiresAt) idempotencyCache.delete(key);
-  }
-}
-
 /** Check if a stage transition is allowed by the Kanban flow rules. */
 export function isValidTransition(from: string, to: string): boolean {
   return VALID_TRANSITIONS[from]?.includes(to) ?? false;
 }
 
 // ─── Transition a Card to the Next Stage ──────────────────────────────
+// Enhanced 9-step orchestrator with RBAC, idempotency, and lifecycle events.
 export async function transitionCard(input: {
   cardId: string;
   tenantId: string;
   toStage: CardStage;
   userId?: string;
+  userRole?: UserRole;
   method: 'qr_scan' | 'manual' | 'system';
   notes?: string;
   metadata?: Record<string, unknown>;
+  idempotencyKey?: string;
+  linkedOrderId?: string;
+  linkedOrderType?: 'purchase_order' | 'work_order' | 'transfer_order';
+  quantity?: number;
 }): Promise<{
   card: typeof kanbanCards.$inferSelect;
   transition: typeof cardStageTransitions.$inferSelect;
+  eventId?: string;
 }> {
-  const { cardId, tenantId, toStage, userId, method, notes, metadata } = input;
+  const {
+    cardId, tenantId, toStage, userId, userRole, method,
+    notes, metadata, idempotencyKey, linkedOrderId, linkedOrderType, quantity,
+  } = input;
 
-  // Fetch the card with its loop
+  // ── Step 2: Fetch Card with Tenant Isolation ──
   const card = await db.query.kanbanCards.findFirst({
     where: and(eq(kanbanCards.id, cardId), eq(kanbanCards.tenantId, tenantId)),
     with: { loop: true },
@@ -199,9 +182,34 @@ export async function transitionCard(input: {
     throw new AppError(400, 'Card is deactivated', 'CARD_INACTIVE');
   }
 
-  // Validate the transition
-  const currentStage = card.currentStage;
+  // ── Step 1: Persistent Idempotency Check ──
+  // Idempotency must survive process restarts and horizontal scaling.
+  if (idempotencyKey) {
+    const [existingTransition] = await db
+      .select()
+      .from(cardStageTransitions)
+      .where(
+        and(
+          eq(cardStageTransitions.tenantId, tenantId),
+          eq(cardStageTransitions.cardId, cardId),
+          sql`${cardStageTransitions.metadata} ->> 'idempotencyKey' = ${idempotencyKey}`
+        )
+      )
+      .orderBy(desc(cardStageTransitions.transitionedAt))
+      .limit(1);
 
+    if (existingTransition) {
+      return {
+        card,
+        transition: existingTransition,
+      };
+    }
+  }
+
+  const currentStage = card.currentStage as CardStage;
+  const loopType = card.loop.loopType as LoopType;
+
+  // ── Step 3: Stage Validation ──
   if (!isValidTransition(currentStage, toStage)) {
     const allowed = VALID_TRANSITIONS[currentStage];
     throw new AppError(
@@ -211,16 +219,62 @@ export async function transitionCard(input: {
     );
   }
 
-  // Determine cycle number
-  let cycleNumber = card.completedCycles + 1;
-  if (toStage === 'created' && currentStage === 'restocked') {
-    // Loop restarting — this is a new cycle
-    cycleNumber = card.completedCycles + 1;
+  // ── Step 4: Role Authorization ──
+  if (userRole && !isRoleAllowed(currentStage, toStage, userRole)) {
+    throw new AppError(
+      403,
+      `Role '${userRole}' cannot perform transition ${currentStage} → ${toStage}`,
+      'ROLE_NOT_ALLOWED'
+    );
   }
 
+  // ── Step 5: Loop-Type Compatibility ──
+  if (!isLoopTypeAllowed(currentStage, toStage, loopType)) {
+    throw new AppError(
+      400,
+      `Transition ${currentStage} → ${toStage} is not allowed for '${loopType}' loops`,
+      'LOOP_TYPE_INCOMPATIBLE'
+    );
+  }
+
+  // ── Step 6: Method Validation ──
+  if (!isMethodAllowed(currentStage, toStage, method)) {
+    throw new AppError(
+      400,
+      `Method '${method}' is not allowed for transition ${currentStage} → ${toStage}`,
+      'METHOD_NOT_ALLOWED'
+    );
+  }
+
+  // ── Step 7: Precondition Enforcement ──
+  const rule = TRANSITION_RULES.find((r) => r.from === currentStage && r.to === toStage);
+  if (rule?.requiresLinkedOrder) {
+    if (!linkedOrderId || !linkedOrderType) {
+      throw new AppError(
+        400,
+        `Transition ${currentStage} → ${toStage} requires linkedOrderId and linkedOrderType`,
+        'LINKED_ORDER_REQUIRED'
+      );
+    }
+    if (rule.linkedOrderTypes && !rule.linkedOrderTypes.includes(linkedOrderType)) {
+      throw new AppError(
+        400,
+        `Order type '${linkedOrderType}' is not valid for this transition. Expected: ${rule.linkedOrderTypes.join(', ')}`,
+        'INVALID_ORDER_TYPE'
+      );
+    }
+  }
+
+  // Determine cycle number
+  let cycleNumber = card.completedCycles + 1;
   const now = new Date();
 
-  // Execute the transition in a single transaction
+  // Calculate stage duration from previous stage entry
+  const stageDurationSeconds = card.currentStageEnteredAt
+    ? Math.round((now.getTime() - new Date(card.currentStageEnteredAt).getTime()) / 1000)
+    : null;
+
+  // ── Step 8: Atomic DB Transaction ──
   const result = await db.transaction(async (tx) => {
     // Record the transition (immutable audit)
     const [transition] = await tx
@@ -236,16 +290,29 @@ export async function transitionCard(input: {
         transitionedByUserId: userId,
         method,
         notes,
-        metadata: metadata ?? {},
+        metadata: {
+          ...(metadata ?? {}),
+          ...(linkedOrderId ? { linkedOrderId, linkedOrderType } : {}),
+          ...(idempotencyKey ? { idempotencyKey } : {}),
+          ...(quantity ? { quantity } : {}),
+          ...(stageDurationSeconds !== null ? { stageDurationSeconds } : {}),
+        },
       })
       .returning();
 
-    // Update the card's current stage
+    // Build the card update
     const updateData: Record<string, unknown> = {
       currentStage: toStage,
       currentStageEnteredAt: now,
       updatedAt: now,
     };
+
+    // Link orders when transitioning to 'ordered'
+    if (linkedOrderId && linkedOrderType) {
+      if (linkedOrderType === 'purchase_order') updateData.linkedPurchaseOrderId = linkedOrderId;
+      if (linkedOrderType === 'work_order') updateData.linkedWorkOrderId = linkedOrderId;
+      if (linkedOrderType === 'transfer_order') updateData.linkedTransferOrderId = linkedOrderId;
+    }
 
     // If completing a cycle (restocked → created), increment the cycle counter
     if (currentStage === 'restocked' && toStage === 'created') {
@@ -264,11 +331,16 @@ export async function transitionCard(input: {
     return { card: updatedCard, transition };
   });
 
-  // Publish event for real-time WebSocket updates
+  // ── Step 9: Domain Event Emission (fire-and-forget) ──
+  let eventId: string | undefined;
   try {
     const eventBus = getEventBus(config.REDIS_URL);
+
+    // Primary transition event
+    eventId = `evt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     await eventBus.publish({
-      type: 'card.transition',
+      type: 'lifecycle.transition',
+      eventId,
       tenantId,
       cardId,
       loopId: card.loopId,
@@ -276,14 +348,79 @@ export async function transitionCard(input: {
       toStage,
       method,
       userId,
-      timestamp: new Date().toISOString(),
+      cycleNumber,
+      stageDurationSeconds: stageDurationSeconds ?? undefined,
+      idempotencyKey,
+      timestamp: now.toISOString(),
     });
+
+    // Queue entry event (when card is triggered, it enters the order queue)
+    if (toStage === 'triggered') {
+      await eventBus.publish({
+        type: 'lifecycle.queue_entry',
+        tenantId,
+        cardId,
+        loopId: card.loopId,
+        loopType,
+        partId: card.loop.partId,
+        facilityId: card.loop.facilityId,
+        quantity: quantity ?? card.loop.orderQuantity,
+        timestamp: now.toISOString(),
+      });
+    }
+
+    // Order linked event
+    if (linkedOrderId && linkedOrderType && toStage === 'ordered') {
+      await eventBus.publish({
+        type: 'lifecycle.order_linked',
+        tenantId,
+        cardId,
+        loopId: card.loopId,
+        orderId: linkedOrderId,
+        orderType: linkedOrderType,
+        timestamp: now.toISOString(),
+      });
+    }
+
+    // Cycle complete event
+    if (currentStage === 'restocked' && toStage === 'created') {
+      const [cycleStartTransition] = await db
+        .select({ transitionedAt: cardStageTransitions.transitionedAt })
+        .from(cardStageTransitions)
+        .where(
+          and(
+            eq(cardStageTransitions.tenantId, tenantId),
+            eq(cardStageTransitions.cardId, cardId),
+            eq(cardStageTransitions.cycleNumber, cycleNumber)
+          )
+        )
+        .orderBy(asc(cardStageTransitions.transitionedAt))
+        .limit(1);
+
+      const totalCycleDurationSeconds = cycleStartTransition
+        ? Math.max(
+            0,
+            Math.round((now.getTime() - cycleStartTransition.transitionedAt.getTime()) / 1000)
+          )
+        : stageDurationSeconds ?? 0;
+
+      await eventBus.publish({
+        type: 'lifecycle.cycle_complete',
+        tenantId,
+        cardId,
+        loopId: card.loopId,
+        cycleNumber,
+        totalCycleDurationSeconds,
+        timestamp: now.toISOString(),
+      });
+    }
   } catch {
     // Non-critical: don't fail the transition if event publishing fails
-    console.error(`[card-lifecycle] Failed to publish card.transition event for card ${cardId}`);
+    console.error(`[card-lifecycle] Failed to publish lifecycle event for card ${cardId}`);
   }
 
-  return result;
+  const finalResult = { ...result, eventId };
+  return finalResult;
 }
 
 // ─── Trigger a Card via QR Scan ───────────────────────────────────────
@@ -454,5 +591,61 @@ export async function getLoopVelocity(loopId: string, tenantId: string) {
     dataPoints: transitions.length,
     completedCycles: fullCycleTimes.length,
     stageDurations: velocity,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// LIFECYCLE EVENT QUERIES
+// ═══════════════════════════════════════════════════════════════════════
+
+// ─── Get Card Lifecycle Events (Audit Trail) ─────────────────────────
+// Returns all transition records for a card, enriched with stage duration.
+export async function getCardLifecycleEvents(cardId: string, tenantId: string) {
+  const transitions = await db.query.cardStageTransitions.findMany({
+    where: and(
+      eq(cardStageTransitions.cardId, cardId),
+      eq(cardStageTransitions.tenantId, tenantId),
+    ),
+    orderBy: [asc(cardStageTransitions.transitionedAt)],
+  });
+
+  // Enrich with stage duration
+  return transitions.map((t, i) => {
+    const nextTransition = transitions[i + 1];
+    const stageDurationSeconds = nextTransition
+      ? Math.round((nextTransition.transitionedAt.getTime() - t.transitionedAt.getTime()) / 1000)
+      : null;
+
+    return {
+      ...t,
+      stageDurationSeconds,
+      isCurrentStage: !nextTransition,
+    };
+  });
+}
+
+// ─── Get Loop Lifecycle Events ───────────────────────────────────────
+// Returns all transitions for all cards in a loop, grouped by card.
+export async function getLoopLifecycleEvents(
+  loopId: string,
+  tenantId: string,
+  options?: { limit?: number; offset?: number }
+) {
+  const limit = options?.limit ?? 100;
+  const offset = options?.offset ?? 0;
+
+  const transitions = await db.query.cardStageTransitions.findMany({
+    where: and(
+      eq(cardStageTransitions.loopId, loopId),
+      eq(cardStageTransitions.tenantId, tenantId),
+    ),
+    orderBy: [desc(cardStageTransitions.transitionedAt)],
+    limit,
+    offset,
+  });
+
+  return {
+    events: transitions,
+    pagination: { limit, offset, count: transitions.length },
   };
 }

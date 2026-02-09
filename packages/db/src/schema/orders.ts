@@ -57,6 +57,14 @@ export const routingStepStatusEnum = pgEnum('routing_step_status', [
   'skipped',
 ]);
 
+export const woHoldReasonEnum = pgEnum('wo_hold_reason', [
+  'material_shortage',
+  'equipment_failure',
+  'quality_hold',
+  'labor_unavailable',
+  'other',
+]);
+
 // ─── Purchase Orders ─────────────────────────────────────────────────
 export const purchaseOrders = ordersSchema.table(
   'purchase_orders',
@@ -160,11 +168,19 @@ export const workOrders = ordersSchema.table(
     quantityToProduce: integer('quantity_to_produce').notNull(),
     quantityProduced: integer('quantity_produced').notNull().default(0),
     quantityRejected: integer('quantity_rejected').notNull().default(0),
+    quantityScrapped: integer('quantity_scrapped').notNull().default(0),
     scheduledStartDate: timestamp('scheduled_start_date', { withTimezone: true }),
     scheduledEndDate: timestamp('scheduled_end_date', { withTimezone: true }),
     actualStartDate: timestamp('actual_start_date', { withTimezone: true }),
     actualEndDate: timestamp('actual_end_date', { withTimezone: true }),
     priority: integer('priority').notNull().default(0), // higher = more urgent
+    isExpedited: boolean('is_expedited').notNull().default(false),
+    isRework: boolean('is_rework').notNull().default(false),
+    parentWorkOrderId: uuid('parent_work_order_id'), // for split WOs
+    holdReason: woHoldReasonEnum('hold_reason'),
+    holdNotes: text('hold_notes'),
+    cancelReason: text('cancel_reason'),
+    routingTemplateId: uuid('routing_template_id'), // last template applied (informational)
     notes: text('notes'),
     kanbanCardId: uuid('kanban_card_id'),
     createdByUserId: uuid('created_by_user_id'),
@@ -178,6 +194,8 @@ export const workOrders = ordersSchema.table(
     index('wo_status_idx').on(table.tenantId, table.status),
     index('wo_facility_idx').on(table.facilityId),
     index('wo_card_idx').on(table.kanbanCardId),
+    index('wo_parent_idx').on(table.parentWorkOrderId),
+    index('wo_expedited_idx').on(table.tenantId, table.isExpedited),
   ]
 );
 
@@ -299,5 +317,322 @@ export const transferOrderLinesRelations = relations(transferOrderLines, ({ one 
   transferOrder: one(transferOrders, {
     fields: [transferOrderLines.transferOrderId],
     references: [transferOrders.id],
+  }),
+}));
+
+// ─── Receiving Enums ────────────────────────────────────────────────
+export const receiptStatusEnum = pgEnum('receipt_status', [
+  'complete',
+  'partial',
+  'exception',
+]);
+
+export const exceptionTypeEnum = pgEnum('exception_type', [
+  'short_shipment',
+  'damaged',
+  'quality_reject',
+  'wrong_item',
+  'overage',
+]);
+
+export const exceptionSeverityEnum = pgEnum('exception_severity', [
+  'low',
+  'medium',
+  'high',
+  'critical',
+]);
+
+export const exceptionStatusEnum = pgEnum('exception_status', [
+  'open',
+  'in_progress',
+  'resolved',
+  'escalated',
+]);
+
+export const exceptionResolutionTypeEnum = pgEnum('exception_resolution_type', [
+  'follow_up_po',
+  'replacement_card',
+  'return_to_supplier',
+  'credit',
+  'accept_as_is',
+]);
+
+// ─── Receipts ───────────────────────────────────────────────────────
+export const receipts = ordersSchema.table(
+  'receipts',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    tenantId: uuid('tenant_id').notNull(),
+    receiptNumber: varchar('receipt_number', { length: 50 }).notNull(),
+    orderId: uuid('order_id').notNull(),
+    orderType: varchar('order_type', { length: 30 }).notNull(), // purchase_order | work_order | transfer_order
+    status: receiptStatusEnum('status').notNull().default('complete'),
+    receivedByUserId: uuid('received_by_user_id'),
+    notes: text('notes'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('receipt_tenant_number_idx').on(table.tenantId, table.receiptNumber),
+    index('receipt_tenant_idx').on(table.tenantId),
+    index('receipt_order_idx').on(table.orderId),
+    index('receipt_status_idx').on(table.tenantId, table.status),
+  ]
+);
+
+// ─── Receipt Lines ──────────────────────────────────────────────────
+export const receiptLines = ordersSchema.table(
+  'receipt_lines',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    tenantId: uuid('tenant_id').notNull(),
+    receiptId: uuid('receipt_id')
+      .notNull()
+      .references(() => receipts.id, { onDelete: 'cascade' }),
+    orderLineId: uuid('order_line_id').notNull(), // FK to PO/WO/TO line
+    partId: uuid('part_id').notNull(),
+    quantityExpected: integer('quantity_expected').notNull(),
+    quantityAccepted: integer('quantity_accepted').notNull().default(0),
+    quantityDamaged: integer('quantity_damaged').notNull().default(0),
+    quantityRejected: integer('quantity_rejected').notNull().default(0),
+    notes: text('notes'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('receipt_lines_tenant_idx').on(table.tenantId),
+    index('receipt_lines_receipt_idx').on(table.receiptId),
+    index('receipt_lines_part_idx').on(table.partId),
+  ]
+);
+
+// ─── Receiving Exceptions ───────────────────────────────────────────
+export const receivingExceptions = ordersSchema.table(
+  'receiving_exceptions',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    tenantId: uuid('tenant_id').notNull(),
+    receiptId: uuid('receipt_id')
+      .notNull()
+      .references(() => receipts.id, { onDelete: 'cascade' }),
+    receiptLineId: uuid('receipt_line_id')
+      .references(() => receiptLines.id),
+    orderId: uuid('order_id').notNull(),
+    orderType: varchar('order_type', { length: 30 }).notNull(),
+    exceptionType: exceptionTypeEnum('exception_type').notNull(),
+    severity: exceptionSeverityEnum('severity').notNull().default('medium'),
+    status: exceptionStatusEnum('status').notNull().default('open'),
+    quantityAffected: integer('quantity_affected').notNull(),
+    description: text('description'),
+    resolutionType: exceptionResolutionTypeEnum('resolution_type'),
+    resolutionNotes: text('resolution_notes'),
+    resolvedByUserId: uuid('resolved_by_user_id'),
+    resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+    followUpOrderId: uuid('follow_up_order_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('recv_exc_tenant_idx').on(table.tenantId),
+    index('recv_exc_receipt_idx').on(table.receiptId),
+    index('recv_exc_order_idx').on(table.orderId),
+    index('recv_exc_status_idx').on(table.tenantId, table.status),
+    index('recv_exc_type_idx').on(table.exceptionType),
+  ]
+);
+
+// ─── Receiving Relations ────────────────────────────────────────────
+export const receiptsRelations = relations(receipts, ({ many }) => ({
+  lines: many(receiptLines),
+  exceptions: many(receivingExceptions),
+}));
+
+export const receiptLinesRelations = relations(receiptLines, ({ one }) => ({
+  receipt: one(receipts, {
+    fields: [receiptLines.receiptId],
+    references: [receipts.id],
+  }),
+}));
+
+export const receivingExceptionsRelations = relations(receivingExceptions, ({ one }) => ({
+  receipt: one(receipts, {
+    fields: [receivingExceptions.receiptId],
+    references: [receipts.id],
+  }),
+}));
+
+// ─── Routing Templates ──────────────────────────────────────────────
+export const routingTemplates = ordersSchema.table(
+  'routing_templates',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    tenantId: uuid('tenant_id').notNull(),
+    name: varchar('name', { length: 255 }).notNull(),
+    description: text('description'),
+    partId: uuid('part_id'), // optional: default template for a specific part
+    isActive: boolean('is_active').notNull().default(true),
+    createdByUserId: uuid('created_by_user_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('routing_tpl_tenant_idx').on(table.tenantId),
+    index('routing_tpl_part_idx').on(table.partId),
+    index('routing_tpl_active_idx').on(table.tenantId, table.isActive),
+  ]
+);
+
+// ─── Routing Template Steps ─────────────────────────────────────────
+export const routingTemplateSteps = ordersSchema.table(
+  'routing_template_steps',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    tenantId: uuid('tenant_id').notNull(),
+    templateId: uuid('template_id')
+      .notNull()
+      .references(() => routingTemplates.id, { onDelete: 'cascade' }),
+    workCenterId: uuid('work_center_id')
+      .notNull()
+      .references(() => workCenters.id),
+    stepNumber: integer('step_number').notNull(),
+    operationName: varchar('operation_name', { length: 255 }).notNull(),
+    estimatedMinutes: integer('estimated_minutes'),
+    instructions: text('instructions'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('routing_tpl_step_tenant_idx').on(table.tenantId),
+    index('routing_tpl_step_tpl_idx').on(table.templateId),
+    uniqueIndex('routing_tpl_step_number_idx').on(table.templateId, table.stepNumber),
+  ]
+);
+
+// ─── Production Operation Logs ──────────────────────────────────────
+export const productionOperationLogs = ordersSchema.table(
+  'production_operation_logs',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    tenantId: uuid('tenant_id').notNull(),
+    workOrderId: uuid('work_order_id')
+      .notNull()
+      .references(() => workOrders.id, { onDelete: 'cascade' }),
+    routingStepId: uuid('routing_step_id')
+      .references(() => workOrderRoutings.id),
+    operationType: varchar('operation_type', { length: 50 }).notNull(), // start_step, complete_step, skip_step, report_quantity, hold, resume, etc.
+    actualMinutes: integer('actual_minutes'),
+    quantityProduced: integer('quantity_produced'),
+    quantityRejected: integer('quantity_rejected'),
+    quantityScrapped: integer('quantity_scrapped'),
+    operatorUserId: uuid('operator_user_id'),
+    notes: text('notes'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('prod_op_log_tenant_idx').on(table.tenantId),
+    index('prod_op_log_wo_idx').on(table.workOrderId),
+    index('prod_op_log_step_idx').on(table.routingStepId),
+    index('prod_op_log_type_idx').on(table.operationType),
+  ]
+);
+
+// ─── Work Center Capacity Windows ───────────────────────────────────
+export const workCenterCapacityWindows = ordersSchema.table(
+  'work_center_capacity_windows',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    tenantId: uuid('tenant_id').notNull(),
+    workCenterId: uuid('work_center_id')
+      .notNull()
+      .references(() => workCenters.id, { onDelete: 'cascade' }),
+    dayOfWeek: integer('day_of_week').notNull(), // 0=Sun, 1=Mon, ... 6=Sat
+    startHour: integer('start_hour').notNull(), // 0-23
+    endHour: integer('end_hour').notNull(), // 0-23
+    availableMinutes: integer('available_minutes').notNull(), // total minutes available in this window
+    allocatedMinutes: integer('allocated_minutes').notNull().default(0),
+    effectiveDate: timestamp('effective_date', { withTimezone: true }).notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('wc_cap_tenant_idx').on(table.tenantId),
+    index('wc_cap_wc_idx').on(table.workCenterId),
+    index('wc_cap_day_idx').on(table.workCenterId, table.dayOfWeek),
+  ]
+);
+
+// ─── Production Queue Entries ───────────────────────────────────────
+export const productionQueueEntries = ordersSchema.table(
+  'production_queue_entries',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    tenantId: uuid('tenant_id').notNull(),
+    workOrderId: uuid('work_order_id')
+      .notNull()
+      .references(() => workOrders.id, { onDelete: 'cascade' }),
+    cardId: uuid('card_id'), // linked kanban card
+    loopId: uuid('loop_id'), // linked kanban loop
+    partId: uuid('part_id').notNull(),
+    facilityId: uuid('facility_id').notNull(),
+    priorityScore: numeric('priority_score', { precision: 8, scale: 4 }).notNull().default('0'),
+    manualPriority: integer('manual_priority').notNull().default(0),
+    isExpedited: boolean('is_expedited').notNull().default(false),
+    totalSteps: integer('total_steps').notNull().default(0),
+    completedSteps: integer('completed_steps').notNull().default(0),
+    status: varchar('status', { length: 30 }).notNull().default('pending'), // pending, active, on_hold, completed, cancelled
+    enteredQueueAt: timestamp('entered_queue_at', { withTimezone: true }).notNull().defaultNow(),
+    startedAt: timestamp('started_at', { withTimezone: true }),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('prod_queue_tenant_idx').on(table.tenantId),
+    uniqueIndex('prod_queue_wo_idx').on(table.workOrderId),
+    index('prod_queue_card_idx').on(table.cardId),
+    index('prod_queue_status_idx').on(table.tenantId, table.status),
+    index('prod_queue_priority_idx').on(table.tenantId, table.priorityScore),
+    index('prod_queue_facility_idx').on(table.facilityId),
+  ]
+);
+
+// ─── Production Relations ───────────────────────────────────────────
+export const routingTemplatesRelations = relations(routingTemplates, ({ many }) => ({
+  steps: many(routingTemplateSteps),
+}));
+
+export const routingTemplateStepsRelations = relations(routingTemplateSteps, ({ one }) => ({
+  template: one(routingTemplates, {
+    fields: [routingTemplateSteps.templateId],
+    references: [routingTemplates.id],
+  }),
+  workCenter: one(workCenters, {
+    fields: [routingTemplateSteps.workCenterId],
+    references: [workCenters.id],
+  }),
+}));
+
+export const productionOperationLogsRelations = relations(productionOperationLogs, ({ one }) => ({
+  workOrder: one(workOrders, {
+    fields: [productionOperationLogs.workOrderId],
+    references: [workOrders.id],
+  }),
+  routingStep: one(workOrderRoutings, {
+    fields: [productionOperationLogs.routingStepId],
+    references: [workOrderRoutings.id],
+  }),
+}));
+
+export const workCenterCapacityWindowsRelations = relations(workCenterCapacityWindows, ({ one }) => ({
+  workCenter: one(workCenters, {
+    fields: [workCenterCapacityWindows.workCenterId],
+    references: [workCenters.id],
+  }),
+}));
+
+export const productionQueueEntriesRelations = relations(productionQueueEntries, ({ one }) => ({
+  workOrder: one(workOrders, {
+    fields: [productionQueueEntries.workOrderId],
+    references: [workOrders.id],
   }),
 }));

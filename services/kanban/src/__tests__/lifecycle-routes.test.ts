@@ -32,13 +32,34 @@ const mockGetCardLifecycleEvents = vi.fn();
 const mockGetLoopLifecycleEvents = vi.fn();
 const mockGetLoopVelocity = vi.fn();
 
-vi.mock('../services/lifecycle.service.js', () => ({
+vi.mock('../services/card-lifecycle.service.js', () => ({
   transitionCard: mockTransitionCard,
   triggerCardByScan: vi.fn(),
   getCardHistory: mockGetCardHistory,
   getCardLifecycleEvents: mockGetCardLifecycleEvents,
   getLoopLifecycleEvents: mockGetLoopLifecycleEvents,
   getLoopVelocity: mockGetLoopVelocity,
+  VALID_TRANSITIONS: {
+    created: ['triggered'],
+    triggered: ['ordered'],
+    ordered: ['in_transit', 'received'],
+    in_transit: ['received'],
+    received: ['restocked'],
+    restocked: ['created'],
+  },
+  TRANSITION_MATRIX: {
+    created: ['triggered'],
+    triggered: ['ordered'],
+    ordered: ['in_transit', 'received'],
+    in_transit: ['received'],
+    received: ['restocked'],
+    restocked: ['created'],
+  },
+  TRANSITION_RULES: [],
+  isValidTransition: vi.fn(),
+  isRoleAllowed: vi.fn(),
+  isLoopTypeAllowed: vi.fn(),
+  isMethodAllowed: vi.fn(),
 }));
 
 const mockCalculateLoopInferredQuantity = vi.fn();

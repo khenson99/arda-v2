@@ -69,7 +69,11 @@ export async function getReceivingMetrics(
   const totalReceipts = receiptCount?.count ?? 0;
 
   // Line-level aggregates
-  const lineAggConditions = [eq(receiptLines.tenantId, query.tenantId)];
+  let totalLines = 0;
+  let totalAccepted = 0;
+  let totalDamaged = 0;
+  let totalRejected = 0;
+
   if (query.dateFrom || query.dateTo) {
     // Join with receipts for date filtering
     const [lineAgg] = await db
@@ -83,11 +87,12 @@ export async function getReceivingMetrics(
       .innerJoin(receipts, eq(receiptLines.receiptId, receipts.id))
       .where(and(...dateConditions));
 
-    var totalLines = lineAgg?.totalLines ?? 0;
-    var totalAccepted = lineAgg?.totalAccepted ?? 0;
-    var totalDamaged = lineAgg?.totalDamaged ?? 0;
-    var totalRejected = lineAgg?.totalRejected ?? 0;
+    totalLines = lineAgg?.totalLines ?? 0;
+    totalAccepted = lineAgg?.totalAccepted ?? 0;
+    totalDamaged = lineAgg?.totalDamaged ?? 0;
+    totalRejected = lineAgg?.totalRejected ?? 0;
   } else {
+    const lineAggConditions = [eq(receiptLines.tenantId, query.tenantId)];
     const [lineAgg] = await db
       .select({
         totalLines: sql<number>`count(*)`,
@@ -98,10 +103,10 @@ export async function getReceivingMetrics(
       .from(receiptLines)
       .where(and(...lineAggConditions));
 
-    var totalLines = lineAgg?.totalLines ?? 0;
-    var totalAccepted = lineAgg?.totalAccepted ?? 0;
-    var totalDamaged = lineAgg?.totalDamaged ?? 0;
-    var totalRejected = lineAgg?.totalRejected ?? 0;
+    totalLines = lineAgg?.totalLines ?? 0;
+    totalAccepted = lineAgg?.totalAccepted ?? 0;
+    totalDamaged = lineAgg?.totalDamaged ?? 0;
+    totalRejected = lineAgg?.totalRejected ?? 0;
   }
 
   const totalProcessed = totalAccepted + totalDamaged + totalRejected;
