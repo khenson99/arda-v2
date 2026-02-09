@@ -4,11 +4,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // These tests verify the scan and lifecycle deduplication logic.
 // Database and event bus are fully mocked.
 
-const mockFindFirst = vi.fn();
-const mockSelect = vi.fn();
-const mockInsert = vi.fn();
-const mockUpdate = vi.fn();
-const mockTransaction = vi.fn();
+const {
+  mockFindFirst,
+  mockSelect,
+  mockInsert,
+  mockUpdate,
+  mockTransaction,
+} = vi.hoisted(() => ({
+  mockFindFirst: vi.fn(),
+  mockSelect: vi.fn(),
+  mockInsert: vi.fn(),
+  mockUpdate: vi.fn(),
+  mockTransaction: vi.fn(),
+}));
 
 vi.mock('@arda/db', () => ({
   db: {
