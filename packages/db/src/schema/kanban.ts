@@ -217,6 +217,70 @@ export interface ReloWisaImpact {
   estimatedTurnImprovement?: number;   // ratio
 }
 
+// ─── Print Job Status ────────────────────────────────────────────────
+export const printJobStatusEnum = pgEnum('print_job_status', [
+  'pending',
+  'printing',
+  'completed',
+  'failed',
+  'cancelled',
+]);
+
+// ─── Print Jobs ──────────────────────────────────────────────────────
+// Tracks each batch print operation for audit and reprint workflows.
+export const printJobs = kanbanSchema.table(
+  'print_jobs',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    tenantId: uuid('tenant_id').notNull(),
+    status: printJobStatusEnum('status').notNull().default('pending'),
+    format: varchar('format', { length: 50 }).notNull(),       // CardFormat value
+    printerClass: varchar('printer_class', { length: 20 }).notNull(), // 'standard' | 'thermal'
+    cardCount: integer('card_count').notNull(),
+    isReprint: boolean('is_reprint').notNull().default(false),
+    settings: jsonb('settings').$type<PrintJobSettings>().default({}),
+    requestedByUserId: uuid('requested_by_user_id'),
+    startedAt: timestamp('started_at', { withTimezone: true }),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    failedAt: timestamp('failed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('print_jobs_tenant_idx').on(table.tenantId),
+    index('print_jobs_status_idx').on(table.tenantId, table.status),
+  ]
+);
+
+export interface PrintJobSettings {
+  scale?: number;
+  margins?: { top: number; right: number; bottom: number; left: number };
+  colorMode?: 'color' | 'monochrome';
+  orientation?: 'portrait' | 'landscape';
+}
+
+// ─── Print Job Items ─────────────────────────────────────────────────
+// Each card included in a print job.
+export const printJobItems = kanbanSchema.table(
+  'print_job_items',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    tenantId: uuid('tenant_id').notNull(),
+    printJobId: uuid('print_job_id')
+      .notNull()
+      .references(() => printJobs.id, { onDelete: 'cascade' }),
+    cardId: uuid('card_id')
+      .notNull()
+      .references(() => kanbanCards.id, { onDelete: 'cascade' }),
+    previousPrintCount: integer('previous_print_count').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('print_job_items_job_idx').on(table.printJobId),
+    index('print_job_items_card_idx').on(table.cardId),
+  ]
+);
+
 // ─── Relations ────────────────────────────────────────────────────────
 export const kanbanLoopsRelations = relations(kanbanLoops, ({ many }) => ({
   cards: many(kanbanCards),
@@ -241,5 +305,20 @@ export const cardStageTransitionsRelations = relations(cardStageTransitions, ({ 
   loop: one(kanbanLoops, {
     fields: [cardStageTransitions.loopId],
     references: [kanbanLoops.id],
+  }),
+}));
+
+export const printJobsRelations = relations(printJobs, ({ many }) => ({
+  items: many(printJobItems),
+}));
+
+export const printJobItemsRelations = relations(printJobItems, ({ one }) => ({
+  printJob: one(printJobs, {
+    fields: [printJobItems.printJobId],
+    references: [printJobs.id],
+  }),
+  card: one(kanbanCards, {
+    fields: [printJobItems.cardId],
+    references: [kanbanCards.id],
   }),
 }));

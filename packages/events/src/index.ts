@@ -80,6 +80,186 @@ export interface NotificationEvent {
   timestamp: string;
 }
 
+// ─── Lifecycle Domain Events ──────────────────────────────────────────
+export interface LifecycleTransitionEvent {
+  type: 'lifecycle.transition';
+  tenantId: string;
+  cardId: string;
+  loopId: string;
+  fromStage: string | null;
+  toStage: string;
+  cycleNumber: number;
+  method: string;
+  actorRole?: string;
+  userId?: string;
+  quantity?: number;
+  stageDurationSeconds?: number;
+  idempotencyKey?: string;
+  eventId: string;
+  timestamp: string;
+}
+
+export interface LifecycleTransitionRejectedEvent {
+  type: 'lifecycle.transition_rejected';
+  tenantId: string;
+  cardId: string;
+  loopId: string;
+  attemptedFromStage: string;
+  attemptedToStage: string;
+  reason: string;
+  errorCode: string;
+  userId?: string;
+  actorRole?: string;
+  timestamp: string;
+}
+
+export interface LifecycleCycleCompleteEvent {
+  type: 'lifecycle.cycle_complete';
+  tenantId: string;
+  cardId: string;
+  loopId: string;
+  cycleNumber: number;
+  totalCycleDurationSeconds: number;
+  timestamp: string;
+}
+
+export interface LifecycleQueueEntryEvent {
+  type: 'lifecycle.queue_entry';
+  tenantId: string;
+  cardId: string;
+  loopId: string;
+  loopType: 'procurement' | 'production' | 'transfer';
+  partId: string;
+  facilityId: string;
+  quantity: number;
+  timestamp: string;
+}
+
+export interface LifecycleOrderLinkedEvent {
+  type: 'lifecycle.order_linked';
+  tenantId: string;
+  cardId: string;
+  loopId: string;
+  orderId: string;
+  orderType: 'purchase_order' | 'work_order' | 'transfer_order';
+  timestamp: string;
+}
+
+// ─── Receiving Events ────────────────────────────────────────────────
+export interface ReceivingCompletedEvent {
+  type: 'receiving.completed';
+  tenantId: string;
+  receiptId: string;
+  receiptNumber: string;
+  orderType: 'purchase_order' | 'transfer_order' | 'work_order';
+  orderId: string;
+  status: string;
+  totalAccepted: number;
+  totalDamaged: number;
+  totalRejected: number;
+  exceptionsCreated: number;
+  timestamp: string;
+}
+
+export interface ReceivingExceptionCreatedEvent {
+  type: 'receiving.exception_created';
+  tenantId: string;
+  exceptionId: string;
+  receiptId: string;
+  exceptionType: string;
+  severity: string;
+  quantityAffected: number;
+  orderId: string;
+  orderType: string;
+  timestamp: string;
+}
+
+export interface ReceivingExceptionResolvedEvent {
+  type: 'receiving.exception_resolved';
+  tenantId: string;
+  exceptionId: string;
+  receiptId: string;
+  exceptionType: string;
+  resolutionType: string;
+  resolvedByUserId?: string;
+  followUpOrderId?: string;
+  timestamp: string;
+}
+
+// ─── Production Events ──────────────────────────────────────────────
+export interface ProductionStepCompletedEvent {
+  type: 'production.step_completed';
+  tenantId: string;
+  workOrderId: string;
+  workOrderNumber: string;
+  stepNumber: number;
+  operationName: string;
+  workCenterId: string;
+  actualMinutes: number;
+  status: 'complete' | 'skipped';
+  timestamp: string;
+}
+
+export interface ProductionQuantityReportedEvent {
+  type: 'production.quantity_reported';
+  tenantId: string;
+  workOrderId: string;
+  workOrderNumber: string;
+  quantityProduced: number;
+  quantityRejected: number;
+  quantityScrapped: number;
+  timestamp: string;
+}
+
+export interface ProductionHoldEvent {
+  type: 'production.hold';
+  tenantId: string;
+  workOrderId: string;
+  workOrderNumber: string;
+  holdReason: string;
+  holdNotes?: string;
+  userId?: string;
+  timestamp: string;
+}
+
+export interface ProductionResumeEvent {
+  type: 'production.resume';
+  tenantId: string;
+  workOrderId: string;
+  workOrderNumber: string;
+  userId?: string;
+  timestamp: string;
+}
+
+export interface ProductionExpediteEvent {
+  type: 'production.expedite';
+  tenantId: string;
+  workOrderId: string;
+  workOrderNumber: string;
+  previousPriority: number;
+  userId?: string;
+  timestamp: string;
+}
+
+export interface ProductionSplitEvent {
+  type: 'production.split';
+  tenantId: string;
+  parentWorkOrderId: string;
+  childWorkOrderId: string;
+  parentQuantity: number;
+  childQuantity: number;
+  timestamp: string;
+}
+
+export interface ProductionReworkEvent {
+  type: 'production.rework';
+  tenantId: string;
+  originalWorkOrderId: string;
+  reworkWorkOrderId: string;
+  reworkQuantity: number;
+  timestamp: string;
+}
+
 // Re-export security events
 export {
   type SecurityEvent,
@@ -105,7 +285,22 @@ export type ArdaEvent =
   | ReloWisaRecommendationEvent
   | QueueRiskDetectedEvent
   | NotificationEvent
-  | SecurityEvent;
+  | SecurityEvent
+  | LifecycleTransitionEvent
+  | LifecycleTransitionRejectedEvent
+  | LifecycleCycleCompleteEvent
+  | LifecycleQueueEntryEvent
+  | LifecycleOrderLinkedEvent
+  | ReceivingCompletedEvent
+  | ReceivingExceptionCreatedEvent
+  | ReceivingExceptionResolvedEvent
+  | ProductionStepCompletedEvent
+  | ProductionQuantityReportedEvent
+  | ProductionHoldEvent
+  | ProductionResumeEvent
+  | ProductionExpediteEvent
+  | ProductionSplitEvent
+  | ProductionReworkEvent;
 
 // ─── Event Channel Names ────────────────────────────────────────────
 const CHANNEL_PREFIX = 'arda:events';

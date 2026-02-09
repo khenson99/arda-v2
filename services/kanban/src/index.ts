@@ -11,6 +11,8 @@ import { loopsRouter } from './routes/loops.routes.js';
 import { cardsRouter } from './routes/cards.routes.js';
 import { scanRouter } from './routes/scan.routes.js';
 import { velocityRouter } from './routes/velocity.routes.js';
+import { printJobsRouter } from './routes/print-jobs.routes.js';
+import { lifecycleRouter } from './routes/lifecycle.routes.js';
 import { errorHandler } from './middleware/error-handler.js';
 
 const app = express();
@@ -48,6 +50,8 @@ app.use(authMiddleware);
 app.use('/loops', loopsRouter);
 app.use('/cards', cardsRouter);
 app.use('/velocity', velocityRouter);
+app.use('/print-jobs', printJobsRouter);
+app.use('/lifecycle', lifecycleRouter);
 
 app.use(errorHandler);
 
