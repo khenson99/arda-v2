@@ -6,12 +6,9 @@ import {
   timestamp,
   boolean,
   integer,
-  numeric,
   jsonb,
   index,
-  pgEnum,
 } from 'drizzle-orm/pg-core';
-import { tenants } from './tenants.js';
 
 export const billingSchema = pgSchema('billing');
 

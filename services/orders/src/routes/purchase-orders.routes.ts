@@ -184,11 +184,6 @@ async function writePurchaseOrderLinesReceivedAudit(
 }
 
 // Validation schemas
-const PaginationSchema = z.object({
-  page: z.coerce.number().int().positive().default(1),
-  limit: z.coerce.number().int().positive().max(100).default(20),
-});
-
 const POFilterSchema = z.object({
   status: z.enum([
     'draft',

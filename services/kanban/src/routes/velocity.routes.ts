@@ -6,7 +6,7 @@ import { getLoopVelocity } from '../services/card-lifecycle.service.js';
 import { AppError } from '../middleware/error-handler.js';
 
 export const velocityRouter = Router();
-const { kanbanLoops, kanbanCards, cardStageTransitions } = schema;
+const { kanbanLoops, cardStageTransitions } = schema;
 
 // ─── GET /velocity/:loopId — Velocity data for a specific loop ───────
 velocityRouter.get('/:loopId', async (req: AuthRequest, res, next) => {

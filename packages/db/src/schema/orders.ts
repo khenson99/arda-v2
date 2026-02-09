@@ -7,15 +7,11 @@ import {
   boolean,
   integer,
   numeric,
-  jsonb,
   index,
   uniqueIndex,
   pgEnum,
-  serial,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
-import { parts, suppliers } from './catalog.js';
-import { facilities } from './locations.js';
 
 export const ordersSchema = pgSchema('orders');
 

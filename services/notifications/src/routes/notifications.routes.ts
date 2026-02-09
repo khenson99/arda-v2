@@ -14,8 +14,6 @@ const listQuerySchema = z.object({
   offset: z.coerce.number().int().nonnegative().default(0),
 });
 
-const markReadBodySchema = z.object({});
-
 // GET / — List notifications for current user
 notificationsRouter.get('/', async (req, res, next) => {
   try {

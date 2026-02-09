@@ -13,7 +13,6 @@ import {
   pgEnum,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
-import { facilities, storageLocations } from './locations.js';
 
 export const catalogSchema = pgSchema('catalog');
 

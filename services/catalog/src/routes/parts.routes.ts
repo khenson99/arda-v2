@@ -1,12 +1,12 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { eq, and, ilike, sql } from 'drizzle-orm';
-import { db, withTenantContext, schema } from '@arda/db';
+import { db, schema } from '@arda/db';
 import type { AuthRequest } from '@arda/auth-utils';
 import { AppError } from '../middleware/error-handler.js';
 
 export const partsRouter = Router();
-const { parts, partCategories, supplierParts } = schema;
+const { parts } = schema;
 
 /** Escape LIKE/ILIKE metacharacters so user input is treated literally. */
 function escapeLike(str: string): string {

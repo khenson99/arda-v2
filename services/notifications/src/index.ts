@@ -69,26 +69,38 @@ startEventListener(config.REDIS_URL).catch((err) => {
 });
 
 // ─── Graceful Shutdown ───────────────────────────────────────────────
-function shutdown(signal: string) {
+let shuttingDown = false;
+
+async function shutdown(signal: string) {
+  if (shuttingDown) {
+    return;
+  }
+  shuttingDown = true;
+
   log.info({ signal }, 'Shutting down gracefully');
 
-  server.close(() => {
-    log.info('HTTP server closed');
+  const forceShutdownTimer = setTimeout(() => {
+    log.fatal('Forced shutdown after timeout');
+    process.exit(1);
+  }, 10_000).unref();
+
+  await new Promise<void>((resolve) => {
+    server.close(() => {
+      log.info('HTTP server closed');
+      resolve();
+    });
   });
 
   try {
     const eventBus = getEventBus(config.REDIS_URL);
-    void eventBus.shutdown().catch((err) => {
-      log.error({ err }, 'EventBus shutdown error');
-    });
+    await eventBus.shutdown();
+    log.info('Event bus closed');
   } catch {
     // EventBus may not be initialized
   }
 
-  setTimeout(() => {
-    log.fatal('Forced shutdown after timeout');
-    process.exit(1);
-  }, 10_000).unref();
+  clearTimeout(forceShutdownTimer);
+  process.exit(0);
 }
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));

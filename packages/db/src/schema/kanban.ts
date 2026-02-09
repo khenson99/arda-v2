@@ -13,8 +13,6 @@ import {
   pgEnum,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
-import { parts } from './catalog.js';
-import { facilities, storageLocations } from './locations.js';
 
 export const kanbanSchema = pgSchema('kanban');
 
@@ -220,7 +218,7 @@ export interface ReloWisaImpact {
 }
 
 // ─── Relations ────────────────────────────────────────────────────────
-export const kanbanLoopsRelations = relations(kanbanLoops, ({ one, many }) => ({
+export const kanbanLoopsRelations = relations(kanbanLoops, ({ many }) => ({
   cards: many(kanbanCards),
   transitions: many(cardStageTransitions),
   parameterHistory: many(kanbanParameterHistory),

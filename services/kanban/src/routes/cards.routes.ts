@@ -8,7 +8,7 @@ import { transitionCard, getCardHistory } from '../services/card-lifecycle.servi
 import { generateQRDataUrl, generateQRSvg, buildScanUrl } from '../utils/qr-generator.js';
 
 export const cardsRouter = Router();
-const { kanbanCards, kanbanLoops } = schema;
+const { kanbanCards } = schema;
 
 // ─── GET /cards — List cards with filters ────────────────────────────
 cardsRouter.get('/', async (req: AuthRequest, res, next) => {

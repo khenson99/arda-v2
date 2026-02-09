@@ -4,6 +4,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { config, serviceUrls, createLogger } from '@arda/config';
+import { getEventBus } from '@arda/events';
 
 const log = createLogger('api-gateway');
 import { db } from '@arda/db';
@@ -89,24 +90,59 @@ server.listen(PORT, () => {
 });
 
 // ─── Graceful Shutdown ───────────────────────────────────────────────
-function shutdown(signal: string) {
+let shuttingDown = false;
+
+async function shutdown(signal: string) {
+  if (shuttingDown) {
+    return;
+  }
+  shuttingDown = true;
+
   log.info({ signal }, 'Shutting down gracefully');
 
-  server.close(() => {
-    log.info('HTTP server closed');
-  });
-
-  io.close(() => {
-    log.info('WebSocket server closed');
-  });
-
-  setTimeout(() => {
+  const forceShutdownTimer = setTimeout(() => {
     log.fatal('Forced shutdown after timeout');
     process.exit(1);
   }, 10_000).unref();
+
+  await Promise.all([
+    new Promise<void>((resolve) => {
+      server.close(() => {
+        log.info('HTTP server closed');
+        resolve();
+      });
+    }),
+    new Promise<void>((resolve) => {
+      io.close(() => {
+        log.info('WebSocket server closed');
+        resolve();
+      });
+    }),
+  ]);
+
+  try {
+    const eventBus = getEventBus(config.REDIS_URL);
+    await eventBus.shutdown();
+    log.info('Event bus closed');
+  } catch {
+    // EventBus may not have been initialized if no websocket consumers connected.
+  }
+
+  clearTimeout(forceShutdownTimer);
+  process.exit(0);
 }
 
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => {
+  void shutdown('SIGTERM').catch((err) => {
+    log.error({ err }, 'Graceful shutdown failed');
+    process.exit(1);
+  });
+});
+process.on('SIGINT', () => {
+  void shutdown('SIGINT').catch((err) => {
+    log.error({ err }, 'Graceful shutdown failed');
+    process.exit(1);
+  });
+});
 
 export default app;

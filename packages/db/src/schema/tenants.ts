@@ -5,10 +5,10 @@ import {
   text,
   timestamp,
   boolean,
+  integer,
   jsonb,
   index,
 } from 'drizzle-orm/pg-core';
-import { relations } from 'drizzle-orm';
 
 export const authSchema = pgSchema('auth');
 
@@ -48,6 +48,3 @@ export interface TenantSettings {
   autoConsolidateOrders?: boolean;
   reloWisaEnabled?: boolean;
 }
-
-// We need the integer import
-import { integer } from 'drizzle-orm/pg-core';

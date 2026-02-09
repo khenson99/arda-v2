@@ -9,7 +9,6 @@ import {
   index,
   pgEnum,
 } from 'drizzle-orm/pg-core';
-import { relations } from 'drizzle-orm';
 
 export const notificationsSchema = pgSchema('notifications');
 

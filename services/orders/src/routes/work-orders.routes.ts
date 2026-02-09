@@ -514,7 +514,7 @@ workOrdersRouter.patch('/:id/status', async (req: AuthRequest, res, next) => {
     }
 
     // Update work order
-    const [updatedWO] = await db
+    await db
       .update(workOrders)
       .set(updateValues)
       .where(and(eq(workOrders.id, id), eq(workOrders.tenantId, tenantId)))
@@ -715,7 +715,7 @@ workOrdersRouter.patch('/:id/production', async (req: AuthRequest, res, next) =>
     const newQuantityRejected = currentWO.quantityRejected + quantityRejected;
 
     // Update work order
-    const [updatedWO] = await db
+    await db
       .update(workOrders)
       .set({
         quantityProduced: newQuantityProduced,

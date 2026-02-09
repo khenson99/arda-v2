@@ -7,9 +7,7 @@ import type { CardStage } from '@arda/shared-types';
 
 const {
   kanbanCards,
-  kanbanLoops,
   cardStageTransitions,
-  kanbanParameterHistory,
 } = schema;
 
 // ─── Valid Stage Transitions ──────────────────────────────────────────
@@ -211,7 +209,7 @@ export async function triggerCardByScan(input: {
       ? 'Production Queue'
       : 'Transfer Queue';
 
-  // TODO: Add to the appropriate queue table / emit queue event
+  // Queue surfaces are derived from card stage state in the orders service.
 
   return {
     card: result.card,

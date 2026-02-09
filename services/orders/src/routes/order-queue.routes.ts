@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { eq, and, sql, inArray, desc, asc } from 'drizzle-orm';
+import { eq, and, sql, inArray, asc } from 'drizzle-orm';
 import { db, schema } from '@arda/db';
 import { getEventBus } from '@arda/events';
 import { config } from '@arda/config';
@@ -556,7 +556,7 @@ const queueRiskQuerySchema = z.object({
       }
       return value;
     }, z.boolean())
-    .default(true),
+    .default(false),
 });
 
 // GET / - List all triggered cards needing orders

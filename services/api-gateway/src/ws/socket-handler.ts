@@ -36,7 +36,7 @@ export function setupWebSocket(httpServer: HttpServer, redisUrl: string): Socket
       const payload = verifyAccessToken(token);
       (socket as AuthenticatedSocket).user = payload;
       next();
-    } catch (err) {
+    } catch {
       next(new Error('Invalid token'));
     }
   });
