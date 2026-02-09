@@ -15,7 +15,7 @@ const log = createLogger('ws');
 export function setupWebSocket(httpServer: HttpServer, redisUrl: string): SocketServer {
   const io = new SocketServer(httpServer, {
     cors: {
-      origin: config.APP_URL,
+      origin: getCorsOrigins(),
       credentials: true,
     },
     path: '/socket.io',
