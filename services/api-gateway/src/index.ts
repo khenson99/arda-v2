@@ -14,6 +14,9 @@ import { setupWebSocket } from './ws/socket-handler.js';
 
 const app = express();
 
+// Trust the first proxy (Railway's reverse proxy) for correct client IPs
+app.set('trust proxy', 1);
+
 // ─── Global Middleware ────────────────────────────────────────────────
 app.use(helmet());
 app.use(cors({
