@@ -1377,6 +1377,8 @@ function ScanRoute({
     void processScan(deepLinkCardId);
   }, [deepLinkCardId, deepLinkIsValid, processScan]);
 
+  const retryCardId = result?.cardId;
+
   return (
     <div className="space-y-4">
       {deepLinkCardId && (
@@ -1449,7 +1451,7 @@ function ScanRoute({
               <ScanResult
                 result={result}
                 onDismiss={dismissResult}
-                onRetry={result.cardId ? () => void processScan(result.cardId) : undefined}
+                onRetry={retryCardId ? () => void processScan(retryCardId) : undefined}
               />
             ) : (
               <p className="rounded-md border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
