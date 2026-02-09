@@ -13,6 +13,8 @@ import { workCentersRouter } from './routes/work-centers.routes.js';
 import { transferOrdersRouter } from './routes/transfer-orders.routes.js';
 import { orderQueueRouter } from './routes/order-queue.routes.js';
 import { auditRouter } from './routes/audit.routes.js';
+import { receivingRouter } from './routes/receiving.routes.js';
+import { productionQueueRouter } from './routes/production-queue.routes.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { startQueueRiskScheduler } from './services/queue-risk-scheduler.service.js';
 
