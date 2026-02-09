@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-build-test:
+    name: Lint, Build & Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build packages & services
+        run: npx turbo build
+
+      - name: Run tests
+        run: npx turbo test
+
+  docker-build:
+    name: Docker Build (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: lint-build-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - api-gateway
+          - auth
+          - catalog
+          - kanban
+          - notifications
+          - orders
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          build-args: SERVICE=${{ matrix.service }}
+          tags: arda/${{ matrix.service }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

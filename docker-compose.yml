@@ -1,6 +1,27 @@
-version: '3.9'
+x-service-defaults: &service-defaults
+  build:
+    context: .
+    dockerfile: Dockerfile
+  restart: unless-stopped
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  environment: &service-env
+    NODE_ENV: production
+    DATABASE_URL: postgresql://arda:arda_dev_password@postgres:5432/arda_v2
+    REDIS_URL: redis://redis:6379
+    JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-change-in-production}
+    JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev-jwt-refresh-secret-change-in-production}
+    JWT_EXPIRY: ${JWT_EXPIRY:-15m}
+    JWT_REFRESH_EXPIRY: ${JWT_REFRESH_EXPIRY:-7d}
+    GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+    APP_URL: ${APP_URL:-http://localhost:5173}
 
 services:
+  # ─── Infrastructure ──────────────────────────────────────────────────
+
   postgres:
     image: postgres:16-alpine
     container_name: arda-postgres
@@ -26,30 +47,94 @@ services:
       - '6379:6379'
     volumes:
       - redis_data:/data
+    command: redis-server --appendonly yes
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
       interval: 5s
       timeout: 5s
       retries: 5
 
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
-    container_name: arda-elasticsearch
-    environment:
-      - discovery.type=single-node
-      - xpack.security.enabled=false
-      - 'ES_JAVA_OPTS=-Xms512m -Xmx512m'
+  # ─── Application Services ────────────────────────────────────────────
+
+  api-gateway:
+    <<: *service-defaults
+    container_name: arda-api-gateway
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: api-gateway
     ports:
-      - '9200:9200'
-    volumes:
-      - es_data:/usr/share/elasticsearch/data
-    healthcheck:
-      test: ['CMD-SHELL', 'curl -f http://localhost:9200/_cluster/health || exit 1']
-      interval: 10s
-      timeout: 5s
-      retries: 10
+      - '4000:3000'
+    environment:
+      <<: *service-env
+      PORT: 3000
+      AUTH_SERVICE_URL: http://auth:3000
+      CATALOG_SERVICE_URL: http://catalog:3000
+      KANBAN_SERVICE_URL: http://kanban:3000
+      ORDERS_SERVICE_URL: http://orders:3000
+      NOTIFICATIONS_SERVICE_URL: http://notifications:3000
+
+  auth:
+    <<: *service-defaults
+    container_name: arda-auth
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: auth
+    environment:
+      <<: *service-env
+      PORT: 3000
+
+  catalog:
+    <<: *service-defaults
+    container_name: arda-catalog
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: catalog
+    environment:
+      <<: *service-env
+      PORT: 3000
+
+  kanban:
+    <<: *service-defaults
+    container_name: arda-kanban
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: kanban
+    environment:
+      <<: *service-env
+      PORT: 3000
+
+  orders:
+    <<: *service-defaults
+    container_name: arda-orders
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: orders
+    environment:
+      <<: *service-env
+      PORT: 3000
+
+  notifications:
+    <<: *service-defaults
+    container_name: arda-notifications
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: notifications
+    environment:
+      <<: *service-env
+      PORT: 3000
 
 volumes:
   postgres_data:
   redis_data:
-  es_data:
