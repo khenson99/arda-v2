@@ -53,6 +53,8 @@ app.use('/work-centers', workCentersRouter);
 app.use('/transfer-orders', transferOrdersRouter);
 app.use('/queue', orderQueueRouter);
 app.use('/audit', auditRouter);
+app.use('/receiving', receivingRouter);
+app.use('/production-queue', productionQueueRouter);
 
 app.use(errorHandler);
 

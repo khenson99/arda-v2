@@ -1,17 +1,37 @@
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, desc, asc, inArray } from 'drizzle-orm';
 import { db, schema } from '@arda/db';
 import { getEventBus } from '@arda/events';
 import { config } from '@arda/config';
 import { AppError } from '../middleware/error-handler.js';
-import type { CardStage } from '@arda/shared-types';
+import type { CardStage, UserRole, LoopType } from '@arda/shared-types';
 
 const {
   kanbanCards,
+  kanbanLoops,
   cardStageTransitions,
+  kanbanParameterHistory,
 } = schema;
 
-// ─── Valid Stage Transitions ──────────────────────────────────────────
-// Enforces the Kanban loop flow: CREATED → TRIGGERED → ORDERED → IN_TRANSIT → RECEIVED → RESTOCKED
+// ═══════════════════════════════════════════════════════════════════════
+// LIFECYCLE ORCHESTRATOR — Enhanced Transition Engine
+// ═══════════════════════════════════════════════════════════════════════
+//
+// This module implements a 9-step lifecycle transition pipeline:
+//   1. Idempotency check (dedup by key)
+//   2. Card fetch (with tenant isolation)
+//   3. Stage validation (TRANSITION_MATRIX)
+//   4. Role authorization (TRANSITION_RULES)
+//   5. Loop-type compatibility check
+//   6. Method validation
+//   7. Precondition enforcement (linked orders, etc.)
+//   8. Atomic DB transaction (card update + transition record + lifecycle event)
+//   9. Domain event emission (fire-and-forget via Redis pub/sub)
+//
+// ═══════════════════════════════════════════════════════════════════════
+
+// ─── Transition Matrix ───────────────────────────────────────────────
+// Maps each stage to its allowed next stages. This is the source of truth
+// for the Kanban flow: CREATED → TRIGGERED → ORDERED → IN_TRANSIT → RECEIVED → RESTOCKED → CREATED
 export const VALID_TRANSITIONS: Record<string, string[]> = {
   created: ['triggered'],
   triggered: ['ordered'],
@@ -20,6 +40,130 @@ export const VALID_TRANSITIONS: Record<string, string[]> = {
   received: ['restocked'],
   restocked: ['created'], // loop restart (new cycle)
 };
+
+// Alias for enhanced API consumers
+export const TRANSITION_MATRIX = VALID_TRANSITIONS;
+
+// ─── Transition Rules ────────────────────────────────────────────────
+// Each rule defines who can perform a transition, under what conditions,
+// and with which methods. This is the authorization layer for the lifecycle.
+
+export interface TransitionRule {
+  from: CardStage;
+  to: CardStage;
+  allowedRoles: UserRole[];
+  allowedLoopTypes: LoopType[];
+  allowedMethods: ('qr_scan' | 'manual' | 'system')[];
+  requiresLinkedOrder?: boolean;
+  linkedOrderTypes?: ('purchase_order' | 'work_order' | 'transfer_order')[];
+  description: string;
+}
+
+export const TRANSITION_RULES: TransitionRule[] = [
+  {
+    from: 'created',
+    to: 'triggered',
+    allowedRoles: ['tenant_admin', 'inventory_manager', 'procurement_manager', 'receiving_manager'],
+    allowedLoopTypes: ['procurement', 'production', 'transfer'],
+    allowedMethods: ['qr_scan', 'manual', 'system'],
+    description: 'Scan or manually trigger replenishment signal',
+  },
+  {
+    from: 'triggered',
+    to: 'ordered',
+    allowedRoles: ['tenant_admin', 'inventory_manager', 'procurement_manager'],
+    allowedLoopTypes: ['procurement', 'production', 'transfer'],
+    allowedMethods: ['manual', 'system'],
+    requiresLinkedOrder: true,
+    linkedOrderTypes: ['purchase_order', 'work_order', 'transfer_order'],
+    description: 'Link to PO/WO/TO and advance to ordered',
+  },
+  {
+    from: 'ordered',
+    to: 'in_transit',
+    allowedRoles: ['tenant_admin', 'inventory_manager', 'procurement_manager', 'receiving_manager'],
+    allowedLoopTypes: ['procurement', 'transfer'],
+    allowedMethods: ['manual', 'system'],
+    description: 'Mark shipment as in transit (skip for production)',
+  },
+  {
+    from: 'ordered',
+    to: 'received',
+    allowedRoles: ['tenant_admin', 'inventory_manager', 'receiving_manager'],
+    allowedLoopTypes: ['production'],
+    allowedMethods: ['manual', 'system', 'qr_scan'],
+    description: 'Direct receive for production loops (skip in_transit)',
+  },
+  {
+    from: 'in_transit',
+    to: 'received',
+    allowedRoles: ['tenant_admin', 'inventory_manager', 'receiving_manager'],
+    allowedLoopTypes: ['procurement', 'transfer'],
+    allowedMethods: ['manual', 'system', 'qr_scan'],
+    description: 'Receive goods at destination facility',
+  },
+  {
+    from: 'received',
+    to: 'restocked',
+    allowedRoles: ['tenant_admin', 'inventory_manager', 'receiving_manager'],
+    allowedLoopTypes: ['procurement', 'production', 'transfer'],
+    allowedMethods: ['manual', 'system', 'qr_scan'],
+    description: 'Confirm restock at storage location',
+  },
+  {
+    from: 'restocked',
+    to: 'created',
+    allowedRoles: ['tenant_admin', 'inventory_manager'],
+    allowedLoopTypes: ['procurement', 'production', 'transfer'],
+    allowedMethods: ['manual', 'system'],
+    description: 'Reset card for new cycle',
+  },
+];
+
+// ─── Rule Lookup Helpers ─────────────────────────────────────────────
+
+export function isRoleAllowed(from: CardStage, to: CardStage, role: UserRole): boolean {
+  if (role === 'tenant_admin') return true;
+  const rule = TRANSITION_RULES.find((r) => r.from === from && r.to === to);
+  return rule ? rule.allowedRoles.includes(role) : false;
+}
+
+export function isLoopTypeAllowed(from: CardStage, to: CardStage, loopType: LoopType): boolean {
+  const rule = TRANSITION_RULES.find((r) => r.from === from && r.to === to);
+  return rule ? rule.allowedLoopTypes.includes(loopType) : false;
+}
+
+export function isMethodAllowed(from: CardStage, to: CardStage, method: string): boolean {
+  const rule = TRANSITION_RULES.find((r) => r.from === from && r.to === to);
+  return rule ? rule.allowedMethods.includes(method as 'qr_scan' | 'manual' | 'system') : false;
+}
+
+// ─── Idempotency Cache ───────────────────────────────────────────────
+// In-memory cache for idempotency keys. In production this would be Redis.
+const idempotencyCache = new Map<string, { result: unknown; expiresAt: number }>();
+const IDEMPOTENCY_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+function checkIdempotency(key: string): unknown | null {
+  const entry = idempotencyCache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    idempotencyCache.delete(key);
+    return null;
+  }
+  return entry.result;
+}
+
+function setIdempotency(key: string, result: unknown): void {
+  idempotencyCache.set(key, { result, expiresAt: Date.now() + IDEMPOTENCY_TTL_MS });
+}
+
+// Periodic cleanup (runs lazily, not on a timer)
+function cleanupIdempotencyCache(): void {
+  const now = Date.now();
+  for (const [key, entry] of idempotencyCache) {
+    if (now > entry.expiresAt) idempotencyCache.delete(key);
+  }
+}
 
 /** Check if a stage transition is allowed by the Kanban flow rules. */
 export function isValidTransition(from: string, to: string): boolean {
