@@ -15,13 +15,29 @@ import { setupWebSocket } from './ws/socket-handler.js';
 
 const app = express();
 
+const allowedCorsOrigins = (config.CORS_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+if (!allowedCorsOrigins.includes(config.APP_URL)) {
+  allowedCorsOrigins.push(config.APP_URL);
+}
+
 // Trust the first proxy (Railway's reverse proxy) for correct client IPs
 app.set('trust proxy', 1);
 
 // ─── Global Middleware ────────────────────────────────────────────────
 app.use(helmet());
 app.use(cors({
-  origin: config.APP_URL,
+  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    if (!origin || allowedCorsOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -45,6 +61,8 @@ const authLimiter = rateLimit({
 });
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
+app.use('/api/auth/forgot-password', authLimiter);
+app.use('/api/auth/reset-password', authLimiter);
 
 // Logging
 app.use(requestLogger);
