@@ -11,7 +11,7 @@ export async function startEventListener(redisUrl: string): Promise<void> {
         case 'card.transition':
           // Create notification for relevant users when cards move to key stages
           if (['triggered', 'received', 'restocked'].includes(event.toStage)) {
-            await createNotification({
+            await createNotification(eventBus, {
               tenantId: event.tenantId,
               type: 'card_triggered',
               title: `Kanban card moved to ${event.toStage}`,
@@ -23,7 +23,7 @@ export async function startEventListener(redisUrl: string): Promise<void> {
           break;
 
         case 'order.created':
-          await createNotification({
+          await createNotification(eventBus, {
             tenantId: event.tenantId,
             type: 'po_created',
             title: `New ${event.orderType.replace('_', ' ')} created`,
@@ -38,7 +38,7 @@ export async function startEventListener(redisUrl: string): Promise<void> {
           break;
 
         case 'relowisa.recommendation':
-          await createNotification({
+          await createNotification(eventBus, {
             tenantId: event.tenantId,
             type: 'relowisa_recommendation',
             title: 'New ReLoWiSa recommendation',
@@ -56,15 +56,18 @@ export async function startEventListener(redisUrl: string): Promise<void> {
   console.log('[notifications] Event listener started');
 }
 
-async function createNotification(params: {
-  tenantId: string;
-  userId?: string;
-  type: string;
-  title: string;
-  body: string;
-  actionUrl?: string;
-  metadata?: Record<string, unknown>;
-}) {
+async function createNotification(
+  eventBus: ReturnType<typeof getEventBus>,
+  params: {
+    tenantId: string;
+    userId?: string;
+    type: string;
+    title: string;
+    body: string;
+    actionUrl?: string;
+    metadata?: Record<string, unknown>;
+  }
+) {
   const targetUserIds = params.userId
     ? [params.userId]
     : (
@@ -78,17 +81,45 @@ async function createNotification(params: {
     return;
   }
 
-  await db.insert(schema.notifications).values(
-    targetUserIds.map((userId) => ({
-      tenantId: params.tenantId,
-      userId,
-      type: params.type as (typeof schema.notificationTypeEnum.enumValues)[number],
-      title: params.title,
-      body: params.body,
-      actionUrl: params.actionUrl,
-      isRead: false,
-      metadata: params.metadata || {},
-      createdAt: new Date(),
-    }))
+  const insertedNotifications = await db
+    .insert(schema.notifications)
+    .values(
+      targetUserIds.map((userId) => ({
+        tenantId: params.tenantId,
+        userId,
+        type: params.type as (typeof schema.notificationTypeEnum.enumValues)[number],
+        title: params.title,
+        body: params.body,
+        actionUrl: params.actionUrl,
+        isRead: false,
+        metadata: params.metadata || {},
+        createdAt: new Date(),
+      }))
+    )
+    .returning({
+      id: schema.notifications.id,
+      userId: schema.notifications.userId,
+      type: schema.notifications.type,
+      title: schema.notifications.title,
+    });
+
+  await Promise.all(
+    insertedNotifications.map(async (notification) => {
+      try {
+        await eventBus.publish({
+          type: 'notification.created',
+          tenantId: params.tenantId,
+          userId: notification.userId,
+          notificationId: notification.id,
+          notificationType: notification.type,
+          title: notification.title,
+          timestamp: new Date().toISOString(),
+        });
+      } catch {
+        console.error(
+          `[notifications] Failed to publish notification.created event for ${notification.id}`
+        );
+      }
+    })
   );
 }

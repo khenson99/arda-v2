@@ -671,6 +671,26 @@ purchaseOrdersRouter.patch('/:id/receive', async (req: AuthRequest, res, next) =
       return { updated, updatedLines };
     });
 
+    if (updated.status !== po.status) {
+      try {
+        const eventBus = getEventBus(config.REDIS_URL);
+        await eventBus.publish({
+          type: 'order.status_changed',
+          tenantId,
+          orderType: 'purchase_order',
+          orderId: id,
+          orderNumber: po.poNumber,
+          fromStatus: po.status,
+          toStatus: updated.status,
+          timestamp: new Date().toISOString(),
+        });
+      } catch {
+        console.error(
+          `[purchase-orders] Failed to publish order.status_changed event for ${po.poNumber}`
+        );
+      }
+    }
+
     res.json({
       data: {
         ...updated,

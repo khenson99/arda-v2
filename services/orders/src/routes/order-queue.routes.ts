@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { eq, and, sql, inArray, desc, asc } from 'drizzle-orm';
 import { db, schema } from '@arda/db';
+import { getEventBus } from '@arda/events';
+import { config } from '@arda/config';
 import type { AuthRequest } from '@arda/auth-utils';
 import { AppError } from '../middleware/error-handler.js';
 import {
@@ -9,13 +11,14 @@ import {
   getNextWONumber,
   getNextTONumber,
 } from '../services/order-number.service.js';
+import { transitionTriggeredCardToOrdered } from '../services/card-lifecycle.service.js';
 
 export const orderQueueRouter = Router();
 
 const {
   kanbanCards,
   kanbanLoops,
-  cardStageTransitions,
+  auditLog,
   purchaseOrders,
   purchaseOrderLines,
   workOrders,
@@ -23,6 +26,176 @@ const {
   transferOrders,
   transferOrderLines,
 } = schema;
+
+type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+interface RequestAuditContext {
+  userId?: string;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+function getRequestAuditContext(req: AuthRequest): RequestAuditContext {
+  const forwarded = req.headers['x-forwarded-for'];
+  const forwardedIp = Array.isArray(forwarded)
+    ? forwarded[0]
+    : forwarded?.split(',')[0]?.trim();
+
+  const rawIp = forwardedIp || req.socket.remoteAddress || undefined;
+  const userAgentHeader = req.headers['user-agent'];
+  const userAgent = Array.isArray(userAgentHeader) ? userAgentHeader[0] : userAgentHeader;
+
+  return {
+    userId: req.user?.sub,
+    ipAddress: rawIp?.slice(0, 45),
+    userAgent,
+  };
+}
+
+async function writeOrderQueueAudit(
+  tx: DbTransaction,
+  input: {
+    tenantId: string;
+    action: string;
+    entityType: string;
+    entityId: string;
+    newState: Record<string, unknown>;
+    metadata: Record<string, unknown>;
+    context: RequestAuditContext;
+  }
+) {
+  await tx.insert(auditLog).values({
+    tenantId: input.tenantId,
+    userId: input.context.userId,
+    action: input.action,
+    entityType: input.entityType,
+    entityId: input.entityId,
+    previousState: null,
+    newState: input.newState,
+    metadata: input.metadata,
+    ipAddress: input.context.ipAddress,
+    userAgent: input.context.userAgent,
+    timestamp: new Date(),
+  });
+}
+
+async function writeCardTransitionAudit(
+  tx: DbTransaction,
+  input: {
+    tenantId: string;
+    transitionedCards: Array<{ cardId: string; loopId: string }>;
+    orderType: 'purchase_order' | 'work_order' | 'transfer_order';
+    orderId: string;
+    orderNumber: string;
+    context: RequestAuditContext;
+  }
+) {
+  if (input.transitionedCards.length === 0) return;
+
+  await tx.insert(auditLog).values(
+    input.transitionedCards.map((card) => ({
+      tenantId: input.tenantId,
+      userId: input.context.userId,
+      action: 'kanban_card.transitioned_to_ordered',
+      entityType: 'kanban_card',
+      entityId: card.cardId,
+      previousState: { stage: 'triggered' },
+      newState: {
+        stage: 'ordered',
+        orderType: input.orderType,
+        orderId: input.orderId,
+        orderNumber: input.orderNumber,
+      },
+      metadata: {
+        loopId: card.loopId,
+        source: 'order_queue',
+      },
+      ipAddress: input.context.ipAddress,
+      userAgent: input.context.userAgent,
+      timestamp: new Date(),
+    }))
+  );
+}
+
+async function publishOrderCreatedEvent(input: {
+  tenantId: string;
+  orderType: 'purchase_order' | 'work_order' | 'transfer_order';
+  orderId: string;
+  orderNumber: string;
+  linkedCardIds: string[];
+}) {
+  try {
+    const eventBus = getEventBus(config.REDIS_URL);
+    await eventBus.publish({
+      type: 'order.created',
+      tenantId: input.tenantId,
+      orderType: input.orderType,
+      orderId: input.orderId,
+      orderNumber: input.orderNumber,
+      linkedCardIds: input.linkedCardIds,
+      timestamp: new Date().toISOString(),
+    });
+  } catch {
+    console.error(
+      `[order-queue] Failed to publish order.created event for ${input.orderType} ${input.orderNumber}`
+    );
+  }
+}
+
+async function publishCardOrderedTransitions(input: {
+  tenantId: string;
+  cards: Array<{
+    cardId: string;
+    loopId: string;
+  }>;
+}) {
+  if (input.cards.length === 0) return;
+
+  const eventBus = getEventBus(config.REDIS_URL);
+
+  await Promise.all(
+    input.cards.map(async (card) => {
+      try {
+        await eventBus.publish({
+          type: 'card.transition',
+          tenantId: input.tenantId,
+          cardId: card.cardId,
+          loopId: card.loopId,
+          fromStage: 'triggered',
+          toStage: 'ordered',
+          method: 'system',
+          timestamp: new Date().toISOString(),
+        });
+      } catch {
+        console.error(
+          `[order-queue] Failed to publish card.transition event for card ${card.cardId}`
+        );
+      }
+    })
+  );
+}
+
+export async function emitQueueOrderEvents(input: {
+  tenantId: string;
+  orderType: 'purchase_order' | 'work_order' | 'transfer_order';
+  orderId: string;
+  orderNumber: string;
+  linkedCardIds: string[];
+  transitionedCards: Array<{ cardId: string; loopId: string }>;
+}) {
+  await publishOrderCreatedEvent({
+    tenantId: input.tenantId,
+    orderType: input.orderType,
+    orderId: input.orderId,
+    orderNumber: input.orderNumber,
+    linkedCardIds: input.linkedCardIds,
+  });
+
+  await publishCardOrderedTransitions({
+    tenantId: input.tenantId,
+    cards: input.transitionedCards,
+  });
+}
 
 // Validation schemas
 const createPOSchema = z.object({
@@ -191,6 +364,7 @@ orderQueueRouter.get('/summary', async (req: AuthRequest, res, next) => {
 orderQueueRouter.post('/create-po', async (req: AuthRequest, res, next) => {
   try {
     const tenantId = req.user?.tenantId;
+    const auditContext = getRequestAuditContext(req);
 
     if (!tenantId) {
       throw new AppError(401, 'Tenant ID not found');
@@ -283,6 +457,8 @@ orderQueueRouter.post('/create-po', async (req: AuthRequest, res, next) => {
 
       const poId = insertedPO[0].id;
 
+      const transitionedCards: Array<{ cardId: string; loopId: string }> = [];
+
       // Create PO lines and update cards
       for (let i = 0; i < cardDetails.length; i++) {
         const cardDetail = cardDetails[i];
@@ -304,35 +480,53 @@ orderQueueRouter.post('/create-po', async (req: AuthRequest, res, next) => {
           })
           .execute();
 
-        // Update kanban card with PO link
-        await tx
-          .update(kanbanCards)
-          .set({
-            linkedPurchaseOrderId: poId,
-            currentStage: 'ordered',
-            currentStageEnteredAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .where(and(eq(kanbanCards.id, cardDetail.id), eq(kanbanCards.tenantId, tenantId)))
-          .execute();
+        const transitionedCard = await transitionTriggeredCardToOrdered(tx, {
+          tenantId,
+          cardId: cardDetail.id,
+          linkedPurchaseOrderId: poId,
+          notes: `Created PO ${poNumber}`,
+          userId: auditContext.userId,
+        });
 
-        // Insert stage transition
-        await tx
-          .insert(cardStageTransitions)
-          .values({
-            tenantId,
-            cardId: cardDetail.id,
-            loopId: cardDetail.loopId,
-            fromStage: 'triggered',
-            toStage: 'ordered',
-            method: 'system',
-            cycleNumber: (cardDetail.completedCycles || 0) + 1,
-            notes: `Created PO ${poNumber}`,
-          })
-          .execute();
+        transitionedCards.push(transitionedCard);
       }
 
-      return { poId, poNumber };
+      await writeOrderQueueAudit(tx, {
+        tenantId,
+        action: 'order_queue.purchase_order_created',
+        entityType: 'purchase_order',
+        entityId: poId,
+        newState: {
+          status: 'draft',
+          poNumber,
+          lineCount: cardDetails.length,
+        },
+        metadata: {
+          source: 'order_queue',
+          linkedCardIds: cardIds,
+        },
+        context: auditContext,
+      });
+
+      await writeCardTransitionAudit(tx, {
+        tenantId,
+        transitionedCards,
+        orderType: 'purchase_order',
+        orderId: poId,
+        orderNumber: poNumber,
+        context: auditContext,
+      });
+
+      return { poId, poNumber, transitionedCards };
+    });
+
+    await emitQueueOrderEvents({
+      tenantId,
+      orderType: 'purchase_order',
+      orderId: result.poId,
+      orderNumber: result.poNumber,
+      linkedCardIds: cardIds,
+      transitionedCards: result.transitionedCards,
     });
 
     res.status(201).json({
@@ -356,6 +550,7 @@ orderQueueRouter.post('/create-po', async (req: AuthRequest, res, next) => {
 orderQueueRouter.post('/create-wo', async (req: AuthRequest, res, next) => {
   try {
     const tenantId = req.user?.tenantId;
+    const auditContext = getRequestAuditContext(req);
 
     if (!tenantId) {
       throw new AppError(401, 'Tenant ID not found');
@@ -451,34 +646,54 @@ orderQueueRouter.post('/create-wo', async (req: AuthRequest, res, next) => {
         }
       }
 
-      // Update kanban card with WO link
-      await tx
-        .update(kanbanCards)
-        .set({
-          linkedWorkOrderId: woId,
-          currentStage: 'ordered',
-          currentStageEnteredAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(and(eq(kanbanCards.id, cardId), eq(kanbanCards.tenantId, tenantId)))
-        .execute();
+      const transitionedCard = await transitionTriggeredCardToOrdered(tx, {
+        tenantId,
+        cardId,
+        linkedWorkOrderId: woId,
+        notes: `Created WO ${woNumber}`,
+        userId: auditContext.userId,
+      });
 
-      // Insert stage transition
-      await tx
-        .insert(cardStageTransitions)
-        .values({
-          tenantId,
-          cardId,
-          loopId: card.loopId,
-          fromStage: 'triggered',
-          toStage: 'ordered',
-          method: 'system',
-          cycleNumber: (card.completedCycles || 0) + 1,
-          notes: `Created WO ${woNumber}`,
-        })
-        .execute();
+      await writeOrderQueueAudit(tx, {
+        tenantId,
+        action: 'order_queue.work_order_created',
+        entityType: 'work_order',
+        entityId: woId,
+        newState: {
+          status: 'draft',
+          woNumber,
+          quantityToProduce: card.orderQuantity,
+        },
+        metadata: {
+          source: 'order_queue',
+          linkedCardIds: [cardId],
+        },
+        context: auditContext,
+      });
 
-      return { woId, woNumber };
+      await writeCardTransitionAudit(tx, {
+        tenantId,
+        transitionedCards: [transitionedCard],
+        orderType: 'work_order',
+        orderId: woId,
+        orderNumber: woNumber,
+        context: auditContext,
+      });
+
+      return {
+        woId,
+        woNumber,
+        transitionedCards: [transitionedCard],
+      };
+    });
+
+    await emitQueueOrderEvents({
+      tenantId,
+      orderType: 'work_order',
+      orderId: result.woId,
+      orderNumber: result.woNumber,
+      linkedCardIds: [cardId],
+      transitionedCards: result.transitionedCards,
     });
 
     res.status(201).json({
@@ -502,6 +717,7 @@ orderQueueRouter.post('/create-wo', async (req: AuthRequest, res, next) => {
 orderQueueRouter.post('/create-to', async (req: AuthRequest, res, next) => {
   try {
     const tenantId = req.user?.tenantId;
+    const auditContext = getRequestAuditContext(req);
 
     if (!tenantId) {
       throw new AppError(401, 'Tenant ID not found');
@@ -574,6 +790,8 @@ orderQueueRouter.post('/create-to', async (req: AuthRequest, res, next) => {
 
       const toId = insertedTO[0].id;
 
+      const transitionedCards: Array<{ cardId: string; loopId: string }> = [];
+
       // Create TO lines and update cards
       for (let i = 0; i < cardResults.length; i++) {
         const card = cardResults[i];
@@ -592,35 +810,53 @@ orderQueueRouter.post('/create-to', async (req: AuthRequest, res, next) => {
           })
           .execute();
 
-        // Update kanban card with TO link
-        await tx
-          .update(kanbanCards)
-          .set({
-            linkedTransferOrderId: toId,
-            currentStage: 'ordered',
-            currentStageEnteredAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .where(and(eq(kanbanCards.id, card.id), eq(kanbanCards.tenantId, tenantId)))
-          .execute();
+        const transitionedCard = await transitionTriggeredCardToOrdered(tx, {
+          tenantId,
+          cardId: card.id,
+          linkedTransferOrderId: toId,
+          notes: `Created TO ${toNumber}`,
+          userId: auditContext.userId,
+        });
 
-        // Insert stage transition
-        await tx
-          .insert(cardStageTransitions)
-          .values({
-            tenantId,
-            cardId: card.id,
-            loopId: card.loopId,
-            fromStage: 'triggered',
-            toStage: 'ordered',
-            method: 'system',
-            cycleNumber: (card.completedCycles || 0) + 1,
-            notes: `Created TO ${toNumber}`,
-          })
-          .execute();
+        transitionedCards.push(transitionedCard);
       }
 
-      return { toId, toNumber };
+      await writeOrderQueueAudit(tx, {
+        tenantId,
+        action: 'order_queue.transfer_order_created',
+        entityType: 'transfer_order',
+        entityId: toId,
+        newState: {
+          status: 'draft',
+          toNumber,
+          lineCount: cardResults.length,
+        },
+        metadata: {
+          source: 'order_queue',
+          linkedCardIds: cardIds,
+        },
+        context: auditContext,
+      });
+
+      await writeCardTransitionAudit(tx, {
+        tenantId,
+        transitionedCards,
+        orderType: 'transfer_order',
+        orderId: toId,
+        orderNumber: toNumber,
+        context: auditContext,
+      });
+
+      return { toId, toNumber, transitionedCards };
+    });
+
+    await emitQueueOrderEvents({
+      tenantId,
+      orderType: 'transfer_order',
+      orderId: result.toId,
+      orderNumber: result.toNumber,
+      linkedCardIds: cardIds,
+      transitionedCards: result.transitionedCards,
     });
 
     res.status(201).json({
