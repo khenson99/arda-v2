@@ -15,7 +15,6 @@ import {
   ArrowUpRight,
   Bell,
   Boxes,
-  CheckCircle2,
   CircleAlert,
   Factory,
   Filter,
@@ -40,6 +39,9 @@ import {
   CardTitle,
   Input,
 } from "@/components/ui";
+import { ConflictResolver, ManualLookup, ScanResult, Scanner, SyncStatus } from "@/components/scan";
+import { useScanSession } from "@/hooks/use-scan-session";
+import { configureScanApi } from "@/lib/scan-api";
 import { cn } from "@/lib/utils";
 
 const DEFAULT_RAILWAY_API_BASE = "https://api-gateway-production-83fa.up.railway.app";
@@ -107,18 +109,6 @@ interface QueueCard {
 }
 
 type QueueByLoop = Record<LoopType, QueueCard[]>;
-
-interface ScanTriggerResponse {
-  success: boolean;
-  message: string;
-  loopType: string;
-  partId: string;
-  card: {
-    id: string;
-    currentStage: string;
-    loopId: string;
-  };
-}
 
 interface PartsResponse {
   data: PartRecord[];
