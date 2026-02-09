@@ -65,6 +65,134 @@ async function writeWorkOrderStatusAudit(
   });
 }
 
+async function writeWorkOrderCreateAudit(
+  tx: any,
+  input: {
+    tenantId: string;
+    workOrderId: string;
+    workOrderNumber: string;
+    initialStatus: string;
+    quantityToProduce: number;
+    routingStepCount: number;
+    context: RequestAuditContext;
+  }
+) {
+  await tx.insert(schema.auditLog).values({
+    tenantId: input.tenantId,
+    userId: input.context.userId,
+    action: 'work_order.created',
+    entityType: 'work_order',
+    entityId: input.workOrderId,
+    previousState: null,
+    newState: {
+      status: input.initialStatus,
+      quantityToProduce: input.quantityToProduce,
+      routingStepCount: input.routingStepCount,
+    },
+    metadata: {
+      source: 'work_orders.create',
+      workOrderNumber: input.workOrderNumber,
+    },
+    ipAddress: input.context.ipAddress,
+    userAgent: input.context.userAgent,
+    timestamp: new Date(),
+  });
+}
+
+async function writeWorkOrderRoutingUpdatedAudit(
+  tx: any,
+  input: {
+    tenantId: string;
+    routingId: string;
+    workOrderId: string;
+    workOrderNumber: string;
+    previousRouting: {
+      status: string;
+      actualMinutes: number | null;
+      notes: string | null;
+      stepNumber: number;
+      operationName: string;
+    };
+    updatedRouting: {
+      status: string;
+      actualMinutes: number | null;
+      notes: string | null;
+      stepNumber: number;
+      operationName: string;
+    };
+    context: RequestAuditContext;
+  }
+) {
+  await tx.insert(schema.auditLog).values({
+    tenantId: input.tenantId,
+    userId: input.context.userId,
+    action: 'work_order.routing_updated',
+    entityType: 'work_order_routing',
+    entityId: input.routingId,
+    previousState: {
+      status: input.previousRouting.status,
+      actualMinutes: input.previousRouting.actualMinutes,
+      notes: input.previousRouting.notes,
+    },
+    newState: {
+      status: input.updatedRouting.status,
+      actualMinutes: input.updatedRouting.actualMinutes,
+      notes: input.updatedRouting.notes,
+    },
+    metadata: {
+      source: 'work_orders.routing_update',
+      workOrderId: input.workOrderId,
+      workOrderNumber: input.workOrderNumber,
+      stepNumber: input.updatedRouting.stepNumber,
+      operationName: input.updatedRouting.operationName,
+    },
+    ipAddress: input.context.ipAddress,
+    userAgent: input.context.userAgent,
+    timestamp: new Date(),
+  });
+}
+
+async function writeWorkOrderProductionReportedAudit(
+  tx: any,
+  input: {
+    tenantId: string;
+    workOrderId: string;
+    workOrderNumber: string;
+    previousQuantityProduced: number;
+    previousQuantityRejected: number;
+    newQuantityProduced: number;
+    newQuantityRejected: number;
+    reportedQuantityProduced: number;
+    reportedQuantityRejected: number;
+    context: RequestAuditContext;
+  }
+) {
+  await tx.insert(schema.auditLog).values({
+    tenantId: input.tenantId,
+    userId: input.context.userId,
+    action: 'work_order.production_reported',
+    entityType: 'work_order',
+    entityId: input.workOrderId,
+    previousState: {
+      quantityProduced: input.previousQuantityProduced,
+      quantityRejected: input.previousQuantityRejected,
+    },
+    newState: {
+      quantityProduced: input.newQuantityProduced,
+      quantityRejected: input.newQuantityRejected,
+    },
+    metadata: {
+      source: 'work_orders.production',
+      workOrderNumber: input.workOrderNumber,
+      reportedQuantityProduced: input.reportedQuantityProduced,
+      reportedQuantityRejected: input.reportedQuantityRejected,
+    },
+    ipAddress: input.context.ipAddress,
+    userAgent: input.context.userAgent,
+    timestamp: new Date(),
+  });
+}
+
 // ─── Validation Schemas ──────────────────────────────────────────────
 
 const routingStepInputSchema = z.object({
@@ -248,6 +376,7 @@ workOrdersRouter.post('/', async (req: AuthRequest, res, next) => {
   try {
     const tenantId = req.user!.tenantId;
     const userId = req.user!.sub;
+    const auditContext = getRequestAuditContext(req);
 
     const input = createWorkOrderSchema.parse(req.body);
 
@@ -289,6 +418,16 @@ workOrdersRouter.post('/', async (req: AuthRequest, res, next) => {
         .insert(workOrderRoutings)
         .values(routingStepsToInsert)
         .returning();
+
+      await writeWorkOrderCreateAudit(tx, {
+        tenantId,
+        workOrderId: createdWO.id,
+        workOrderNumber: woNumber,
+        initialStatus: createdWO.status,
+        quantityToProduce: createdWO.quantityToProduce,
+        routingStepCount: createdRoutings.length,
+        context: auditContext,
+      });
 
       return { createdWO, createdRoutings };
     });
@@ -437,6 +576,7 @@ workOrdersRouter.patch('/:id/routings/:routingId', async (req: AuthRequest, res,
     const tenantId = req.user!.tenantId;
     const id = req.params.id as string;
     const routingId = req.params.routingId as string;
+    const auditContext = getRequestAuditContext(req);
 
     const input = updateRoutingStepSchema.parse(req.body);
 
@@ -507,6 +647,28 @@ workOrdersRouter.patch('/:id/routings/:routingId', async (req: AuthRequest, res,
       )
       .returning();
 
+    await writeWorkOrderRoutingUpdatedAudit(db, {
+      tenantId,
+      routingId,
+      workOrderId: id,
+      workOrderNumber: wo[0].woNumber,
+      previousRouting: {
+        status: currentRouting[0].status,
+        actualMinutes: currentRouting[0].actualMinutes,
+        notes: currentRouting[0].notes,
+        stepNumber: currentRouting[0].stepNumber,
+        operationName: currentRouting[0].operationName,
+      },
+      updatedRouting: {
+        status: updatedRouting.status,
+        actualMinutes: updatedRouting.actualMinutes,
+        notes: updatedRouting.notes,
+        stepNumber: updatedRouting.stepNumber,
+        operationName: updatedRouting.operationName,
+      },
+      context: auditContext,
+    });
+
     res.json(updatedRouting);
   } catch (err) {
     if (err instanceof z.ZodError) {
@@ -530,6 +692,7 @@ workOrdersRouter.patch('/:id/production', async (req: AuthRequest, res, next) =>
   try {
     const tenantId = req.user!.tenantId;
     const id = req.params.id as string;
+    const auditContext = getRequestAuditContext(req);
 
     const input = reportProductionSchema.parse(req.body);
     const { quantityProduced, quantityRejected } = input;
@@ -561,6 +724,19 @@ workOrdersRouter.patch('/:id/production', async (req: AuthRequest, res, next) =>
       })
       .where(and(eq(workOrders.id, id), eq(workOrders.tenantId, tenantId)))
       .returning();
+
+    await writeWorkOrderProductionReportedAudit(db, {
+      tenantId,
+      workOrderId: id,
+      workOrderNumber: currentWO.woNumber,
+      previousQuantityProduced: currentWO.quantityProduced,
+      previousQuantityRejected: currentWO.quantityRejected,
+      newQuantityProduced,
+      newQuantityRejected,
+      reportedQuantityProduced: quantityProduced,
+      reportedQuantityRejected: quantityRejected,
+      context: auditContext,
+    });
 
     // Fetch complete work order with routings
     const result = await fetchWorkOrderWithRoutings(id, tenantId);

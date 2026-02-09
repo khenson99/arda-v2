@@ -57,7 +57,7 @@ app.use('/preferences', preferencesRouter);
 
 app.use(errorHandler);
 
-const PORT = config.NOTIFICATIONS_SERVICE_PORT;
+const PORT = config.PORT || config.NOTIFICATIONS_SERVICE_PORT;
 const server = app.listen(PORT, () => {
   log.info({ port: PORT }, 'Notifications service started');
 });

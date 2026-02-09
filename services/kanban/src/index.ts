@@ -51,7 +51,7 @@ app.use('/velocity', velocityRouter);
 
 app.use(errorHandler);
 
-const PORT = config.KANBAN_SERVICE_PORT;
+const PORT = config.PORT || config.KANBAN_SERVICE_PORT;
 const server = app.listen(PORT, () => {
   log.info({ port: PORT }, 'Kanban service started');
 });

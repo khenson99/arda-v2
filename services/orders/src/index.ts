@@ -51,7 +51,7 @@ app.use('/queue', orderQueueRouter);
 
 app.use(errorHandler);
 
-const PORT = config.ORDERS_SERVICE_PORT;
+const PORT = config.PORT || config.ORDERS_SERVICE_PORT;
 const server = app.listen(PORT, () => {
   log.info({ port: PORT }, 'Orders service started');
 });

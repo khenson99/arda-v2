@@ -46,7 +46,7 @@ app.use('/tenants', tenantRouter);
 app.use(errorHandler);
 
 // ─── Start Server ─────────────────────────────────────────────────────
-const PORT = config.AUTH_SERVICE_PORT;
+const PORT = config.PORT || config.AUTH_SERVICE_PORT;
 const server = app.listen(PORT, () => {
   log.info({ port: PORT, env: config.NODE_ENV }, 'Auth service started');
 });

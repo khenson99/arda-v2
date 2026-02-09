@@ -75,7 +75,7 @@ app.use((_req, res) => {
 });
 
 // ─── Start Server ─────────────────────────────────────────────────────
-const PORT = config.API_GATEWAY_PORT;
+const PORT = config.PORT || config.API_GATEWAY_PORT;
 const server = createServer(app);
 
 // Setup WebSocket handler (Socket.IO on /socket.io)

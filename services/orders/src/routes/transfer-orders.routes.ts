@@ -64,6 +64,83 @@ async function writeTransferOrderStatusAudit(
   });
 }
 
+async function writeTransferOrderCreateAudit(
+  tx: any,
+  input: {
+    tenantId: string;
+    transferOrderId: string;
+    transferOrderNumber: string;
+    initialStatus: string;
+    lineCount: number;
+    context: RequestAuditContext;
+  }
+) {
+  await tx.insert(schema.auditLog).values({
+    tenantId: input.tenantId,
+    userId: input.context.userId,
+    action: 'transfer_order.created',
+    entityType: 'transfer_order',
+    entityId: input.transferOrderId,
+    previousState: null,
+    newState: {
+      status: input.initialStatus,
+      lineCount: input.lineCount,
+    },
+    metadata: {
+      source: 'transfer_orders.create',
+      transferOrderNumber: input.transferOrderNumber,
+    },
+    ipAddress: input.context.ipAddress,
+    userAgent: input.context.userAgent,
+    timestamp: new Date(),
+  });
+}
+
+async function writeTransferOrderLinesShippedAudit(
+  tx: any,
+  input: {
+    tenantId: string;
+    transferOrderId: string;
+    transferOrderNumber: string;
+    status: string;
+    shippedLineChanges: Array<{
+      lineId: string;
+      fromQuantityShipped: number;
+      toQuantityShipped: number;
+    }>;
+    context: RequestAuditContext;
+  }
+) {
+  await tx.insert(schema.auditLog).values({
+    tenantId: input.tenantId,
+    userId: input.context.userId,
+    action: 'transfer_order.lines_shipped',
+    entityType: 'transfer_order',
+    entityId: input.transferOrderId,
+    previousState: {
+      status: input.status,
+      lineChanges: input.shippedLineChanges.map((line) => ({
+        lineId: line.lineId,
+        quantityShipped: line.fromQuantityShipped,
+      })),
+    },
+    newState: {
+      status: input.status,
+      lineChanges: input.shippedLineChanges.map((line) => ({
+        lineId: line.lineId,
+        quantityShipped: line.toQuantityShipped,
+      })),
+    },
+    metadata: {
+      source: 'transfer_orders.ship',
+      transferOrderNumber: input.transferOrderNumber,
+    },
+    ipAddress: input.context.ipAddress,
+    userAgent: input.context.userAgent,
+    timestamp: new Date(),
+  });
+}
+
 // Validation schemas
 const createTransferOrderSchema = z.object({
   sourceFacilityId: z.string().uuid(),
@@ -204,6 +281,7 @@ transferOrdersRouter.post('/', async (req: AuthRequest, res, next) => {
     const payload = createTransferOrderSchema.parse(req.body);
     const tenantId = req.user!.tenantId;
     const userId = req.user!.sub;
+    const auditContext = getRequestAuditContext(req);
 
     if (!tenantId || !userId) {
       throw new AppError(401, 'Unauthorized');
@@ -247,6 +325,15 @@ transferOrdersRouter.post('/', async (req: AuthRequest, res, next) => {
           }))
         )
         .returning();
+
+      await writeTransferOrderCreateAudit(tx, {
+        tenantId,
+        transferOrderId: createdOrder.id,
+        transferOrderNumber: toNumber,
+        initialStatus: createdOrder.status,
+        lineCount: lines.length,
+        context: auditContext,
+      });
 
       return { createdOrder, lines };
     });
@@ -399,6 +486,7 @@ transferOrdersRouter.patch('/:id/ship', async (req: AuthRequest, res, next) => {
     const id = req.params.id as string;
     const { lines: shipLines } = shipLinesSchema.parse(req.body);
     const tenantId = req.user!.tenantId;
+    const auditContext = getRequestAuditContext(req);
 
     if (!tenantId) {
       throw new AppError(401, 'Unauthorized');
@@ -418,6 +506,12 @@ transferOrdersRouter.patch('/:id/ship', async (req: AuthRequest, res, next) => {
     }
 
     const { updatedOrder, updatedLines } = await db.transaction(async (tx) => {
+      const shippedLineChanges: Array<{
+        lineId: string;
+        fromQuantityShipped: number;
+        toQuantityShipped: number;
+      }> = [];
+
       for (const shipLine of shipLines) {
         const [line] = await tx
           .select()
@@ -437,6 +531,12 @@ transferOrdersRouter.patch('/:id/ship', async (req: AuthRequest, res, next) => {
         if (shipLine.quantityShipped > line.quantityRequested) {
           throw new AppError(400, `Shipped quantity cannot exceed requested quantity for line ${shipLine.lineId}`);
         }
+
+        shippedLineChanges.push({
+          lineId: shipLine.lineId,
+          fromQuantityShipped: line.quantityShipped,
+          toQuantityShipped: shipLine.quantityShipped,
+        });
 
         await tx
           .update(transferOrderLines)
@@ -467,6 +567,17 @@ transferOrdersRouter.patch('/:id/ship', async (req: AuthRequest, res, next) => {
         .select()
         .from(transferOrders)
         .where(and(eq(transferOrders.id, id), eq(transferOrders.tenantId, tenantId)));
+
+      if (shippedLineChanges.length > 0) {
+        await writeTransferOrderLinesShippedAudit(tx, {
+          tenantId,
+          transferOrderId: id,
+          transferOrderNumber: order.toNumber,
+          status: order.status,
+          shippedLineChanges,
+          context: auditContext,
+        });
+      }
 
       return { updatedOrder, updatedLines };
     });

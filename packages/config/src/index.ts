@@ -47,6 +47,16 @@ const envSchema = z.object({
   ORDERS_SERVICE_PORT: z.coerce.number().default(3004),
   NOTIFICATIONS_SERVICE_PORT: z.coerce.number().default(3005),
 
+  // Railway dynamic port (overrides service-specific ports)
+  PORT: z.coerce.number().optional(),
+
+  // Direct service URL overrides (Railway private networking)
+  AUTH_SERVICE_URL: z.string().url().optional(),
+  CATALOG_SERVICE_URL: z.string().url().optional(),
+  KANBAN_SERVICE_URL: z.string().url().optional(),
+  ORDERS_SERVICE_URL: z.string().url().optional(),
+  NOTIFICATIONS_SERVICE_URL: z.string().url().optional(),
+
   // AWS
   AWS_REGION: z.string().default('us-east-1'),
   AWS_S3_BUCKET: z.string().default('arda-v2-dev'),
@@ -70,12 +80,12 @@ export type Config = z.infer<typeof envSchema>;
 
 // ─── Service URLs (for inter-service communication) ───────────────────
 export const serviceUrls = {
-  gateway: `http://${config.SERVICE_HOST}:${config.API_GATEWAY_PORT}`,
-  auth: `http://${config.SERVICE_HOST}:${config.AUTH_SERVICE_PORT}`,
-  catalog: `http://${config.SERVICE_HOST}:${config.CATALOG_SERVICE_PORT}`,
-  kanban: `http://${config.SERVICE_HOST}:${config.KANBAN_SERVICE_PORT}`,
-  orders: `http://${config.SERVICE_HOST}:${config.ORDERS_SERVICE_PORT}`,
-  notifications: `http://${config.SERVICE_HOST}:${config.NOTIFICATIONS_SERVICE_PORT}`,
+  gateway: `http://${config.SERVICE_HOST}:${config.PORT || config.API_GATEWAY_PORT}`,
+  auth: config.AUTH_SERVICE_URL || `http://${config.SERVICE_HOST}:${config.AUTH_SERVICE_PORT}`,
+  catalog: config.CATALOG_SERVICE_URL || `http://${config.SERVICE_HOST}:${config.CATALOG_SERVICE_PORT}`,
+  kanban: config.KANBAN_SERVICE_URL || `http://${config.SERVICE_HOST}:${config.KANBAN_SERVICE_PORT}`,
+  orders: config.ORDERS_SERVICE_URL || `http://${config.SERVICE_HOST}:${config.ORDERS_SERVICE_PORT}`,
+  notifications: config.NOTIFICATIONS_SERVICE_URL || `http://${config.SERVICE_HOST}:${config.NOTIFICATIONS_SERVICE_PORT}`,
 } as const;
 
 // ─── Structured Logger Factory ───────────────────────────────────────

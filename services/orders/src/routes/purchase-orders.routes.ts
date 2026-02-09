@@ -63,6 +63,81 @@ async function writePurchaseOrderStatusAudit(
   });
 }
 
+async function writePurchaseOrderCreateAudit(
+  tx: any,
+  input: {
+    tenantId: string;
+    poId: string;
+    orderNumber: string;
+    initialStatus: string;
+    lineCount: number;
+    totalAmount: string;
+    context: RequestAuditContext;
+  }
+) {
+  await tx.insert(schema.auditLog).values({
+    tenantId: input.tenantId,
+    userId: input.context.userId,
+    action: 'purchase_order.created',
+    entityType: 'purchase_order',
+    entityId: input.poId,
+    previousState: null,
+    newState: {
+      status: input.initialStatus,
+      lineCount: input.lineCount,
+      totalAmount: input.totalAmount,
+    },
+    metadata: {
+      source: 'purchase_orders.create',
+      orderNumber: input.orderNumber,
+    },
+    ipAddress: input.context.ipAddress,
+    userAgent: input.context.userAgent,
+    timestamp: new Date(),
+  });
+}
+
+async function writePurchaseOrderLineAddedAudit(
+  tx: any,
+  input: {
+    tenantId: string;
+    poId: string;
+    orderNumber: string;
+    lineId: string;
+    lineNumber: number;
+    partId: string;
+    quantityOrdered: number;
+    previousTotalAmount: string;
+    newTotalAmount: string;
+    context: RequestAuditContext;
+  }
+) {
+  await tx.insert(schema.auditLog).values({
+    tenantId: input.tenantId,
+    userId: input.context.userId,
+    action: 'purchase_order.line_added',
+    entityType: 'purchase_order',
+    entityId: input.poId,
+    previousState: {
+      totalAmount: input.previousTotalAmount,
+    },
+    newState: {
+      totalAmount: input.newTotalAmount,
+      lineId: input.lineId,
+      lineNumber: input.lineNumber,
+      partId: input.partId,
+      quantityOrdered: input.quantityOrdered,
+    },
+    metadata: {
+      source: 'purchase_orders.add_line',
+      orderNumber: input.orderNumber,
+    },
+    ipAddress: input.context.ipAddress,
+    userAgent: input.context.userAgent,
+    timestamp: new Date(),
+  });
+}
+
 // Validation schemas
 const PaginationSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -283,6 +358,7 @@ purchaseOrdersRouter.post('/', async (req: AuthRequest, res, next) => {
     const payload = CreatePOSchema.parse(req.body);
     const tenantId = req.user!.tenantId;
     const userId = req.user!.sub;
+    const auditContext = getRequestAuditContext(req);
 
     // Generate PO number
     const poNumber = await getNextPONumber(tenantId);
@@ -332,6 +408,16 @@ purchaseOrdersRouter.post('/', async (req: AuthRequest, res, next) => {
         )
         .returning();
 
+      await writePurchaseOrderCreateAudit(tx, {
+        tenantId,
+        poId: createdPO.id,
+        orderNumber: poNumber,
+        initialStatus: createdPO.status,
+        lineCount: insertedLines.length,
+        totalAmount,
+        context: auditContext,
+      });
+
       return { createdPO, insertedLines };
     });
 
@@ -371,6 +457,7 @@ purchaseOrdersRouter.post('/:id/lines', async (req: AuthRequest, res, next) => {
     const id = req.params.id as string;
     const payload = AddPOLineSchema.parse(req.body);
     const tenantId = req.user!.tenantId;
+    const auditContext = getRequestAuditContext(req);
 
     const newLine = await db.transaction(async (tx) => {
       // Verify PO exists and belongs to tenant
@@ -448,6 +535,19 @@ purchaseOrdersRouter.post('/:id/lines', async (req: AuthRequest, res, next) => {
             eq(schema.purchaseOrders.tenantId, tenantId),
           )
         );
+
+      await writePurchaseOrderLineAddedAudit(tx, {
+        tenantId,
+        poId: id,
+        orderNumber: po.poNumber,
+        lineId: newLine.id,
+        lineNumber: newLine.lineNumber,
+        partId: newLine.partId,
+        quantityOrdered: newLine.quantityOrdered,
+        previousTotalAmount: String(po.totalAmount ?? '0.00'),
+        newTotalAmount: totalAmount,
+        context: auditContext,
+      });
 
       return newLine;
     });

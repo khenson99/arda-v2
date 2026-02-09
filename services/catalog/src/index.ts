@@ -49,7 +49,7 @@ app.use('/categories', categoriesRouter);
 
 app.use(errorHandler);
 
-const PORT = config.CATALOG_SERVICE_PORT;
+const PORT = config.PORT || config.CATALOG_SERVICE_PORT;
 const server = app.listen(PORT, () => {
   log.info({ port: PORT }, 'Catalog service started');
 });
