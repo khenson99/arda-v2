@@ -2,13 +2,38 @@ import { describe, it, expect, vi } from 'vitest';
 import { hasPermission, Permission, type PermissionString } from '@arda/auth-utils';
 import type { UserRole } from '@arda/shared-types';
 
-vi.hoisted(() => {
-  // @arda/auth-utils re-exports JWT helpers that load @arda/config at import time.
-  // Seed required env vars so permission-only tests stay isolated.
-  process.env.DATABASE_URL ??= 'postgres://arda:arda@localhost:5432/arda_test';
-  process.env.JWT_SECRET ??= '12345678901234567890123456789012';
-  process.env.JWT_REFRESH_SECRET ??= 'abcdefghijklmnopqrstuvwxyz123456';
-  process.env.NODE_ENV ??= 'test';
+describe('@arda/auth-utils import hardening', () => {
+  it('imports root exports for permission checks without JWT env vars', async () => {
+    const keys = ['JWT_SECRET', 'JWT_REFRESH_SECRET', 'JWT_EXPIRY', 'JWT_REFRESH_EXPIRY'] as const;
+    const snapshot: Record<(typeof keys)[number], string | undefined> = {
+      JWT_SECRET: process.env.JWT_SECRET,
+      JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET,
+      JWT_EXPIRY: process.env.JWT_EXPIRY,
+      JWT_REFRESH_EXPIRY: process.env.JWT_REFRESH_EXPIRY,
+    };
+
+    for (const key of keys) {
+      delete process.env[key];
+    }
+
+    try {
+      vi.resetModules();
+      const authUtils = await import('@arda/auth-utils');
+
+      expect(
+        authUtils.hasPermission('tenant_admin', authUtils.Permission.KANBAN_LOOPS_READ),
+      ).toBe(true);
+    } finally {
+      for (const key of keys) {
+        const value = snapshot[key];
+        if (value === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
+      }
+    }
+  });
 });
 
 // ─── Test the RBAC matrix for kanban service ────────────────────────

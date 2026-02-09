@@ -1,6 +1,41 @@
 import jwt from 'jsonwebtoken';
 import type { SignOptions } from 'jsonwebtoken';
-import { config } from '@arda/config';
+
+const TOKEN_ISSUER = 'arda-v2';
+const TOKEN_AUDIENCE = 'arda-v2-api';
+const MIN_SECRET_LENGTH = 32;
+
+interface JwtRuntimeConfig {
+  accessSecret: string;
+  refreshSecret: string;
+  accessExpiry: SignOptions['expiresIn'];
+  refreshExpiry: SignOptions['expiresIn'];
+}
+
+function readOptionalEnv(name: string): string | undefined {
+  const value = process.env[name];
+  if (typeof value !== 'string' || value.length === 0) return undefined;
+  return value;
+}
+
+function readRequiredSecret(name: 'JWT_SECRET' | 'JWT_REFRESH_SECRET'): string {
+  const value = readOptionalEnv(name);
+  if (!value || value.length < MIN_SECRET_LENGTH) {
+    throw new Error(
+      `${name} must be set to a string with at least ${MIN_SECRET_LENGTH} characters`,
+    );
+  }
+  return value;
+}
+
+function getJwtRuntimeConfig(): JwtRuntimeConfig {
+  return {
+    accessSecret: readRequiredSecret('JWT_SECRET'),
+    refreshSecret: readRequiredSecret('JWT_REFRESH_SECRET'),
+    accessExpiry: (readOptionalEnv('JWT_EXPIRY') ?? '15m') as SignOptions['expiresIn'],
+    refreshExpiry: (readOptionalEnv('JWT_REFRESH_EXPIRY') ?? '7d') as SignOptions['expiresIn'],
+  };
+}
 
 // ─── JWT Payload Types ────────────────────────────────────────────────
 export interface JwtPayload {
@@ -21,36 +56,40 @@ interface RefreshTokenPayload {
 
 // ─── Access Tokens ────────────────────────────────────────────────────
 export function generateAccessToken(payload: Omit<JwtPayload, 'iat' | 'exp'>): string {
+  const runtime = getJwtRuntimeConfig();
   const options: SignOptions = {
-    expiresIn: config.JWT_EXPIRY as SignOptions['expiresIn'],
-    issuer: 'arda-v2',
-    audience: 'arda-v2-api',
+    expiresIn: runtime.accessExpiry,
+    issuer: TOKEN_ISSUER,
+    audience: TOKEN_AUDIENCE,
   };
-  return jwt.sign(payload, config.JWT_SECRET, options);
+  return jwt.sign(payload, runtime.accessSecret, options);
 }
 
 export function verifyAccessToken(token: string): JwtPayload {
-  return jwt.verify(token, config.JWT_SECRET, {
-    issuer: 'arda-v2',
-    audience: 'arda-v2-api',
+  const runtime = getJwtRuntimeConfig();
+  return jwt.verify(token, runtime.accessSecret, {
+    issuer: TOKEN_ISSUER,
+    audience: TOKEN_AUDIENCE,
   }) as JwtPayload;
 }
 
 // ─── Refresh Tokens ───────────────────────────────────────────────────
 export function generateRefreshToken(userId: string, tokenId: string): string {
+  const runtime = getJwtRuntimeConfig();
   const payload: RefreshTokenPayload = {
     sub: userId,
     tokenId,
   };
   const options: SignOptions = {
-    expiresIn: config.JWT_REFRESH_EXPIRY as SignOptions['expiresIn'],
-    issuer: 'arda-v2',
+    expiresIn: runtime.refreshExpiry,
+    issuer: TOKEN_ISSUER,
   };
-  return jwt.sign(payload, config.JWT_REFRESH_SECRET, options);
+  return jwt.sign(payload, runtime.refreshSecret, options);
 }
 
 export function verifyRefreshToken(token: string): RefreshTokenPayload {
-  return jwt.verify(token, config.JWT_REFRESH_SECRET, {
-    issuer: 'arda-v2',
+  const runtime = getJwtRuntimeConfig();
+  return jwt.verify(token, runtime.refreshSecret, {
+    issuer: TOKEN_ISSUER,
   }) as RefreshTokenPayload;
 }
