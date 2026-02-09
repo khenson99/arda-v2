@@ -1,0 +1,22 @@
+Source External ID,Link Type,Target External ID,Rationale
+ARDA-101,blocks,ARDA-301,Queue logic depends on consistent lifecycle transitions
+ARDA-101,blocks,ARDA-501,Inference requires trustworthy transition history
+ARDA-101,blocks,ARDA-601,Executive dashboard depends on normalized lifecycle data
+ARDA-102,blocks,ARDA-307,Notification preference enforcement needs event stream
+ARDA-102,blocks,ARDA-501,Inference pipelines consume domain events
+ARDA-102,blocks,ARDA-601,Executive near real time metrics depend on events
+ARDA-103,blocks,ARDA-601,Executive reporting requires immutable audit traceability
+ARDA-201,blocks,ARDA-401,Receiving workflows require authenticated web shell
+ARDA-202,blocks,ARDA-401,Receiving at dock needs offline PWA baseline
+ARDA-203,blocks,ARDA-401,Receiving scan flows depend on scan UI and queue replay
+ARDA-301,blocks,ARDA-303,PO conversion uses queue scoring and ranking
+ARDA-303,blocks,ARDA-401,Receiving requires valid purchase orders
+ARDA-304,blocks,ARDA-401,Receiving depends on finalized PO lifecycle states
+ARDA-501,blocks,ARDA-502,Recommendations need inference outputs
+ARDA-502,blocks,ARDA-601,Executive optimization views require recommendation data
+ARDA-503,blocks,ARDA-601,Executive dashboard needs KPI service outputs
+ARDA-507,blocks,ARDA-508,Feature gates rely on active billing and metering
+ARDA-508,blocks,ARDA-608,Release readiness requires entitlement enforcement
+ARDA-604,blocks,ARDA-608,Release needs performance target validation
+ARDA-605,blocks,ARDA-608,Release needs security and isolation validation
+ARDA-607,blocks,ARDA-608,Release follows pilot UAT signoff

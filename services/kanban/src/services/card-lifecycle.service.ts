@@ -14,7 +14,7 @@ const {
 
 // ─── Valid Stage Transitions ──────────────────────────────────────────
 // Enforces the Kanban loop flow: CREATED → TRIGGERED → ORDERED → IN_TRANSIT → RECEIVED → RESTOCKED
-const VALID_TRANSITIONS: Record<string, string[]> = {
+export const VALID_TRANSITIONS: Record<string, string[]> = {
   created: ['triggered'],
   triggered: ['ordered'],
   ordered: ['in_transit', 'received'], // in_transit can be skipped for local procurement
@@ -22,6 +22,11 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
   received: ['restocked'],
   restocked: ['created'], // loop restart (new cycle)
 };
+
+/** Check if a stage transition is allowed by the Kanban flow rules. */
+export function isValidTransition(from: string, to: string): boolean {
+  return VALID_TRANSITIONS[from]?.includes(to) ?? false;
+}
 
 // ─── Transition a Card to the Next Stage ──────────────────────────────
 export async function transitionCard(input: {
@@ -54,12 +59,12 @@ export async function transitionCard(input: {
 
   // Validate the transition
   const currentStage = card.currentStage;
-  const allowedNextStages = VALID_TRANSITIONS[currentStage];
 
-  if (!allowedNextStages?.includes(toStage)) {
+  if (!isValidTransition(currentStage, toStage)) {
+    const allowed = VALID_TRANSITIONS[currentStage];
     throw new AppError(
       400,
-      `Invalid transition: ${currentStage} → ${toStage}. Allowed: ${allowedNextStages?.join(', ')}`,
+      `Invalid transition: ${currentStage} → ${toStage}. Allowed: ${allowed?.join(', ')}`,
       'INVALID_TRANSITION'
     );
   }

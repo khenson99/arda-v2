@@ -22,7 +22,7 @@ interface RefreshTokenPayload {
 // ─── Access Tokens ────────────────────────────────────────────────────
 export function generateAccessToken(payload: Omit<JwtPayload, 'iat' | 'exp'>): string {
   const options: SignOptions = {
-    expiresIn: config.JWT_EXPIRY as string,
+    expiresIn: config.JWT_EXPIRY as SignOptions['expiresIn'],
     issuer: 'arda-v2',
     audience: 'arda-v2-api',
   };
@@ -43,7 +43,7 @@ export function generateRefreshToken(userId: string, tokenId: string): string {
     tokenId,
   };
   const options: SignOptions = {
-    expiresIn: config.JWT_REFRESH_EXPIRY as string,
+    expiresIn: config.JWT_REFRESH_EXPIRY as SignOptions['expiresIn'],
     issuer: 'arda-v2',
   };
   return jwt.sign(payload, config.JWT_REFRESH_SECRET, options);
