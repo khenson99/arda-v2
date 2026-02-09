@@ -12,6 +12,59 @@ const { workOrders, workOrderRoutings } = schema;
 
 export const workOrdersRouter = Router();
 
+interface RequestAuditContext {
+  userId?: string;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+function getRequestAuditContext(req: AuthRequest): RequestAuditContext {
+  const forwarded = req.headers['x-forwarded-for'];
+  const forwardedIp = Array.isArray(forwarded)
+    ? forwarded[0]
+    : forwarded?.split(',')[0]?.trim();
+
+  const rawIp = forwardedIp || req.socket.remoteAddress || undefined;
+  const userAgentHeader = req.headers['user-agent'];
+  const userAgent = Array.isArray(userAgentHeader) ? userAgentHeader[0] : userAgentHeader;
+
+  return {
+    userId: req.user?.sub,
+    ipAddress: rawIp?.slice(0, 45),
+    userAgent,
+  };
+}
+
+async function writeWorkOrderStatusAudit(
+  tx: any,
+  input: {
+    tenantId: string;
+    workOrderId: string;
+    workOrderNumber: string;
+    fromStatus: string;
+    toStatus: string;
+    context: RequestAuditContext;
+    metadata: Record<string, unknown>;
+  }
+) {
+  await tx.insert(schema.auditLog).values({
+    tenantId: input.tenantId,
+    userId: input.context.userId,
+    action: 'work_order.status_changed',
+    entityType: 'work_order',
+    entityId: input.workOrderId,
+    previousState: { status: input.fromStatus },
+    newState: { status: input.toStatus },
+    metadata: {
+      ...input.metadata,
+      workOrderNumber: input.workOrderNumber,
+    },
+    ipAddress: input.context.ipAddress,
+    userAgent: input.context.userAgent,
+    timestamp: new Date(),
+  });
+}
+
 // ─── Validation Schemas ──────────────────────────────────────────────
 
 const routingStepInputSchema = z.object({
@@ -278,6 +331,7 @@ workOrdersRouter.patch('/:id/status', async (req: AuthRequest, res, next) => {
   try {
     const tenantId = req.user!.tenantId;
     const id = req.params.id as string;
+    const auditContext = getRequestAuditContext(req);
 
     const input = statusTransitionSchema.parse(req.body);
     const { status: newStatus } = input;
@@ -326,6 +380,18 @@ workOrdersRouter.patch('/:id/status', async (req: AuthRequest, res, next) => {
       .set(updateValues)
       .where(and(eq(workOrders.id, id), eq(workOrders.tenantId, tenantId)))
       .returning();
+
+    await writeWorkOrderStatusAudit(db, {
+      tenantId,
+      workOrderId: id,
+      workOrderNumber: currentWO.woNumber,
+      fromStatus: currentWO.status,
+      toStatus: newStatus,
+      context: auditContext,
+      metadata: {
+        source: 'work_orders.status',
+      },
+    });
 
     // Publish order.status_changed event
     try {

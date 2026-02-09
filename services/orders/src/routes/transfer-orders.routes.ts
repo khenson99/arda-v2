@@ -11,6 +11,59 @@ import { getNextTONumber } from '../services/order-number.service.js';
 export const transferOrdersRouter = Router();
 const { transferOrders, transferOrderLines } = schema;
 
+interface RequestAuditContext {
+  userId?: string;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+function getRequestAuditContext(req: AuthRequest): RequestAuditContext {
+  const forwarded = req.headers['x-forwarded-for'];
+  const forwardedIp = Array.isArray(forwarded)
+    ? forwarded[0]
+    : forwarded?.split(',')[0]?.trim();
+
+  const rawIp = forwardedIp || req.socket.remoteAddress || undefined;
+  const userAgentHeader = req.headers['user-agent'];
+  const userAgent = Array.isArray(userAgentHeader) ? userAgentHeader[0] : userAgentHeader;
+
+  return {
+    userId: req.user?.sub,
+    ipAddress: rawIp?.slice(0, 45),
+    userAgent,
+  };
+}
+
+async function writeTransferOrderStatusAudit(
+  tx: any,
+  input: {
+    tenantId: string;
+    transferOrderId: string;
+    transferOrderNumber: string;
+    fromStatus: string;
+    toStatus: string;
+    context: RequestAuditContext;
+    metadata: Record<string, unknown>;
+  }
+) {
+  await tx.insert(schema.auditLog).values({
+    tenantId: input.tenantId,
+    userId: input.context.userId,
+    action: 'transfer_order.status_changed',
+    entityType: 'transfer_order',
+    entityId: input.transferOrderId,
+    previousState: { status: input.fromStatus },
+    newState: { status: input.toStatus },
+    metadata: {
+      ...input.metadata,
+      transferOrderNumber: input.transferOrderNumber,
+    },
+    ipAddress: input.context.ipAddress,
+    userAgent: input.context.userAgent,
+    timestamp: new Date(),
+  });
+}
+
 // Validation schemas
 const createTransferOrderSchema = z.object({
   sourceFacilityId: z.string().uuid(),
@@ -232,6 +285,7 @@ transferOrdersRouter.patch('/:id/status', async (req: AuthRequest, res, next) =>
     const id = req.params.id as string;
     const { status: newStatus } = statusTransitionSchema.parse(req.body);
     const tenantId = req.user!.tenantId;
+    const auditContext = getRequestAuditContext(req);
 
     if (!tenantId) {
       throw new AppError(401, 'Unauthorized');
@@ -287,6 +341,18 @@ transferOrdersRouter.patch('/:id/status', async (req: AuthRequest, res, next) =>
         )
       )
       .returning();
+
+    await writeTransferOrderStatusAudit(db, {
+      tenantId,
+      transferOrderId: id,
+      transferOrderNumber: order.toNumber,
+      fromStatus: order.status,
+      toStatus: newStatus,
+      context: auditContext,
+      metadata: {
+        source: 'transfer_orders.status',
+      },
+    });
 
     // Publish order.status_changed event
     try {
@@ -423,6 +489,7 @@ transferOrdersRouter.patch('/:id/receive', async (req: AuthRequest, res, next) =
     const id = req.params.id as string;
     const { lines: receiveLines } = receiveLinesSchema.parse(req.body);
     const tenantId = req.user!.tenantId;
+    const auditContext = getRequestAuditContext(req);
 
     if (!tenantId) {
       throw new AppError(401, 'Unauthorized');
@@ -487,6 +554,38 @@ transferOrdersRouter.patch('/:id/receive', async (req: AuthRequest, res, next) =
           )
         );
 
+      const fullyReceived = updatedLines.length > 0
+        && updatedLines.every((line) => line.quantityReceived >= line.quantityShipped);
+
+      if (fullyReceived && order.status !== 'received') {
+        await tx
+          .update(transferOrders)
+          .set({
+            status: 'received',
+            receivedDate: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(transferOrders.id, id),
+              eq(transferOrders.tenantId, tenantId),
+            )
+          );
+
+        await writeTransferOrderStatusAudit(tx, {
+          tenantId,
+          transferOrderId: id,
+          transferOrderNumber: order.toNumber,
+          fromStatus: order.status,
+          toStatus: 'received',
+          context: auditContext,
+          metadata: {
+            source: 'transfer_orders.receive',
+            updatedLineIds: receiveLines.map((line) => line.lineId),
+          },
+        });
+      }
+
       const [updatedOrder] = await tx
         .select()
         .from(transferOrders)
@@ -494,6 +593,26 @@ transferOrdersRouter.patch('/:id/receive', async (req: AuthRequest, res, next) =
 
       return { updatedOrder, updatedLines };
     });
+
+    if (updatedOrder.status !== order.status) {
+      try {
+        const eventBus = getEventBus(config.REDIS_URL);
+        await eventBus.publish({
+          type: 'order.status_changed',
+          tenantId,
+          orderType: 'transfer_order',
+          orderId: id,
+          orderNumber: order.toNumber,
+          fromStatus: order.status,
+          toStatus: updatedOrder.status,
+          timestamp: new Date().toISOString(),
+        });
+      } catch {
+        console.error(
+          `[transfer-orders] Failed to publish order.status_changed event for ${order.toNumber}`
+        );
+      }
+    }
 
     res.json({
       ...updatedOrder,

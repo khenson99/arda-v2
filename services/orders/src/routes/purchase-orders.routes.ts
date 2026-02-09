@@ -10,6 +10,59 @@ import { getNextPONumber } from '../services/order-number.service.js';
 
 export const purchaseOrdersRouter = Router();
 
+interface RequestAuditContext {
+  userId?: string;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+function getRequestAuditContext(req: AuthRequest): RequestAuditContext {
+  const forwarded = req.headers['x-forwarded-for'];
+  const forwardedIp = Array.isArray(forwarded)
+    ? forwarded[0]
+    : forwarded?.split(',')[0]?.trim();
+
+  const rawIp = forwardedIp || req.socket.remoteAddress || undefined;
+  const userAgentHeader = req.headers['user-agent'];
+  const userAgent = Array.isArray(userAgentHeader) ? userAgentHeader[0] : userAgentHeader;
+
+  return {
+    userId: req.user?.sub,
+    ipAddress: rawIp?.slice(0, 45),
+    userAgent,
+  };
+}
+
+async function writePurchaseOrderStatusAudit(
+  tx: any,
+  input: {
+    tenantId: string;
+    poId: string;
+    fromStatus: string;
+    toStatus: string;
+    orderNumber: string;
+    context: RequestAuditContext;
+    metadata: Record<string, unknown>;
+  }
+) {
+  await tx.insert(schema.auditLog).values({
+    tenantId: input.tenantId,
+    userId: input.context.userId,
+    action: 'purchase_order.status_changed',
+    entityType: 'purchase_order',
+    entityId: input.poId,
+    previousState: { status: input.fromStatus },
+    newState: { status: input.toStatus },
+    metadata: {
+      ...input.metadata,
+      orderNumber: input.orderNumber,
+    },
+    ipAddress: input.context.ipAddress,
+    userAgent: input.context.userAgent,
+    timestamp: new Date(),
+  });
+}
+
 // Validation schemas
 const PaginationSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -415,6 +468,7 @@ purchaseOrdersRouter.patch('/:id/status', async (req: AuthRequest, res, next) =>
   try {
     const id = req.params.id as string;
     const { status: newStatus, cancelReason } = StatusTransitionSchema.parse(req.body);
+    const auditContext = getRequestAuditContext(req);
 
     // Verify PO exists and belongs to tenant
     const purchaseOrder = await db
@@ -458,6 +512,19 @@ purchaseOrdersRouter.patch('/:id/status', async (req: AuthRequest, res, next) =>
             eq(schema.purchaseOrders.tenantId, req.user!.tenantId),
           ),
         );
+
+      await writePurchaseOrderStatusAudit(db, {
+        tenantId: req.user!.tenantId,
+        poId: id,
+        fromStatus: po.status,
+        toStatus: newStatus,
+        orderNumber: po.poNumber,
+        context: auditContext,
+        metadata: {
+          source: 'purchase_orders.status',
+          cancelReason,
+        },
+      });
 
       const updated = await db
         .select()
@@ -504,6 +571,18 @@ purchaseOrdersRouter.patch('/:id/status', async (req: AuthRequest, res, next) =>
         ),
       );
 
+    await writePurchaseOrderStatusAudit(db, {
+      tenantId: req.user!.tenantId,
+      poId: id,
+      fromStatus: po.status,
+      toStatus: newStatus,
+      orderNumber: po.poNumber,
+      context: auditContext,
+      metadata: {
+        source: 'purchase_orders.status',
+      },
+    });
+
     const updated = await db
       .select()
       .from(schema.purchaseOrders)
@@ -549,6 +628,7 @@ purchaseOrdersRouter.patch('/:id/receive', async (req: AuthRequest, res, next) =
     const id = req.params.id as string;
     const { lines: receiveLines } = ReceiveLinesSchema.parse(req.body);
     const tenantId = req.user!.tenantId;
+    const auditContext = getRequestAuditContext(req);
 
     // Verify PO exists and belongs to tenant
     const purchaseOrder = await db
@@ -644,6 +724,19 @@ purchaseOrdersRouter.patch('/:id/receive', async (req: AuthRequest, res, next) =
               eq(schema.purchaseOrders.tenantId, tenantId),
             ),
           );
+
+        await writePurchaseOrderStatusAudit(tx, {
+          tenantId,
+          poId: id,
+          fromStatus: po.status,
+          toStatus: newStatus,
+          orderNumber: po.poNumber,
+          context: auditContext,
+          metadata: {
+            source: 'purchase_orders.receive',
+            updatedLineIds: receiveLines.map((line) => line.lineId),
+          },
+        });
       }
 
       const [updated] = await tx
