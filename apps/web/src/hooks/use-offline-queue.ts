@@ -10,6 +10,7 @@ import {
   type QueuedScanEvent,
   type QueueStatusCounts,
   type ReplayFn,
+  type EnqueueScanOptions,
 } from '@/lib/offline-queue';
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -33,7 +34,11 @@ export interface UseOfflineQueueReturn {
   /** Whether a replay is currently in progress */
   isReplaying: boolean;
   /** Enqueue a new scan event */
-  enqueue: (cardId: string, location?: { lat: number; lng: number }) => Promise<QueuedScanEvent>;
+  enqueue: (
+    cardId: string,
+    location?: { lat: number; lng: number },
+    options?: EnqueueScanOptions,
+  ) => Promise<QueuedScanEvent>;
   /** Manually trigger a replay of pending items */
   replay: () => Promise<void>;
   /** Remove a specific queue item (discard) */
@@ -66,6 +71,7 @@ export function useOfflineQueue({
 
   const sendFnRef = useRef(sendFn);
   const reconnectReplayTimerRef = useRef<number | null>(null);
+  const isReplayingRef = useRef(false);
   sendFnRef.current = sendFn;
 
   // Refresh queue state from IndexedDB
@@ -84,7 +90,8 @@ export function useOfflineQueue({
 
   // Replay pending items
   const replay = useCallback(async () => {
-    if (isReplaying) return;
+    if (isReplayingRef.current) return;
+    isReplayingRef.current = true;
     setIsReplaying(true);
 
     try {
@@ -93,14 +100,19 @@ export function useOfflineQueue({
     } catch (err) {
       console.error('[offline-queue] Replay failed:', err);
     } finally {
+      isReplayingRef.current = false;
       setIsReplaying(false);
     }
-  }, [isReplaying, refresh]);
+  }, [refresh]);
 
   // Enqueue a new scan
   const enqueue = useCallback(
-    async (cardId: string, location?: { lat: number; lng: number }) => {
-      const event = await enqueueScan(cardId, location);
+    async (
+      cardId: string,
+      location?: { lat: number; lng: number },
+      options?: EnqueueScanOptions,
+    ) => {
+      const event = await enqueueScan(cardId, location, options);
       await refresh();
       return event;
     },
