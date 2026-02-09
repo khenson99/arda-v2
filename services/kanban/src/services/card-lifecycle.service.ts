@@ -462,6 +462,16 @@ export async function triggerCardByScan(input: {
     throw new AppError(400, 'This card has been deactivated.', 'CARD_INACTIVE');
   }
 
+  // Fast path for normal scans: card must still be in created stage.
+  // Idempotent replays with the same key are handled through transitionCard below.
+  if (card.currentStage !== 'created' && !idempotencyKey) {
+    throw new AppError(
+      400,
+      `This card is already in the "${card.currentStage}" stage. It can only be scanned when in the "created" stage.`,
+      'CARD_ALREADY_TRIGGERED'
+    );
+  }
+
   let result: Awaited<ReturnType<typeof transitionCard>>;
 
   try {
