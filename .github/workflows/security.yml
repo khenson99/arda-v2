@@ -1,0 +1,144 @@
+name: Security Gates
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+# ─── Security CI Gates ──────────────────────────────────────────────
+# Gate 1: Verify RBAC permission registry is consistent
+# Gate 2: Verify all auth-guarded routes have permission checks
+# Gate 3: Run security-focused tests (auth, permissions, RLS)
+# ────────────────────────────────────────────────────────────────────
+
+jobs:
+  # ─── Security Tests ─────────────────────────────────────────────────
+  security-tests:
+    name: Security Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build packages
+        run: npx turbo build --filter='./packages/*'
+
+      - name: Run permission registry tests
+        run: npx vitest run --reporter=verbose packages/auth-utils/src/tenant-context.test.ts
+
+      - name: Run security events tests
+        run: npx vitest run --reporter=verbose packages/events/src/security-events.test.ts
+
+      - name: Run auth guard tests
+        run: npx vitest run --reporter=verbose services/kanban/src/middleware/auth-guards.test.ts
+
+      - name: Run token service tests
+        run: npx vitest run --reporter=verbose services/auth/src/services/token.service.test.ts
+
+      - name: Run RLS helper tests
+        run: npx vitest run --reporter=verbose packages/db/src/rls/rls.test.ts
+
+  # ─── Permission Registry Integrity ──────────────────────────────────
+  permission-integrity:
+    name: Permission Registry Integrity
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build packages
+        run: npx turbo build --filter='./packages/*'
+
+      - name: Verify Permission const has no duplicate values
+        run: |
+          node -e "
+            const { Permission } = require('./packages/auth-utils/dist/permissions.js');
+            const values = Object.values(Permission);
+            const unique = new Set(values);
+            if (values.length !== unique.size) {
+              const dupes = values.filter((v, i) => values.indexOf(v) !== i);
+              console.error('Duplicate permission values found:', dupes);
+              process.exit(1);
+            }
+            console.log('Permission registry OK: ' + values.length + ' unique permissions');
+          "
+
+      - name: Verify all roles in ROLE_PERMISSIONS are valid
+        run: |
+          node -e "
+            const { ROLE_PERMISSIONS } = require('./packages/auth-utils/dist/permissions.js');
+            const validRoles = [
+              'inventory_manager', 'procurement_manager', 'receiving_manager',
+              'ecommerce_director', 'salesperson', 'executive'
+            ];
+            const configuredRoles = Object.keys(ROLE_PERMISSIONS);
+            const missing = validRoles.filter(r => !configuredRoles.includes(r));
+            if (missing.length > 0) {
+              console.error('Missing role configurations:', missing);
+              process.exit(1);
+            }
+            console.log('All ' + validRoles.length + ' non-admin roles configured');
+          "
+
+  # ─── Auth Guard Coverage ────────────────────────────────────────────
+  auth-guard-coverage:
+    name: Auth Guard Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify all services have auth-guards.ts
+        run: |
+          SERVICES="kanban orders catalog notifications"
+          MISSING=""
+          for svc in $SERVICES; do
+            if [ ! -f "services/$svc/src/middleware/auth-guards.ts" ]; then
+              MISSING="$MISSING $svc"
+            fi
+          done
+          if [ -n "$MISSING" ]; then
+            echo "Missing auth-guards.ts in services:$MISSING"
+            exit 1
+          fi
+          echo "All services have auth-guards.ts"
+
+      - name: Verify RLS policies SQL exists
+        run: |
+          if [ ! -f "packages/db/src/rls/policies.sql" ]; then
+            echo "Missing RLS policies SQL file"
+            exit 1
+          fi
+          echo "RLS policies file present"
+
+      - name: Verify security events module exists
+        run: |
+          if [ ! -f "packages/events/src/security-events.ts" ]; then
+            echo "Missing security events module"
+            exit 1
+          fi
+          echo "Security events module present"

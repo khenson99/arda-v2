@@ -80,6 +80,23 @@ export interface NotificationEvent {
   timestamp: string;
 }
 
+// Re-export security events
+export {
+  type SecurityEvent,
+  type AuthLoginEvent,
+  type AuthLoginFailedEvent,
+  type AuthLogoutEvent,
+  type TokenRefreshEvent,
+  type TokenReplayDetectedEvent,
+  type TokenRevokedEvent,
+  type AuthorizationDeniedEvent,
+  type TenantContextViolationEvent,
+  SecurityEventType,
+  isSecurityEvent,
+} from './security-events.js';
+
+import type { SecurityEvent } from './security-events.js';
+
 export type ArdaEvent =
   | CardTransitionEvent
   | OrderCreatedEvent
@@ -87,7 +104,8 @@ export type ArdaEvent =
   | LoopParameterChangedEvent
   | ReloWisaRecommendationEvent
   | QueueRiskDetectedEvent
-  | NotificationEvent;
+  | NotificationEvent
+  | SecurityEvent;
 
 // ─── Event Channel Names ────────────────────────────────────────────
 const CHANNEL_PREFIX = 'arda:events';
@@ -98,6 +116,10 @@ export function getTenantChannel(tenantId: string): string {
 
 export function getGlobalChannel(): string {
   return `${CHANNEL_PREFIX}:global`;
+}
+
+function hasTenantScope(event: ArdaEvent): event is ArdaEvent & { tenantId: string } {
+  return 'tenantId' in event && typeof event.tenantId === 'string' && event.tenantId.length > 0;
 }
 
 // ─── Event Bus (Redis Pub/Sub) ──────────────────────────────────────
@@ -127,14 +149,15 @@ export class EventBus {
 
   /** Publish an event to a tenant's channel */
   async publish(event: ArdaEvent): Promise<void> {
-    const tenantId = event.tenantId;
-    const channel = getTenantChannel(tenantId);
     const message = JSON.stringify(event);
 
-    await Promise.all([
-      this.publisher.publish(channel, message),
-      this.publisher.publish(getGlobalChannel(), message),
-    ]);
+    const publishOps: Array<Promise<number>> = [this.publisher.publish(getGlobalChannel(), message)];
+
+    if (hasTenantScope(event)) {
+      publishOps.push(this.publisher.publish(getTenantChannel(event.tenantId), message));
+    }
+
+    await Promise.all(publishOps);
   }
 
   /** Subscribe to events for a specific tenant */
