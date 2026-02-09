@@ -35,7 +35,7 @@ notificationsRouter.get('/', async (req, res, next) => {
     }
 
     if (queryParams.type) {
-      conditions.push(eq(schema.notifications.type, queryParams.type as any));
+      conditions.push(eq(schema.notifications.type, queryParams.type as (typeof schema.notificationTypeEnum.enumValues)[number]));
     }
 
     const notifications = await db

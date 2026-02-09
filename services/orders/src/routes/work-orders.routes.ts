@@ -121,7 +121,7 @@ workOrdersRouter.get('/', async (req: AuthRequest, res, next) => {
     const conditions = [eq(workOrders.tenantId, tenantId)];
 
     if (status) {
-      conditions.push(eq(workOrders.status, status as any));
+      conditions.push(eq(workOrders.status, status as (typeof schema.woStatusEnum.enumValues)[number]));
     }
     if (partId) {
       conditions.push(eq(workOrders.partId, partId as string));

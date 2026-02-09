@@ -1,4 +1,7 @@
 import Redis from 'ioredis';
+import { createLogger } from '@arda/config';
+
+const log = createLogger('event-bus');
 
 // ─── Event Types ────────────────────────────────────────────────────
 export interface CardTransitionEvent {
@@ -101,7 +104,7 @@ export class EventBus {
           }
         }
       } catch (err) {
-        console.error('[EventBus] Failed to parse event:', err);
+        log.error({ err }, 'Failed to parse event');
       }
     });
   }

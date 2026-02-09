@@ -1,7 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import { config } from '@arda/config';
+import { config, createLogger } from '@arda/config';
+
+const log = createLogger('catalog');
 import { db } from '@arda/db';
 import { sql } from 'drizzle-orm';
 import { authMiddleware } from '@arda/auth-utils';
@@ -49,18 +51,18 @@ app.use(errorHandler);
 
 const PORT = config.CATALOG_SERVICE_PORT;
 const server = app.listen(PORT, () => {
-  console.log(`[catalog-service] Running on port ${PORT}`);
+  log.info({ port: PORT }, 'Catalog service started');
 });
 
 // ─── Graceful Shutdown ───────────────────────────────────────────────
 function shutdown(signal: string) {
-  console.log(`[catalog-service] ${signal} received, shutting down gracefully...`);
+  log.info({ signal }, 'Shutting down gracefully');
   server.close(() => {
-    console.log('[catalog-service] HTTP server closed');
+    log.info('HTTP server closed');
     process.exit(0);
   });
   setTimeout(() => {
-    console.error('[catalog-service] Forced shutdown after timeout');
+    log.fatal('Forced shutdown after timeout');
     process.exit(1);
   }, 10_000).unref();
 }

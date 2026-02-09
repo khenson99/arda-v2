@@ -21,7 +21,7 @@ cardsRouter.get('/', async (req: AuthRequest, res, next) => {
 
     const conditions = [eq(kanbanCards.tenantId, tenantId), eq(kanbanCards.isActive, true)];
     if (loopId) conditions.push(eq(kanbanCards.loopId, loopId));
-    if (stage) conditions.push(eq(kanbanCards.currentStage, stage as any));
+    if (stage) conditions.push(eq(kanbanCards.currentStage, stage as (typeof schema.cardStageEnum.enumValues)[number]));
 
     const whereClause = and(...conditions);
     const offset = (page - 1) * pageSize;

@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import { config } from '@arda/config';
+import { config, createLogger } from '@arda/config';
 import { db } from '@arda/db';
 import { sql } from 'drizzle-orm';
 import { getEventBus } from '@arda/events';
@@ -10,6 +10,8 @@ import { notificationsRouter } from './routes/notifications.routes.js';
 import { preferencesRouter } from './routes/preferences.routes.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { startEventListener } from './services/event-listener.js';
+
+const log = createLogger('notifications');
 
 const app = express();
 
@@ -57,35 +59,34 @@ app.use(errorHandler);
 
 const PORT = config.NOTIFICATIONS_SERVICE_PORT;
 const server = app.listen(PORT, () => {
-  console.log(`[notifications-service] Running on port ${PORT}`);
+  log.info({ port: PORT }, 'Notifications service started');
 });
 
 // Start event listener
 startEventListener(config.REDIS_URL).catch((err) => {
-  console.error('[notifications-service] Failed to start event listener:', err);
+  log.error({ err }, 'Failed to start event listener');
   process.exit(1);
 });
 
 // ─── Graceful Shutdown ───────────────────────────────────────────────
 function shutdown(signal: string) {
-  console.log(`[notifications-service] ${signal} received, shutting down gracefully...`);
+  log.info({ signal }, 'Shutting down gracefully');
 
   server.close(() => {
-    console.log('[notifications-service] HTTP server closed');
+    log.info('HTTP server closed');
   });
 
-  // Shutdown event bus (close Redis connections)
   try {
     const eventBus = getEventBus(config.REDIS_URL);
     void eventBus.shutdown().catch((err) => {
-      console.error('[notifications-service] EventBus shutdown error:', err);
+      log.error({ err }, 'EventBus shutdown error');
     });
   } catch {
     // EventBus may not be initialized
   }
 
   setTimeout(() => {
-    console.error('[notifications-service] Forced shutdown after timeout');
+    log.fatal('Forced shutdown after timeout');
     process.exit(1);
   }, 10_000).unref();
 }

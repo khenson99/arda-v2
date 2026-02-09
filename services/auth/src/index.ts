@@ -1,7 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import { config } from '@arda/config';
+import { config, createLogger } from '@arda/config';
+
+const log = createLogger('auth');
 import { db } from '@arda/db';
 import { sql } from 'drizzle-orm';
 import { authRouter } from './routes/auth.routes.js';
@@ -46,19 +48,18 @@ app.use(errorHandler);
 // ─── Start Server ─────────────────────────────────────────────────────
 const PORT = config.AUTH_SERVICE_PORT;
 const server = app.listen(PORT, () => {
-  console.log(`[auth-service] Running on port ${PORT}`);
-  console.log(`[auth-service] Environment: ${config.NODE_ENV}`);
+  log.info({ port: PORT, env: config.NODE_ENV }, 'Auth service started');
 });
 
 // ─── Graceful Shutdown ───────────────────────────────────────────────
 function shutdown(signal: string) {
-  console.log(`[auth-service] ${signal} received, shutting down gracefully...`);
+  log.info({ signal }, 'Shutting down gracefully');
   server.close(() => {
-    console.log('[auth-service] HTTP server closed');
+    log.info('HTTP server closed');
     process.exit(0);
   });
   setTimeout(() => {
-    console.error('[auth-service] Forced shutdown after timeout');
+    log.fatal('Forced shutdown after timeout');
     process.exit(1);
   }, 10_000).unref();
 }

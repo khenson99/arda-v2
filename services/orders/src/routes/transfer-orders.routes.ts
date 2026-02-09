@@ -68,7 +68,7 @@ transferOrdersRouter.get('/', async (req: AuthRequest, res, next) => {
     const conditions = [eq(transferOrders.tenantId, tenantId)];
 
     if (status) {
-      conditions.push(eq(transferOrders.status, status as any));
+      conditions.push(eq(transferOrders.status, status as (typeof schema.transferStatusEnum.enumValues)[number]));
     }
     if (sourceFacilityId) {
       conditions.push(eq(transferOrders.sourceFacilityId, sourceFacilityId));

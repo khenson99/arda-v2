@@ -110,8 +110,8 @@ preferencesRouter.put('/', async (req, res, next) => {
               and(
                 eq(schema.notificationPreferences.tenantId, tenantId),
                 eq(schema.notificationPreferences.userId, userId),
-                eq(schema.notificationPreferences.notificationType, notifType as any),
-                eq(schema.notificationPreferences.channel, channel as any)
+                eq(schema.notificationPreferences.notificationType, notifType as (typeof schema.notificationTypeEnum.enumValues)[number]),
+                eq(schema.notificationPreferences.channel, channel as (typeof schema.notificationChannelEnum.enumValues)[number])
               )
             );
 
@@ -124,8 +124,8 @@ preferencesRouter.put('/', async (req, res, next) => {
             await tx.insert(schema.notificationPreferences).values({
               tenantId,
               userId,
-              notificationType: notifType as any,
-              channel: channel as any,
+              notificationType: notifType as (typeof schema.notificationTypeEnum.enumValues)[number],
+              channel: channel as (typeof schema.notificationChannelEnum.enumValues)[number],
               isEnabled,
               createdAt: new Date(),
               updatedAt: new Date(),

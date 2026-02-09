@@ -58,7 +58,7 @@ partsRouter.get('/', async (req: AuthRequest, res, next) => {
       );
     }
     if (query.categoryId) conditions.push(eq(parts.categoryId, query.categoryId));
-    if (query.type) conditions.push(eq(parts.type, query.type as any));
+    if (query.type) conditions.push(eq(parts.type, query.type as (typeof schema.partTypeEnum.enumValues)[number]));
     if (query.isSellable !== undefined) conditions.push(eq(parts.isSellable, query.isSellable));
     if (query.isActive !== undefined) conditions.push(eq(parts.isActive, query.isActive));
     else conditions.push(eq(parts.isActive, true)); // default to active only

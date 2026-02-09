@@ -35,7 +35,7 @@ loopsRouter.get('/', async (req: AuthRequest, res, next) => {
 
     const conditions = [eq(kanbanLoops.tenantId, tenantId), eq(kanbanLoops.isActive, true)];
     if (facilityId) conditions.push(eq(kanbanLoops.facilityId, facilityId));
-    if (loopType) conditions.push(eq(kanbanLoops.loopType, loopType as any));
+    if (loopType) conditions.push(eq(kanbanLoops.loopType, loopType as (typeof schema.loopTypeEnum.enumValues)[number]));
 
     const whereClause = and(...conditions);
     const offset = (page - 1) * pageSize;

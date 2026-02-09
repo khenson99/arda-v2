@@ -82,7 +82,7 @@ async function createNotification(params: {
     targetUserIds.map((userId) => ({
       tenantId: params.tenantId,
       userId,
-      type: params.type as any,
+      type: params.type as (typeof schema.notificationTypeEnum.enumValues)[number],
       title: params.title,
       body: params.body,
       actionUrl: params.actionUrl,

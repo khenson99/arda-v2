@@ -74,7 +74,7 @@ orderQueueRouter.get('/', async (req: AuthRequest, res, next) => {
 
     // Filter by loopType if provided
     if (loopType && ['procurement', 'production', 'transfer'].includes(String(loopType))) {
-      conditions.push(eq(kanbanLoops.loopType, String(loopType) as any));
+      conditions.push(eq(kanbanLoops.loopType, String(loopType) as (typeof schema.loopTypeEnum.enumValues)[number]));
     }
 
     const query = db

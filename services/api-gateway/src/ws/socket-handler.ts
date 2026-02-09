@@ -1,10 +1,16 @@
 import { Server as HttpServer } from 'http';
-import { Server as SocketServer } from 'socket.io';
-import { verifyAccessToken } from '@arda/auth-utils';
-import { config } from '@arda/config';
+import { Server as SocketServer, type Socket } from 'socket.io';
+import { verifyAccessToken, type JwtPayload } from '@arda/auth-utils';
+import { config, createLogger } from '@arda/config';
 import { getEventBus, type ArdaEvent } from '@arda/events';
 import { db, schema } from '@arda/db';
 import { eq, and } from 'drizzle-orm';
+
+interface AuthenticatedSocket extends Socket {
+  user: JwtPayload;
+}
+
+const log = createLogger('ws');
 
 export function setupWebSocket(httpServer: HttpServer, redisUrl: string): SocketServer {
   const io = new SocketServer(httpServer, {
@@ -28,7 +34,7 @@ export function setupWebSocket(httpServer: HttpServer, redisUrl: string): Socket
         return next(new Error('Authentication required'));
       }
       const payload = verifyAccessToken(token);
-      (socket as any).user = payload;
+      (socket as AuthenticatedSocket).user = payload;
       next();
     } catch (err) {
       next(new Error('Invalid token'));
@@ -36,10 +42,10 @@ export function setupWebSocket(httpServer: HttpServer, redisUrl: string): Socket
   });
 
   io.on('connection', (socket) => {
-    const user = (socket as any).user;
+    const user = (socket as AuthenticatedSocket).user;
     const tenantId = user.tenantId;
 
-    console.log(`[ws] Client connected: ${user.sub} (tenant: ${tenantId})`);
+    log.info({ userId: user.sub, tenantId }, 'Client connected');
 
     // Join tenant room
     socket.join(`tenant:${tenantId}`);
@@ -88,11 +94,11 @@ export function setupWebSocket(httpServer: HttpServer, redisUrl: string): Socket
     });
 
     socket.on('disconnect', () => {
-      console.log(`[ws] Client disconnected: ${user.sub}`);
+      log.info({ userId: user.sub }, 'Client disconnected');
       eventBus.unsubscribeTenant(tenantId, handler);
     });
   });
 
-  console.log('[ws] Socket.IO WebSocket handler ready on /socket.io');
+  log.info('Socket.IO WebSocket handler ready on /socket.io');
   return io;
 }

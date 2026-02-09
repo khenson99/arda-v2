@@ -3,7 +3,9 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import { config, serviceUrls } from '@arda/config';
+import { config, serviceUrls, createLogger } from '@arda/config';
+
+const log = createLogger('api-gateway');
 import { db } from '@arda/db';
 import { sql } from 'drizzle-orm';
 import { setupProxies } from './routes/proxy.js';
@@ -80,32 +82,23 @@ const server = createServer(app);
 const io = setupWebSocket(server, config.REDIS_URL);
 
 server.listen(PORT, () => {
-  console.log(`[api-gateway] Running on port ${PORT}`);
-  console.log(`[api-gateway] Proxying to services:`);
-  console.log(`  auth     → ${serviceUrls.auth}`);
-  console.log(`  catalog  → ${serviceUrls.catalog}`);
-  console.log(`  kanban   → ${serviceUrls.kanban}`);
-  console.log(`  orders   → ${serviceUrls.orders}`);
-  console.log(`  notify   → ${serviceUrls.notifications}`);
+  log.info({ port: PORT, services: serviceUrls }, 'API gateway started');
 });
 
 // ─── Graceful Shutdown ───────────────────────────────────────────────
 function shutdown(signal: string) {
-  console.log(`[api-gateway] ${signal} received, shutting down gracefully...`);
+  log.info({ signal }, 'Shutting down gracefully');
 
-  // Stop accepting new connections
   server.close(() => {
-    console.log('[api-gateway] HTTP server closed');
+    log.info('HTTP server closed');
   });
 
-  // Close WebSocket connections
   io.close(() => {
-    console.log('[api-gateway] WebSocket server closed');
+    log.info('WebSocket server closed');
   });
 
-  // Force exit after 10 seconds
   setTimeout(() => {
-    console.error('[api-gateway] Forced shutdown after timeout');
+    log.fatal('Forced shutdown after timeout');
     process.exit(1);
   }, 10_000).unref();
 }

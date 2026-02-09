@@ -1,7 +1,10 @@
+import type { ServerResponse } from 'http';
 import type { Express } from 'express';
 import { createProxyMiddleware, type Options } from 'http-proxy-middleware';
-import { serviceUrls } from '@arda/config';
+import { serviceUrls, createLogger } from '@arda/config';
 import { authMiddleware } from '@arda/auth-utils';
+
+const log = createLogger('proxy');
 
 // ─── Service Route Map ────────────────────────────────────────────────
 // Maps URL prefixes to upstream services.
@@ -76,10 +79,11 @@ export function setupProxies(app: Express): void {
           }
         },
         error: (err, _req, res) => {
-          console.error(`[api-gateway] Proxy error for ${route.prefix}:`, err.message);
+          log.error({ prefix: route.prefix, err: err.message }, 'Proxy error');
           if ('writeHead' in res && typeof res.writeHead === 'function') {
-            (res as any).writeHead(502);
-            (res as any).end(JSON.stringify({
+            const httpRes = res as ServerResponse;
+            httpRes.writeHead(502);
+            httpRes.end(JSON.stringify({
               error: 'Service unavailable',
               service: route.prefix,
             }));
@@ -96,6 +100,6 @@ export function setupProxies(app: Express): void {
       app.use(route.prefix, createProxyMiddleware(proxyOptions));
     }
 
-    console.log(`  [proxy] ${route.prefix} → ${route.target}`);
+    log.debug({ prefix: route.prefix, target: route.target }, 'Proxy route registered');
   }
 }

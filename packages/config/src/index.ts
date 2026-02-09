@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import pino from 'pino';
 import 'dotenv/config';
 
 // ─── Environment Schema ───────────────────────────────────────────────
@@ -76,3 +77,15 @@ export const serviceUrls = {
   orders: `http://${config.SERVICE_HOST}:${config.ORDERS_SERVICE_PORT}`,
   notifications: `http://${config.SERVICE_HOST}:${config.NOTIFICATIONS_SERVICE_PORT}`,
 } as const;
+
+// ─── Structured Logger Factory ───────────────────────────────────────
+export function createLogger(name: string) {
+  return pino({
+    name,
+    level: config.NODE_ENV === 'production' ? 'info' : 'debug',
+    ...(config.NODE_ENV !== 'production' && {
+      transport: { target: 'pino/file', options: { destination: 1 } },
+      formatters: { level: (label: string) => ({ level: label }) },
+    }),
+  });
+}
