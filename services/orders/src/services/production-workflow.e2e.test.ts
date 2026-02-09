@@ -842,6 +842,8 @@ describe('production queue routes integration', () => {
       testState.dbSelectResults.push([{ avgWaitHours: 4.3 }]);
       // Work centers list
       testState.dbSelectResults.push([]);
+      // Scrap analysis (hold operations)
+      testState.dbSelectResults.push([]);
       // Queue health
       testState.dbSelectResults.push([{
         currentBacklog: 8,
@@ -849,8 +851,6 @@ describe('production queue routes integration', () => {
         oldestAgeHours: 72.5,
         expeditedInQueue: 1,
       }]);
-      // Scrap analysis (hold operations)
-      testState.dbSelectResults.push([]);
 
       const app = createTestApp();
       const res = await requestJson(app, 'GET', '/production-queue/analytics');
