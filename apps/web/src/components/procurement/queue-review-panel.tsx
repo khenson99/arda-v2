@@ -8,9 +8,8 @@
 
 import * as React from 'react';
 import { cn } from '@/lib/utils';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { QueueItemCard } from './queue-item-card';
 import type { QueueItem, CriticalityLevel } from './types';
 
@@ -149,7 +148,7 @@ export function QueueReviewPanel({
                   ['medium', 'accent'],
                   ['low', 'secondary'],
                 ] as const
-              ).map(([level, variant]) => (
+              ).map(([level]) => (
                 <button
                   key={level}
                   type="button"
