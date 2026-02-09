@@ -1,7 +1,15 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { Request, Response, NextFunction } from 'express';
+import { describe, it, expect, vi } from 'vitest';
 import { hasPermission, Permission, type PermissionString } from '@arda/auth-utils';
 import type { UserRole } from '@arda/shared-types';
+
+vi.hoisted(() => {
+  // @arda/auth-utils re-exports JWT helpers that load @arda/config at import time.
+  // Seed required env vars so permission-only tests stay isolated.
+  process.env.DATABASE_URL ??= 'postgres://arda:arda@localhost:5432/arda_test';
+  process.env.JWT_SECRET ??= '12345678901234567890123456789012';
+  process.env.JWT_REFRESH_SECRET ??= 'abcdefghijklmnopqrstuvwxyz123456';
+  process.env.NODE_ENV ??= 'test';
+});
 
 // ─── Test the RBAC matrix for kanban service ────────────────────────
 // These tests verify that the permission registry correctly maps roles

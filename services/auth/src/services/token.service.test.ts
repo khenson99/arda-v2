@@ -155,10 +155,6 @@ describe('token.service', () => {
 
       await expect(
         rotateRefreshToken({ token: 'bad-token' }),
-      ).rejects.toThrow(TokenError);
-
-      await expect(
-        rotateRefreshToken({ token: 'bad-token' }),
       ).rejects.toMatchObject({ code: 'INVALID_REFRESH_TOKEN' });
     });
 

@@ -556,7 +556,7 @@ const queueRiskQuerySchema = z.object({
       }
       return value;
     }, z.boolean())
-    .default(false),
+    .default(true),
 });
 
 // GET / - List all triggered cards needing orders

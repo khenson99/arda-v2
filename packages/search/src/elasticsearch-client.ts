@@ -6,6 +6,7 @@
  */
 
 import { Client } from '@elastic/elasticsearch';
+import type { estypes } from '@elastic/elasticsearch';
 import type { SearchClient, SearchQuery, SearchResult, SearchHit, IndexMapping } from './types.js';
 
 export interface ElasticsearchClientConfig {
@@ -155,11 +156,19 @@ export class ElasticsearchSearchClient implements SearchClient {
       return;
     }
 
+    const dynamic = (
+      mapping.dynamic === 'true'
+        ? true
+        : mapping.dynamic === 'false'
+          ? false
+          : mapping.dynamic
+    ) as estypes.MappingDynamicMapping | undefined;
+
     await this.client.indices.create({
       index: indexName,
       mappings: {
-        dynamic: mapping.dynamic as 'strict' | 'true' | 'false' | undefined,
-        properties: mapping.properties as Record<string, unknown>,
+        ...(dynamic !== undefined && { dynamic }),
+        properties: mapping.properties as Record<string, estypes.MappingProperty>,
       },
       settings: mapping.settings
         ? {
