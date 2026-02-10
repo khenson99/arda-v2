@@ -60,7 +60,7 @@ const routes: RouteConfig[] = [
   {
     prefix: '/api/notifications',
     target: serviceUrls.notifications,
-    pathRewrite: {},
+    pathRewrite: { '^/': '/notifications/' },
     requiresAuth: true,
   },
   // ── Public scan endpoint (QR code deep-link, no auth) ──
