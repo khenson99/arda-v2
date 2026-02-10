@@ -25,7 +25,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui";
-import { EditableCell, PaginationBar, ColumnConfig } from "@/components/data-table";
+import { EditableCell, PaginationBar, ColumnConfig, BulkActionsBar, ItemCardList } from "@/components/data-table";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { ErrorBanner } from "@/components/error-banner";
 import { NextActionBanner } from "@/components/next-action-banner";
 import { useWorkspaceData } from "@/hooks/use-workspace-data";
@@ -211,6 +212,8 @@ export function PartsRoute({
     }
   });
   const [inlineOverrides, setInlineOverrides] = React.useState<Record<string, Partial<PartRecord>>>({});
+  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
+  const isMobile = useMediaQuery("(max-width: 767px)");
 
   // Persist page size + column config to localStorage
   React.useEffect(() => {
@@ -336,6 +339,19 @@ export function PartsRoute({
     setPage(1);
   }, [activeTab, pageSize, search]);
 
+  // Clear selection when page / tab / search changes
+  React.useEffect(() => {
+    setSelectedIds(new Set());
+  }, [activeTab, pageSize, search, page]);
+
+  const toggleOne = React.useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
   // ── Pagination math ──────────────────────────────────────────
 
   const totalPages = Math.max(1, Math.ceil(filteredParts.length / pageSize));
@@ -346,6 +362,22 @@ export function PartsRoute({
   const visibleColumnsSet = React.useMemo(() => new Set(visibleColumns), [visibleColumns]);
   const tableColumnCount = visibleColumns.length + 1;
   const tableMinWidth = Math.max(1280, 120 + visibleColumns.length * 138);
+
+  const toggleAll = React.useCallback(() => {
+    setSelectedIds((prev) =>
+      prev.size === pagedParts.length ? new Set() : new Set(pagedParts.map((p) => p.id)),
+    );
+  }, [pagedParts]);
+
+  // Aggregate card IDs from selected parts for bulk actions
+  const selectedCardIds = React.useMemo(() => {
+    const ids: string[] = [];
+    for (const partId of selectedIds) {
+      const stats = queueStatsByPartId.get(partId);
+      if (stats) ids.push(...stats.cardIds);
+    }
+    return ids;
+  }, [selectedIds, queueStatsByPartId]);
 
   // ── Optimistic update handler ────────────────────────────────
 
@@ -499,69 +531,106 @@ export function PartsRoute({
           you press Enter or click away.
         </p>
 
-        {/* ── Table ─────────────────────────────────────────── */}
+        {/* ── Table / Card list ────────────────────────────── */}
 
-        <div className="overflow-hidden rounded-lg border border-table-border bg-card shadow-arda-sm">
-          <div className="overflow-x-auto">
-            <TooltipProvider delayDuration={140}>
-              <table
-                className="w-full divide-y divide-table-border text-[12.5px]"
-                style={{ minWidth: `${tableMinWidth}px` }}
-              >
-                <thead className="bg-table-header text-[12px]">
-                  <tr>
-                    <th className="table-cell-density w-9">
-                      <input
-                        type="checkbox"
-                        aria-label="Select all items"
-                        className="h-4 w-4 rounded border-input text-primary focus:ring-ring"
-                      />
-                    </th>
-                    {visibleColumns.map((columnKey) => {
-                      const column = ITEM_TABLE_COLUMNS.find((c) => c.key === columnKey);
-                      if (!column) return null;
-                      return (
-                        <th
-                          key={columnKey}
-                          className="table-cell-density text-left font-semibold whitespace-nowrap"
-                        >
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="cursor-default truncate">{column.label}</span>
-                            </TooltipTrigger>
-                            <TooltipContent>{column.label}</TooltipContent>
-                          </Tooltip>
-                        </th>
-                      );
-                    })}
-                  </tr>
-                </thead>
-                <tbody>
-                  {pagedParts.length === 0 && (
+        {isMobile ? (
+          <>
+            <ItemCardList
+              parts={pagedParts}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleOne}
+              queueStatsByPartId={queueStatsByPartId}
+              orderLineByItem={orderLineByItem}
+              session={session}
+            />
+            {pagedParts.length === 0 && (
+              <p className="py-10 text-center text-sm text-muted-foreground">No items match your search.</p>
+            )}
+          </>
+        ) : (
+          <div className="overflow-hidden rounded-lg border border-table-border bg-card shadow-arda-sm">
+            <div className="overflow-x-auto">
+              <TooltipProvider delayDuration={140}>
+                <table
+                  className="w-full divide-y divide-table-border text-[12.5px]"
+                  style={{ minWidth: `${tableMinWidth}px` }}
+                >
+                  <thead className="bg-table-header text-[12px]">
                     <tr>
-                      <td colSpan={tableColumnCount} className="px-4 py-10 text-center text-muted-foreground">
-                        No items match your search.
-                      </td>
+                      <th className="table-cell-density w-9">
+                        <input
+                          type="checkbox"
+                          aria-label="Select all items"
+                          className="h-4 w-4 rounded border-input text-primary focus:ring-ring"
+                          checked={pagedParts.length > 0 && selectedIds.size === pagedParts.length}
+                          ref={(el) => {
+                            if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < pagedParts.length;
+                          }}
+                          onChange={toggleAll}
+                        />
+                      </th>
+                      {visibleColumns.map((columnKey) => {
+                        const column = ITEM_TABLE_COLUMNS.find((c) => c.key === columnKey);
+                        if (!column) return null;
+                        return (
+                          <th
+                            key={columnKey}
+                            className="table-cell-density text-left font-semibold whitespace-nowrap"
+                          >
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="cursor-default truncate">{column.label}</span>
+                              </TooltipTrigger>
+                              <TooltipContent>{column.label}</TooltipContent>
+                            </Tooltip>
+                          </th>
+                        );
+                      })}
                     </tr>
-                  )}
+                  </thead>
+                  <tbody>
+                    {pagedParts.length === 0 && (
+                      <tr>
+                        <td colSpan={tableColumnCount} className="px-4 py-10 text-center text-muted-foreground">
+                          No items match your search.
+                        </td>
+                      </tr>
+                    )}
 
-                  {pagedParts.map((part) => (
-                    <ItemRow
-                      key={part.id}
-                      part={part}
-                      visibleColumnsSet={visibleColumnsSet}
-                      visibleColumns={visibleColumns}
-                      queueStatsByPartId={queueStatsByPartId}
-                      orderLineByItem={orderLineByItem}
-                      session={session}
-                      onOptimisticUpdate={applyOptimisticUpdate}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </TooltipProvider>
+                    {pagedParts.map((part) => (
+                      <ItemRow
+                        key={part.id}
+                        part={part}
+                        visibleColumnsSet={visibleColumnsSet}
+                        visibleColumns={visibleColumns}
+                        queueStatsByPartId={queueStatsByPartId}
+                        orderLineByItem={orderLineByItem}
+                        session={session}
+                        onOptimisticUpdate={applyOptimisticUpdate}
+                        isSelected={selectedIds.has(part.id)}
+                        onToggle={() => toggleOne(part.id)}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </TooltipProvider>
+            </div>
+
+            <PaginationBar
+              currentPage={currentPage}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              totalItems={filteredParts.length}
+              firstIndex={firstVisibleIndex}
+              lastIndex={lastVisibleIndex}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
           </div>
+        )}
 
+        {/* Pagination also on mobile */}
+        {isMobile && pagedParts.length > 0 && (
           <PaginationBar
             currentPage={currentPage}
             totalPages={totalPages}
@@ -572,9 +641,22 @@ export function PartsRoute({
             onPageChange={setPage}
             onPageSizeChange={setPageSize}
           />
-        </div>
+        )}
+
         </div>
       </section>
+
+      {/* ── Bulk actions bar (slides up when items selected) ─── */}
+      <BulkActionsBar
+        selectedCount={selectedIds.size}
+        selectedCardIds={selectedCardIds}
+        session={session}
+        onDeselectAll={() => setSelectedIds(new Set())}
+        onComplete={() => {
+          setSelectedIds(new Set());
+          void refreshAll();
+        }}
+      />
     </div>
   );
 }
@@ -720,6 +802,8 @@ interface ItemRowProps {
   orderLineByItem: Record<string, import("@/types").OrderLineByItemSummary>;
   session: AuthSession;
   onOptimisticUpdate: (partId: string, patch: Partial<PartRecord>) => void;
+  isSelected: boolean;
+  onToggle: () => void;
 }
 
 const ItemRow = React.memo(function ItemRow({
@@ -730,6 +814,8 @@ const ItemRow = React.memo(function ItemRow({
   orderLineByItem,
   session,
   onOptimisticUpdate,
+  isSelected,
+  onToggle,
 }: ItemRowProps) {
   const queueStats = queueStatsByPartId.get(part.id);
   const orderLineSummary = orderLineByItem[part.eId ?? part.id];
@@ -968,11 +1054,24 @@ const ItemRow = React.memo(function ItemRow({
     }
   };
 
+  const STATUS_ROW_CLASSES: Record<string, string> = {
+    success:   "border-l-4 border-l-[hsl(var(--arda-success))] bg-[hsl(var(--arda-success)/0.03)]",
+    warning:   "border-l-4 border-l-[hsl(var(--arda-warning))] bg-[hsl(var(--arda-warning)/0.03)]",
+    accent:    "border-l-4 border-l-[hsl(var(--arda-blue))] bg-[hsl(var(--arda-blue)/0.03)]",
+    secondary: "",
+  };
+
   return (
-    <tr className="border-t border-table-border hover:bg-table-row-hover/70">
+    <tr className={cn(
+      "border-t border-table-border hover:bg-table-row-hover/70",
+      STATUS_ROW_CLASSES[statusVariant],
+      isSelected && "bg-[hsl(var(--arda-blue)/0.06)]",
+    )}>
       <td className="table-cell-density">
         <input
           type="checkbox"
+          checked={isSelected}
+          onChange={onToggle}
           aria-label={`Select ${part.partNumber}`}
           className="h-4 w-4 rounded border-input text-primary focus:ring-ring"
         />

@@ -1,5 +1,6 @@
 import * as React from "react";
 import {
+  ArrowUpDown,
   ChevronDown,
   Filter,
   Loader2,
@@ -217,6 +218,36 @@ const QueueCardItem = React.memo(function QueueCardItem({
   );
 });
 
+/* ── Sort helpers ───────────────────────────────────────────────────── */
+
+type QueueSortKey = "age" | "cardNumber" | "stage" | "quantity";
+
+const STAGE_ORDER: Record<string, number> = {
+  created: 0,
+  triggered: 1,
+  ordered: 2,
+  in_transit: 3,
+  received: 4,
+  restocked: 5,
+};
+
+function makeSortFn(sortKey: QueueSortKey) {
+  return (a: QueueCard, b: QueueCard): number => {
+    switch (sortKey) {
+      case "age":
+        return new Date(a.currentStageEnteredAt).getTime() - new Date(b.currentStageEnteredAt).getTime();
+      case "cardNumber":
+        return a.cardNumber - b.cardNumber;
+      case "stage":
+        return (STAGE_ORDER[a.currentStage] ?? 99) - (STAGE_ORDER[b.currentStage] ?? 99);
+      case "quantity":
+        return (b.orderQuantity ?? 0) - (a.orderQuantity ?? 0);
+      default:
+        return 0;
+    }
+  };
+}
+
 /* ── Queue route ────────────────────────────────────────────────────── */
 
 export function QueueRoute({
@@ -231,6 +262,7 @@ export function QueueRoute({
 
   const [activeLoopFilter, setActiveLoopFilter] = React.useState<LoopType | "all">("all");
   const [searchTerm, setSearchTerm] = React.useState("");
+  const [sortKey, setSortKey] = React.useState<QueueSortKey>("age");
 
   // Build part lookup by ID so expanded cards can show rich part data
   const partById = React.useMemo(() => {
@@ -265,12 +297,14 @@ export function QueueRoute({
       );
     };
 
+    const sortFn = makeSortFn(sortKey);
+
     return {
-      procurement: queueByLoop.procurement.filter(matchesSearch),
-      production: queueByLoop.production.filter(matchesSearch),
-      transfer: queueByLoop.transfer.filter(matchesSearch),
+      procurement: queueByLoop.procurement.filter(matchesSearch).sort(sortFn),
+      production: queueByLoop.production.filter(matchesSearch).sort(sortFn),
+      transfer: queueByLoop.transfer.filter(matchesSearch).sort(sortFn),
     } satisfies QueueByLoop;
-  }, [queueByLoop, searchTerm, partById]);
+  }, [queueByLoop, searchTerm, partById, sortKey]);
 
   if (isLoading) {
     return (
@@ -335,6 +369,20 @@ export function QueueRoute({
               {isRefreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
               Refresh
             </Button>
+
+            <label className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground">
+              <ArrowUpDown className="h-3.5 w-3.5" />
+              <select
+                className="h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground"
+                value={sortKey}
+                onChange={(e) => setSortKey(e.target.value as QueueSortKey)}
+              >
+                <option value="age">Oldest first</option>
+                <option value="cardNumber">Card #</option>
+                <option value="stage">Stage</option>
+                <option value="quantity">Qty (high→low)</option>
+              </select>
+            </label>
           </div>
         </CardContent>
       </Card>
