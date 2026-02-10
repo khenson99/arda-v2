@@ -60,9 +60,11 @@ interface AuthResponse {
 
 // ─── Register (Creates Tenant + Admin User) ──────────────────────────
 export async function register(input: RegisterInput): Promise<AuthResponse> {
+  const normalizedEmail = input.email.trim().toLowerCase();
+
   // Check if email already exists across any tenant
   const existingUser = await db.query.users.findFirst({
-    where: eq(users.email, input.email),
+    where: eq(users.email, normalizedEmail),
   });
   if (existingUser) {
     throw new AppError(409, 'An account with this email already exists', 'EMAIL_EXISTS');
@@ -99,7 +101,7 @@ export async function register(input: RegisterInput): Promise<AuthResponse> {
       .insert(users)
       .values({
         tenantId: tenant.id,
-        email: input.email,
+        email: normalizedEmail,
         passwordHash,
         firstName: input.firstName,
         lastName: input.lastName,
@@ -130,9 +132,11 @@ export async function register(input: RegisterInput): Promise<AuthResponse> {
 
 // ─── Login ────────────────────────────────────────────────────────────
 export async function login(input: LoginInput): Promise<AuthResponse> {
+  const normalizedEmail = input.email.trim().toLowerCase();
+
   // Find user by email (with tenant data)
   const user = await db.query.users.findFirst({
-    where: eq(users.email, input.email),
+    where: eq(users.email, normalizedEmail),
     with: { tenant: true },
   });
 
