@@ -36,6 +36,8 @@ export function NotesEditor({
   onSaved,
 }: NotesEditorProps) {
   const [isSaving, setIsSaving] = React.useState(false);
+  const [editorNonce, setEditorNonce] = React.useState(0);
+  const [showInitWarning, setShowInitWarning] = React.useState(false);
 
   const editor = useEditor({
     extensions: [
@@ -47,14 +49,24 @@ export function NotesEditor({
       }),
     ],
     content: part.notes || "",
-    immediatelyRender: false,
     editorProps: {
       attributes: {
         class:
           "prose prose-sm max-w-none min-h-[200px] px-3 py-2 focus:outline-none [&_h2]:text-base [&_h2]:font-semibold [&_h3]:text-sm [&_h3]:font-semibold [&_p]:text-sm [&_p]:leading-relaxed [&_ul]:text-sm [&_ol]:text-sm",
       },
     },
-  });
+  }, [part.id, editorNonce]);
+
+  React.useEffect(() => {
+    setShowInitWarning(false);
+    if (editor) return;
+    const timeoutId = window.setTimeout(() => {
+      setShowInitWarning(true);
+    }, 1500);
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [editor, part.id, editorNonce]);
 
   // Reset editor content when part changes
   React.useEffect(() => {
@@ -131,12 +143,27 @@ export function NotesEditor({
         <div className="space-y-1">
           <h3 className="text-sm font-semibold">Item Notes</h3>
           <p className="text-xs text-muted-foreground">
-            Initializing editor...
+            {showInitWarning
+              ? "Editor failed to initialize. Retry loading it."
+              : "Initializing editor..."}
           </p>
         </div>
-        <div className="flex min-h-[200px] items-center justify-center rounded-md border border-border bg-muted/20 text-xs text-muted-foreground">
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          Loading editor
+        <div className="flex min-h-[200px] flex-col items-center justify-center gap-2 rounded-md border border-border bg-muted/20 text-xs text-muted-foreground">
+          {!showInitWarning && (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Loading editor</span>
+            </>
+          )}
+          {showInitWarning && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setEditorNonce((value) => value + 1)}
+            >
+              Retry editor
+            </Button>
+          )}
         </div>
       </div>
     );
