@@ -763,8 +763,28 @@ function QuickActions({
       const loopsResult = await fetchLoops(session.tokens.accessToken, { page: 1, pageSize: 200 });
       const partLoops = loopsResult.data.filter((loop) => loop.partId === part.id);
       if (partLoops.length === 0) {
-        setCreateCardState("idle");
-        toast.error("No loop exists for this item. Create a loop first.");
+        if (!part.eId) {
+          setCreateCardState("idle");
+          toast.error("This item cannot auto-provision a loop yet. Refresh and try again.");
+          return;
+        }
+
+        const author = normalizeOptionalString(session.user.email) || session.user.id;
+        await updateItemRecord(session.tokens.accessToken, {
+          entityId: part.eId,
+          tenantId: session.user.tenantId,
+          author,
+          payload: toItemsInputPayload(part),
+        });
+
+        setCreateCardState("done");
+        toast.success("Created default loop and first card for this item.");
+        try {
+          await onCardCreated?.();
+        } catch {
+          // Keep quick action success even if refresh fails.
+        }
+        setTimeout(() => setCreateCardState("idle"), 1500);
         return;
       }
 
