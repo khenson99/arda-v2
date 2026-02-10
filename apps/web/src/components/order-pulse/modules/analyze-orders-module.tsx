@@ -68,8 +68,15 @@ function toDetectedOrders(orders: GmailDiscoveredOrder[]): DetectedOrder[] {
       name: item.name,
       sku: item.sku,
       asin: item.asin,
+      upc: item.upc,
       quantity: item.quantity,
+      quantityOrdered: item.quantityOrdered,
       unitPrice: item.unitPrice,
+      lineTotal: item.lineTotal,
+      packSize: item.packSize,
+      imageUrl: item.imageUrl,
+      dateOrdered: item.dateOrdered,
+      messageType: item.messageType,
       url: item.url,
     })),
   }));
@@ -159,8 +166,8 @@ export function AnalyzeOrdersModule({
       if (filteredOrders.length === 0) {
         setAnalysisError(
           selectedVendors.size > 0
-            ? "No Gmail purchase messages matched your selected vendors."
-            : "No purchase-related Gmail messages were found yet.",
+            ? "No qualifying industrial supplier emails matched your selected vendors."
+            : "No qualifying industrial supplier order emails were found yet.",
         );
       }
     } catch (error) {
@@ -198,7 +205,7 @@ export function AnalyzeOrdersModule({
           <CardDescription>
             {selectedVendors.size > 0
               ? `Scanning your linked Gmail inbox and filtering for ${selectedVendors.size} selected vendor${selectedVendors.size !== 1 ? "s" : ""}.`
-              : "Scanning your linked Gmail inbox for purchase-related activity and extracting likely orders."}
+              : "Scanning your linked Gmail inbox for industrial supplier receipts, shipping, and delivery emails."}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -240,7 +247,7 @@ export function AnalyzeOrdersModule({
                 </Button>
               </div>
               <p className="text-sm text-muted-foreground">
-                Pulls recent purchase emails and converts them into actionable order candidates.
+                Pulls industrial supplier order emails and converts them into actionable order candidates.
               </p>
             </div>
           ) : (

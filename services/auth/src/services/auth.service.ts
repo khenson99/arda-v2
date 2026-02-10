@@ -355,6 +355,7 @@ interface OrderHistoryAggregate {
   quantities: number[];
   unitPrices: number[];
   orderDates: string[];
+  avgUnitPrice?: number;
   cadenceDays?: number;
   moq: number;
   recommendedOrderQuantity: number;
@@ -1073,12 +1074,6 @@ function isDiscoveryAllowedDomain(domain: string): boolean {
   return Boolean(normalized) && !GMAIL_DISCOVERY_DOMAIN_DENYLIST.has(normalized);
 }
 
-function extractEmailDomain(fromHeader: string): string | null {
-  const domain = extractRawEmailDomain(fromHeader);
-  if (!domain || !isDiscoveryAllowedDomain(domain)) return null;
-  return domain;
-}
-
 function extractSenderName(fromHeader: string): string | null {
   const nameOnly = fromHeader.split('<')[0]?.trim().replace(/^"+|"+$/g, '');
   if (nameOnly && !nameOnly.includes('@')) return nameOnly;
@@ -1194,7 +1189,9 @@ function isLikelyIndustrialSupplier(input: {
   if (!domain) return false;
 
   const known = resolveKnownVendorByDomain(domain);
-  if (known && INDUSTRIAL_VENDOR_IDS.has(known.id)) return true;
+  if (known) {
+    return INDUSTRIAL_VENDOR_IDS.has(known.id);
+  }
 
   if (input.selectedVendorDomains?.size) {
     for (const candidate of input.selectedVendorDomains) {
@@ -1233,8 +1230,7 @@ function shouldExcludeMessageByContent(input: {
   if (
     labels.has('CATEGORY_PROMOTIONS') ||
     labels.has('CATEGORY_FORUMS') ||
-    labels.has('CATEGORY_SOCIAL') ||
-    labels.has('CATEGORY_UPDATES')
+    labels.has('CATEGORY_SOCIAL')
   ) {
     return true;
   }
@@ -1497,6 +1493,30 @@ export async function discoverGmailSuppliersForUser(input: {
       });
       if (!domain) return;
       const knownVendor = resolveKnownVendorByDomain(domain);
+      const senderName = extractSenderName(fromHeader) || undefined;
+      const resolvedVendorName = knownVendor?.name || senderName || formatVendorNameFromDomain(domain);
+
+      if (
+        shouldExcludeMessageByContent({
+          subject: subjectHeader,
+          snippet,
+          bodyText: '',
+        })
+      ) {
+        return;
+      }
+
+      if (isLikelyFinancialInstitution({ domain, senderName, subject: subjectHeader })) {
+        return;
+      }
+
+      if (!isLikelyIndustrialSupplier({ domain, vendorName: resolvedVendorName })) {
+        return;
+      }
+
+      if (!classifyPurchaseMessageType(`${subjectHeader}\n${snippet}`)) {
+        return;
+      }
 
       const dateHeader =
         headers.find((header) => header.name?.toLowerCase() === 'date')?.value || '';
@@ -1508,12 +1528,11 @@ export async function discoverGmailSuppliersForUser(input: {
           ? internalDateEpochMs
           : Date.now();
 
-      const senderName = extractSenderName(fromHeader);
       const current = supplierByDomain.get(domain);
 
       if (!current) {
         supplierByDomain.set(domain, {
-          vendorName: knownVendor?.name || senderName || formatVendorNameFromDomain(domain),
+          vendorName: resolvedVendorName,
           messageCount: 1,
           lastSeenEpochMs,
         });
@@ -2046,7 +2065,7 @@ function enrichItemViaVendorUrlRules(
 }
 
 function extractPreferredUrlFromSignal(signal: GmailMessageSignal): string | undefined {
-  const urls = extractUrlsFromText(`${signal.subject}\n${signal.snippet}`);
+  const urls = extractUrlsFromText(`${signal.subject}\n${signal.snippet}\n${signal.bodyText}`);
   if (urls.length === 0) return undefined;
 
   const sameVendor = urls.find((url) => {
@@ -2058,6 +2077,156 @@ function extractPreferredUrlFromSignal(signal: GmailMessageSignal): string | und
     }
   });
   return sameVendor || urls[0];
+}
+
+function extractImageUrlFromText(text: string, signal: GmailMessageSignal): string | undefined {
+  const urls = extractUrlsFromText(text);
+  const imageUrl = urls.find((url) => /\.(png|jpe?g|webp|gif)(\?|$)/i.test(url));
+  if (imageUrl) return imageUrl;
+
+  const sameVendor = urls.find((url) => {
+    try {
+      const domain = normalizeHostDomain(new URL(url).hostname);
+      return domainMatchesTarget(domain, signal.domain) && /image|img|product|item/i.test(url);
+    } catch {
+      return false;
+    }
+  });
+  return sameVendor;
+}
+
+function extractPackSizeFromText(text: string): string | undefined {
+  const pattern = /\b(pack(?:\s+of)?\s*\d+|\d+\s*pack|case(?:\s+of)?\s*\d+|box(?:\s+of)?\s*\d+)\b/i;
+  const match = text.match(pattern);
+  return match?.[1] ? normalizeWhitespace(match[1]) : undefined;
+}
+
+function extractSkuFromText(text: string): string | undefined {
+  const labelMatch = text.match(/\b(?:sku|item(?:\s*#| number)?|part(?:\s*#| number)?|model)\b[:#\s-]*([A-Z0-9][A-Z0-9._-]{2,39})/i);
+  if (labelMatch?.[1]) return labelMatch[1].toUpperCase();
+
+  const fallback = text.match(/\b[A-Z0-9]{3,}[._-][A-Z0-9._-]{2,}\b/i);
+  return fallback?.[0] ? fallback[0].toUpperCase() : undefined;
+}
+
+function extractUpcFromText(text: string): string | undefined {
+  const upcLabel = text.match(/\bupc\b[:#\s-]*(\d{8,14})\b/i);
+  if (upcLabel?.[1]) return upcLabel[1];
+
+  const standalone = text.match(/\b(\d{12}|\d{13}|\d{14})\b/);
+  return standalone?.[1];
+}
+
+function extractAsinFromText(text: string): string | undefined {
+  const labeled = text.match(/\basin\b[:#\s-]*([A-Z0-9]{10})\b/i);
+  if (labeled?.[1]) return labeled[1].toUpperCase();
+
+  const bare = text.match(/\bB0[A-Z0-9]{8}\b/i);
+  return bare?.[0] ? bare[0].toUpperCase() : undefined;
+}
+
+function extractQuantityFromText(text: string): number | undefined {
+  const quantityMatch = text.match(/\b(?:qty|quantity|ordered)\b[:\s-]*(\d+(?:\.\d+)?)\b/i);
+  if (quantityMatch?.[1]) return toPositiveInt(quantityMatch[1], 1);
+
+  const xMatch = text.match(/\b(\d+)\s*[x×]\b/);
+  if (xMatch?.[1]) return toPositiveInt(xMatch[1], 1);
+
+  return undefined;
+}
+
+function extractUnitPriceFromText(text: string): number | undefined {
+  const unitMatch = text.match(/\$\s?(\d+(?:,\d{3})*(?:\.\d{1,2})?)\s*(?:\/|each|ea\b|unit\b)/i);
+  if (unitMatch?.[1]) return toNumber(unitMatch[1].replace(/,/g, '')) ?? undefined;
+
+  const labeled = text.match(/\bunit(?:\s+price)?\b[:\s-]*\$?\s?(\d+(?:,\d{3})*(?:\.\d{1,2})?)/i);
+  if (labeled?.[1]) return toNumber(labeled[1].replace(/,/g, '')) ?? undefined;
+
+  return undefined;
+}
+
+function extractLineTotalFromText(text: string): number | undefined {
+  const totalMatch = text.match(/\b(?:line\s*total|subtotal|total)\b[:\s-]*\$?\s?(\d+(?:,\d{3})*(?:\.\d{1,2})?)/i);
+  if (totalMatch?.[1]) return toNumber(totalMatch[1].replace(/,/g, '')) ?? undefined;
+
+  const price = text.match(/\$\s?(\d+(?:,\d{3})*(?:\.\d{1,2})?)/);
+  return price?.[1] ? toNumber(price[1].replace(/,/g, '')) ?? undefined : undefined;
+}
+
+function extractItemNameFromLine(line: string): string {
+  const withoutNoise = line
+    .replace(/\b(?:qty|quantity|ordered|sku|asin|upc|unit price|price|line total|total)\b[:#]?[^\s]*/gi, ' ')
+    .replace(/\$\s?\d+(?:,\d{3})*(?:\.\d{1,2})?/g, ' ')
+    .replace(/\b\d+\s*(?:x|pack|case|box)\b/gi, ' ')
+    .replace(/[|•]+/g, ' ');
+
+  const cleaned = normalizeWhitespace(withoutNoise);
+  if (cleaned.length >= 4) return cleaned;
+  return normalizeWhitespace(line);
+}
+
+function extractItemsFromSignal(signal: GmailMessageSignal): GmailDetectedOrderItem[] {
+  const messageText = `${signal.subject}\n${signal.snippet}\n${signal.bodyText}`.slice(0, 20_000);
+  const lines = messageText
+    .split(/\n+/g)
+    .map((line) => normalizeWhitespace(line))
+    .filter(Boolean)
+    .slice(0, 500);
+
+  const url = extractPreferredUrlFromSignal(signal);
+  const imageUrl = extractImageUrlFromText(messageText, signal);
+  const candidates: GmailDetectedOrderItem[] = [];
+
+  for (const line of lines) {
+    const looksLikeItem =
+      /\b(?:sku|asin|upc|qty|quantity|item|part|model|unit price|line total|pack)\b/i.test(line) ||
+      /\$\s?\d/.test(line) ||
+      /\|\s*/.test(line);
+    if (!looksLikeItem) continue;
+
+    const name = extractItemNameFromLine(line);
+    if (name.length < 4) continue;
+
+    const quantity = extractQuantityFromText(line) ?? 1;
+    const item: GmailDetectedOrderItem = {
+      name,
+      quantity,
+      quantityOrdered: quantity,
+      sku: extractSkuFromText(line),
+      asin: extractAsinFromText(line),
+      upc: extractUpcFromText(line),
+      unitPrice: extractUnitPriceFromText(line),
+      lineTotal: extractLineTotalFromText(line),
+      packSize: extractPackSizeFromText(line),
+      imageUrl,
+      url,
+      dateOrdered: signal.receivedAt,
+      messageType: signal.messageType,
+    };
+
+    candidates.push(enrichItemViaVendorUrlRules(item, signal.domain));
+    if (candidates.length >= 24) break;
+  }
+
+  if (candidates.length > 0) {
+    return candidates;
+  }
+
+  const fallbackName = normalizeWhitespace(signal.subject) || `Order from ${signal.vendorName}`;
+  return [
+    enrichItemViaVendorUrlRules(
+      {
+        name: fallbackName,
+        quantity: 1,
+        quantityOrdered: 1,
+        url,
+        imageUrl,
+        dateOrdered: signal.receivedAt,
+        messageType: signal.messageType,
+      },
+      signal.domain,
+    ),
+  ];
 }
 
 function buildHeuristicOrdersFromSignals(signals: GmailMessageSignal[]): GmailDetectedOrder[] {
@@ -2077,17 +2246,10 @@ function buildHeuristicOrdersFromSignals(signals: GmailMessageSignal[]): GmailDe
 
   for (const signal of signals) {
     const orderNumber =
-      extractOrderNumber(signal.subject, signal.snippet) ||
+      extractOrderNumber(signal.subject, `${signal.snippet} ${signal.bodyText}`) ||
       `EMAIL-${signal.id.slice(0, 8).toUpperCase()}`;
     const key = `${signal.domain}:${orderNumber}`;
-    const itemName = signal.subject.replace(/\s+/g, ' ').trim() || `Order from ${signal.vendorName}`;
-    const signalUrl = extractPreferredUrlFromSignal(signal);
-
-    const nextItem = enrichItemViaVendorUrlRules({
-      name: itemName,
-      quantity: 1,
-      url: signalUrl,
-    }, signal.domain);
+    const messageItems = extractItemsFromSignal(signal);
 
     const current = grouped.get(key);
     if (!current) {
@@ -2097,18 +2259,18 @@ function buildHeuristicOrdersFromSignals(signals: GmailMessageSignal[]): GmailDe
         orderDate: signal.receivedAt,
         orderDateEpochMs: signal.receivedEpochMs,
         orderNumber,
-        items: [nextItem],
-        confidence: orderNumber.startsWith('EMAIL-') ? 62 : 74,
-        summary: signal.snippet || signal.subject,
+        items: messageItems,
+        confidence: orderNumber.startsWith('EMAIL-') ? 64 : 78,
+        summary: signal.snippet || signal.subject || signal.bodyText.slice(0, 300),
       });
       continue;
     }
 
-    current.items.push(nextItem);
+    current.items.push(...messageItems);
     if (signal.receivedEpochMs > current.orderDateEpochMs) {
       current.orderDateEpochMs = signal.receivedEpochMs;
       current.orderDate = signal.receivedAt;
-      current.summary = signal.snippet || signal.subject;
+      current.summary = signal.snippet || signal.subject || signal.bodyText.slice(0, 300);
     }
   }
 
@@ -2121,7 +2283,7 @@ function buildHeuristicOrdersFromSignals(signals: GmailMessageSignal[]): GmailDe
       orderNumber: entry.orderNumber,
       summary: entry.summary,
       confidence: entry.confidence,
-      items: entry.items.slice(0, 20),
+      items: entry.items.slice(0, 40),
     }))
     .sort((a, b) => Date.parse(b.orderDate) - Date.parse(a.orderDate))
     .slice(0, 120);
@@ -2153,30 +2315,64 @@ function normalizeAiDetectedOrders(
       const name = maybeString(row.name);
       if (!name) continue;
 
+      const quantity = toPositiveInt(
+        row.quantityOrdered ?? row.quantity,
+        1,
+      );
+      const dateOrdered = normalizeIsoTimestamp(
+        row.dateOrdered,
+        normalizeIsoTimestamp(record.orderDate, fallbackSignal?.receivedAt || new Date().toISOString()),
+      );
+      const messageTypeRaw = maybeString(row.messageType) || maybeString(record.messageType);
+      const messageType =
+        messageTypeRaw === 'receipt' || messageTypeRaw === 'shipping' || messageTypeRaw === 'delivery'
+          ? (messageTypeRaw as PurchaseMessageType)
+          : undefined;
+
       const normalizedItem: GmailDetectedOrderItem = {
         name,
-        quantity: toPositiveInt(row.quantity, 1),
+        quantity,
+        quantityOrdered: quantity,
+        dateOrdered,
+        messageType,
       };
 
       const sku = maybeString(row.sku);
       const asin = maybeString(row.asin);
       const upc = maybeString(row.upc);
       const unitPrice = toNumber(row.unitPrice) ?? undefined;
+      const lineTotal = toNumber(row.lineTotal) ?? undefined;
+      const packSize = maybeString(row.packSize);
+      const imageUrl = maybeString(row.imageUrl);
       const url = maybeString(row.url);
 
       if (sku) normalizedItem.sku = sku;
       if (asin) normalizedItem.asin = asin;
       if (upc) normalizedItem.upc = upc;
       if (unitPrice !== undefined) normalizedItem.unitPrice = unitPrice;
+      if (lineTotal !== undefined) normalizedItem.lineTotal = lineTotal;
+      if (packSize) normalizedItem.packSize = packSize;
+      if (imageUrl) normalizedItem.imageUrl = imageUrl;
       if (url) normalizedItem.url = url;
 
       items.push(enrichItemViaVendorUrlRules(normalizedItem, domain));
     }
 
     if (items.length === 0) {
+      const messageTypeRaw = maybeString(record.messageType);
+      const fallbackMessageType =
+        messageTypeRaw === 'receipt' || messageTypeRaw === 'shipping' || messageTypeRaw === 'delivery'
+          ? (messageTypeRaw as PurchaseMessageType)
+          : undefined;
       items.push({
         name: maybeString(record.summary) || `Purchase email from ${vendorName}`,
         quantity: 1,
+        quantityOrdered: 1,
+        dateOrdered: normalizeIsoTimestamp(
+          record.orderDate,
+          fallbackSignal?.receivedAt || new Date().toISOString(),
+        ),
+        messageType: fallbackMessageType,
       });
     }
 
@@ -2197,7 +2393,7 @@ function normalizeAiDetectedOrders(
       orderNumber,
       summary: maybeString(record.summary),
       confidence: toConfidencePercent(record.confidence, 72),
-      items: items.slice(0, 25),
+      items: items.slice(0, 40),
     });
   }
 
@@ -2240,7 +2436,8 @@ export async function discoverGmailOrdersForUser(input: {
       scannedMessages: 0,
       hasMore,
       analysisMode: 'heuristic',
-      analysisWarning: 'No purchase-related Gmail messages were found in the lookback window.',
+      analysisWarning:
+        'No qualifying industrial supplier receipts/shipping/delivery emails were found in the lookback window.',
     };
   }
 
@@ -2251,7 +2448,8 @@ export async function discoverGmailOrdersForUser(input: {
       scannedMessages: signals.length,
       hasMore,
       analysisMode: 'heuristic',
-      analysisWarning: 'OPENAI_API_KEY is not configured. Using deterministic email parsing.',
+      analysisWarning:
+        'OPENAI_API_KEY is not configured. Using deterministic industrial email parsing.',
     };
   }
 
@@ -2261,7 +2459,7 @@ export async function discoverGmailOrdersForUser(input: {
         {
           role: 'system',
           content:
-            'Extract purchase orders from Gmail message metadata and snippets. Return strict JSON with shape {"orders":[{"vendorName":"string","domain":"string","orderDate":"ISO-8601","orderNumber":"string","summary":"string","confidence":0-1,"items":[{"name":"string","quantity":number,"sku":"string","asin":"string","upc":"string","unitPrice":number,"url":"string"}]}]}. Only include order-like purchase activity.',
+            'Extract industrial supplier order history from Gmail metadata. Return strict JSON: {"orders":[{"vendorName":"string","domain":"string","orderDate":"ISO-8601","orderNumber":"string","summary":"string","messageType":"receipt|shipping|delivery","confidence":0-1,"items":[{"name":"string","quantityOrdered":number,"quantity":number,"sku":"string","asin":"string","upc":"string","unitPrice":number,"lineTotal":number,"packSize":"string","imageUrl":"string","url":"string","dateOrdered":"ISO-8601","messageType":"receipt|shipping|delivery"}]}]}. Include only receipts, shipping notifications, or delivery notifications from industrial distributors/suppliers. Exclude calendar invites, marketing/promotional emails, subscription/renewal notices, and any banking/financial institution messages.',
         },
         {
           role: 'user',
@@ -2273,6 +2471,8 @@ export async function discoverGmailOrdersForUser(input: {
               vendorName: signal.vendorName,
               subject: signal.subject,
               snippet: signal.snippet,
+              bodyText: signal.bodyText.slice(0, 5_000),
+              messageType: signal.messageType,
               receivedAt: signal.receivedAt,
             })),
           }),
@@ -2312,41 +2512,226 @@ export async function discoverGmailOrdersForUser(input: {
     scannedMessages: signals.length,
     hasMore,
     analysisMode: 'heuristic',
-    analysisWarning: 'AI analysis returned no structured orders. Using deterministic parsing.',
+    analysisWarning:
+      'AI analysis returned no structured industrial orders. Using deterministic parsing.',
   };
 }
 
-function buildHeuristicEmailEnrichment(orders: OrderEnrichmentInput[]): AiEmailEnrichedProduct[] {
-  const products: AiEmailEnrichedProduct[] = [];
+function clampInt(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, Math.trunc(value)));
+}
+
+function average(values: number[]): number | undefined {
+  if (!values.length) return undefined;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function percentile(values: number[], p: number, fallback: number): number {
+  if (!values.length) return fallback;
+  const sorted = [...values].sort((a, b) => a - b);
+  const index = Math.min(sorted.length - 1, Math.max(0, Math.round((sorted.length - 1) * p)));
+  return sorted[index] ?? fallback;
+}
+
+function normalizeIdentityToken(value?: string): string | undefined {
+  if (!value) return undefined;
+  const token = value.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return token || undefined;
+}
+
+function parsePackMultiple(packSize?: string): number {
+  if (!packSize) return 1;
+  const match = packSize.match(/(\d{1,4})/);
+  if (!match?.[1]) return 1;
+  return Math.max(1, Math.min(10_000, Number.parseInt(match[1], 10)));
+}
+
+function roundUpToMultiple(value: number, multiple: number): number {
+  const safeMultiple = Math.max(1, multiple);
+  return Math.max(safeMultiple, Math.ceil(Math.max(1, value) / safeMultiple) * safeMultiple);
+}
+
+function toHistoryIdentity(item: Pick<GmailDetectedOrderItem, 'sku' | 'asin' | 'upc' | 'name'>): string {
+  return (
+    normalizeIdentityToken(item.sku) ||
+    normalizeIdentityToken(item.asin) ||
+    normalizeIdentityToken(item.upc) ||
+    normalizeIdentityToken(item.name) ||
+    'item'
+  );
+}
+
+function buildOrderHistoryAggregates(orders: OrderEnrichmentInput[]): OrderHistoryAggregate[] {
+  const byKey = new Map<string, OrderHistoryAggregate>();
 
   for (const order of orders) {
+    const normalizedOrderDate = normalizeIsoTimestamp(order.orderDate);
     for (const item of order.items) {
-      const quantity = toPositiveInt(item.quantity, 1);
-      const roundedMoq = Math.max(1, Math.ceil(quantity / 5) * 5);
-      products.push({
+      const key = `${order.vendorId}:${toHistoryIdentity(item)}`;
+      const quantity = toPositiveInt(item.quantityOrdered ?? item.quantity, 1);
+      const itemDate = normalizeIsoTimestamp(item.dateOrdered, normalizedOrderDate);
+
+      const aggregate = byKey.get(key) || {
+        key,
+        vendorId: order.vendorId,
+        vendorName: order.vendorName,
         name: item.name,
         sku: item.sku,
         asin: item.asin,
         upc: item.upc,
-        vendorId: order.vendorId,
-        vendorName: order.vendorName,
+        imageUrl: item.imageUrl,
         productUrl: item.url,
-        description: `Derived from Gmail order ${order.orderNumber}`,
-        unitPrice: item.unitPrice,
-        moq: roundedMoq,
-        orderCadenceDays: 30,
-        confidence: 58,
-        needsReview: true,
-      });
+        packSize: item.packSize,
+        quantities: [],
+        unitPrices: [],
+        orderDates: [],
+        moq: 1,
+        recommendedOrderQuantity: 1,
+        recommendedMinQuantity: 1,
+        statedLeadTimeDays: 7,
+        safetyStockDays: 3,
+      };
+
+      if (!aggregate.sku && item.sku) aggregate.sku = item.sku;
+      if (!aggregate.asin && item.asin) aggregate.asin = item.asin;
+      if (!aggregate.upc && item.upc) aggregate.upc = item.upc;
+      if (!aggregate.imageUrl && item.imageUrl) aggregate.imageUrl = item.imageUrl;
+      if (!aggregate.productUrl && item.url) aggregate.productUrl = item.url;
+      if (!aggregate.packSize && item.packSize) aggregate.packSize = item.packSize;
+      if ((!aggregate.name || aggregate.name.length < 4) && item.name) aggregate.name = item.name;
+
+      aggregate.quantities.push(quantity);
+      if (typeof item.unitPrice === 'number' && Number.isFinite(item.unitPrice) && item.unitPrice > 0) {
+        aggregate.unitPrices.push(item.unitPrice);
+      } else if (
+        typeof item.lineTotal === 'number' &&
+        Number.isFinite(item.lineTotal) &&
+        item.lineTotal > 0 &&
+        quantity > 0
+      ) {
+        aggregate.unitPrices.push(item.lineTotal / quantity);
+      }
+      aggregate.orderDates.push(itemDate);
+
+      byKey.set(key, aggregate);
     }
   }
 
-  return products;
+  for (const aggregate of byKey.values()) {
+    const dateEpochs = Array.from(
+      new Set(
+        aggregate.orderDates
+          .map((date) => Date.parse(date))
+          .filter((value) => Number.isFinite(value) && value > 0),
+      ),
+    ).sort((a, b) => a - b);
+
+    const intervals: number[] = [];
+    for (let i = 1; i < dateEpochs.length; i += 1) {
+      const prev = dateEpochs[i - 1];
+      const next = dateEpochs[i];
+      if (!prev || !next) continue;
+      const days = Math.max(1, Math.round((next - prev) / (1000 * 60 * 60 * 24)));
+      intervals.push(days);
+    }
+
+    const cadenceDays = clampInt(Math.round(average(intervals) ?? 30), 3, 120);
+    aggregate.cadenceDays = cadenceDays;
+    aggregate.avgUnitPrice = average(aggregate.unitPrices);
+
+    const packMultiple = parsePackMultiple(aggregate.packSize);
+    const avgQty = average(aggregate.quantities) ?? 1;
+    const medianQty = percentile(aggregate.quantities, 0.5, avgQty);
+    const p75Qty = percentile(aggregate.quantities, 0.75, Math.max(avgQty, medianQty));
+
+    const moq = roundUpToMultiple(Math.max(1, Math.round(medianQty)), packMultiple);
+    const orderQty = roundUpToMultiple(
+      Math.max(moq, Math.round(Math.max(p75Qty, avgQty))),
+      packMultiple,
+    );
+    const statedLeadTimeDays = clampInt(Math.round(cadenceDays * 0.35), 2, 30);
+    const safetyStockDays = clampInt(Math.round(cadenceDays * 0.25), 2, 21);
+    const avgDailyUsage = orderQty / Math.max(cadenceDays, 1);
+    const minQty = roundUpToMultiple(
+      Math.max(1, Math.round(avgDailyUsage * (statedLeadTimeDays + safetyStockDays))),
+      packMultiple,
+    );
+
+    aggregate.moq = moq;
+    aggregate.recommendedOrderQuantity = Math.max(orderQty, moq);
+    aggregate.recommendedMinQuantity = Math.max(minQty, 1);
+    aggregate.statedLeadTimeDays = statedLeadTimeDays;
+    aggregate.safetyStockDays = safetyStockDays;
+  }
+
+  return Array.from(byKey.values());
+}
+
+function findMatchingHistoryAggregate(
+  historyAggregates: OrderHistoryAggregate[],
+  input: {
+    vendorId?: string;
+    sku?: string;
+    asin?: string;
+    upc?: string;
+    name?: string;
+  },
+): OrderHistoryAggregate | undefined {
+  const vendorId = input.vendorId?.trim();
+  const skuToken = normalizeIdentityToken(input.sku);
+  const asinToken = normalizeIdentityToken(input.asin);
+  const upcToken = normalizeIdentityToken(input.upc);
+  const nameToken = normalizeIdentityToken(input.name);
+
+  return historyAggregates.find((aggregate) => {
+    if (vendorId && aggregate.vendorId !== vendorId) return false;
+    const aggSku = normalizeIdentityToken(aggregate.sku);
+    const aggAsin = normalizeIdentityToken(aggregate.asin);
+    const aggUpc = normalizeIdentityToken(aggregate.upc);
+    const aggName = normalizeIdentityToken(aggregate.name);
+    return Boolean(
+      (skuToken && aggSku && skuToken === aggSku) ||
+        (asinToken && aggAsin && asinToken === aggAsin) ||
+        (upcToken && aggUpc && upcToken === aggUpc) ||
+        (nameToken && aggName && nameToken === aggName),
+    );
+  });
+}
+
+function buildHeuristicEmailEnrichment(
+  historyAggregates: OrderHistoryAggregate[],
+): AiEmailEnrichedProduct[] {
+  return historyAggregates.map((aggregate) => {
+    const sampleSize = aggregate.orderDates.length;
+    const confidence = clampInt(52 + sampleSize * 6, 55, 90);
+    return {
+      name: aggregate.name,
+      sku: aggregate.sku,
+      asin: aggregate.asin,
+      upc: aggregate.upc,
+      imageUrl: aggregate.imageUrl,
+      vendorId: aggregate.vendorId,
+      vendorName: aggregate.vendorName,
+      productUrl: aggregate.productUrl,
+      description: `Derived from ${sampleSize} historical order line${sampleSize === 1 ? '' : 's'} in Gmail.`,
+      unitPrice: aggregate.avgUnitPrice,
+      moq: aggregate.moq,
+      orderCadenceDays: aggregate.cadenceDays,
+      recommendedOrderQuantity: aggregate.recommendedOrderQuantity,
+      recommendedMinQuantity: aggregate.recommendedMinQuantity,
+      statedLeadTimeDays: aggregate.statedLeadTimeDays,
+      safetyStockDays: aggregate.safetyStockDays,
+      orderHistorySampleSize: sampleSize,
+      confidence,
+      needsReview: sampleSize < 2,
+    };
+  });
 }
 
 function normalizeAiEnrichedProducts(
   rawProducts: unknown,
   orders: OrderEnrichmentInput[],
+  historyAggregates: OrderHistoryAggregate[],
 ): AiEmailEnrichedProduct[] {
   if (!Array.isArray(rawProducts)) return [];
 
@@ -2373,25 +2758,53 @@ function normalizeAiEnrichedProducts(
         ? orders.find((order) => order.vendorName.toLowerCase() === vendorName.toLowerCase())
         : undefined) ||
       orders[0];
+    const resolvedVendorId = vendorId || matchedOrder?.vendorId || 'unknown-vendor';
+    const matchedHistory = findMatchingHistoryAggregate(historyAggregates, {
+      vendorId: resolvedVendorId,
+      sku: maybeString(record.sku),
+      asin: maybeString(record.asin),
+      upc: maybeString(record.upc),
+      name,
+    });
+    const fallbackMoq = matchedHistory?.moq ?? 10;
+    const fallbackCadence = matchedHistory?.cadenceDays ?? 30;
+    const fallbackConfidence = matchedHistory ? clampInt(70 + matchedHistory.orderDates.length * 3, 70, 94) : 72;
 
     normalized.push({
       name,
       sku: maybeString(record.sku),
       asin: maybeString(record.asin),
       upc: maybeString(record.upc),
-      imageUrl: maybeString(record.imageUrl),
-      vendorId: vendorId || matchedOrder?.vendorId || 'unknown-vendor',
+      imageUrl: maybeString(record.imageUrl) || matchedHistory?.imageUrl,
+      vendorId: resolvedVendorId,
       vendorName: vendorName || matchedOrder?.vendorName || 'Unknown Vendor',
-      productUrl: maybeString(record.productUrl),
+      productUrl: maybeString(record.productUrl) || matchedHistory?.productUrl,
       description: maybeString(record.description),
-      unitPrice: toNumber(record.unitPrice) ?? undefined,
-      moq: toPositiveInt(record.moq, 10),
-      orderCadenceDays: toPositiveInt(record.orderCadenceDays, 30),
-      confidence: toConfidencePercent(record.confidence, 72),
+      unitPrice: toNumber(record.unitPrice) ?? matchedHistory?.avgUnitPrice,
+      moq: toPositiveInt(record.moq, fallbackMoq),
+      orderCadenceDays: toPositiveInt(record.orderCadenceDays, fallbackCadence),
+      recommendedOrderQuantity: toPositiveInt(
+        record.recommendedOrderQuantity,
+        matchedHistory?.recommendedOrderQuantity ?? toPositiveInt(record.moq, fallbackMoq),
+      ),
+      recommendedMinQuantity: toPositiveInt(
+        record.recommendedMinQuantity,
+        matchedHistory?.recommendedMinQuantity ?? toPositiveInt(record.moq, fallbackMoq),
+      ),
+      statedLeadTimeDays: toPositiveInt(
+        record.statedLeadTimeDays,
+        matchedHistory?.statedLeadTimeDays ?? 7,
+      ),
+      safetyStockDays: toPositiveInt(
+        record.safetyStockDays,
+        matchedHistory?.safetyStockDays ?? 3,
+      ),
+      orderHistorySampleSize: matchedHistory?.orderDates.length,
+      confidence: toConfidencePercent(record.confidence, fallbackConfidence),
       needsReview:
         typeof record.needsReview === 'boolean'
           ? record.needsReview
-          : toConfidencePercent(record.confidence, 72) < 80,
+          : toConfidencePercent(record.confidence, fallbackConfidence) < 80,
     });
   }
 
@@ -2405,7 +2818,8 @@ export async function enrichDetectedOrdersWithAi(input: {
     return { products: [], mode: 'heuristic' };
   }
 
-  const heuristicProducts = buildHeuristicEmailEnrichment(input.orders);
+  const orderHistoryAggregates = buildOrderHistoryAggregates(input.orders);
+  const heuristicProducts = buildHeuristicEmailEnrichment(orderHistoryAggregates);
   if (!isOpenAiConfigured()) {
     return {
       products: heuristicProducts,
@@ -2420,12 +2834,28 @@ export async function enrichDetectedOrdersWithAi(input: {
         {
           role: 'system',
           content:
-            'You enrich procurement line items. Return strict JSON: {"products":[{"name":"string","sku":"string","asin":"string","upc":"string","imageUrl":"string","vendorId":"string","vendorName":"string","productUrl":"string","description":"string","unitPrice":number,"moq":number,"orderCadenceDays":number,"confidence":0-100,"needsReview":boolean}]}. Use conservative confidence and set needsReview=true when uncertain.',
+            'You enrich industrial procurement products from historical order lines. Return strict JSON: {"products":[{"name":"string","sku":"string","asin":"string","upc":"string","imageUrl":"string","vendorId":"string","vendorName":"string","productUrl":"string","description":"string","unitPrice":number,"moq":number,"orderCadenceDays":number,"recommendedOrderQuantity":number,"recommendedMinQuantity":number,"statedLeadTimeDays":number,"safetyStockDays":number,"confidence":0-100,"needsReview":boolean}]}. Use order history statistics to inform kanban defaults. Keep recommendations conservative and integer-valued.',
         },
         {
           role: 'user',
           content: JSON.stringify({
             orders: input.orders.slice(0, 120),
+            orderHistory: orderHistoryAggregates.map((entry) => ({
+              vendorId: entry.vendorId,
+              vendorName: entry.vendorName,
+              name: entry.name,
+              sku: entry.sku,
+              asin: entry.asin,
+              upc: entry.upc,
+              orderCount: entry.orderDates.length,
+              cadenceDays: entry.cadenceDays,
+              moq: entry.moq,
+              recommendedOrderQuantity: entry.recommendedOrderQuantity,
+              recommendedMinQuantity: entry.recommendedMinQuantity,
+              statedLeadTimeDays: entry.statedLeadTimeDays,
+              safetyStockDays: entry.safetyStockDays,
+              avgUnitPrice: entry.avgUnitPrice,
+            })),
           }),
         },
       ],
@@ -2433,7 +2863,11 @@ export async function enrichDetectedOrdersWithAi(input: {
       temperature: 0.2,
     });
 
-    const normalized = normalizeAiEnrichedProducts(aiPayload.products, input.orders);
+    const normalized = normalizeAiEnrichedProducts(
+      aiPayload.products,
+      input.orders,
+      orderHistoryAggregates,
+    );
     if (normalized.length > 0) {
       return {
         products: normalized,

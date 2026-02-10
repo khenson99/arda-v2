@@ -183,8 +183,8 @@ export function SelectVendorsModule() {
           Select Your Vendors
         </CardTitle>
         <CardDescription>
-          We scan the last 6 months of email activity, prioritize Amazon and industrial
-          distributors, then let you choose which suppliers to import from.
+          We scan the last 6 months of email activity, focus on industrial distributors
+          and suppliers, then let you choose which vendors to import from.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

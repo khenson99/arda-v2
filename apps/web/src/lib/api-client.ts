@@ -196,10 +196,16 @@ export interface GmailSupplierDiscoveryResponse {
 export interface GmailDiscoveredOrderItem {
   name: string;
   quantity: number;
+  quantityOrdered?: number;
   sku?: string;
   asin?: string;
   upc?: string;
   unitPrice?: number;
+  lineTotal?: number;
+  packSize?: string;
+  imageUrl?: string;
+  dateOrdered?: string;
+  messageType?: "receipt" | "shipping" | "delivery";
   url?: string;
 }
 
@@ -236,6 +242,11 @@ export interface AiEmailEnrichedProduct {
   unitPrice?: number;
   moq: number;
   orderCadenceDays?: number;
+  recommendedOrderQuantity?: number;
+  recommendedMinQuantity?: number;
+  statedLeadTimeDays?: number;
+  safetyStockDays?: number;
+  orderHistorySampleSize?: number;
   confidence: number;
   needsReview: boolean;
 }

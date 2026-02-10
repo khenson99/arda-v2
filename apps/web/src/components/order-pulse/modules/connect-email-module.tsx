@@ -322,7 +322,7 @@ export function ConnectEmailModule({ onConnected, onContinue }: ConnectEmailModu
               </div>
 
               <div className="rounded-lg border border-[hsl(var(--arda-blue)/0.22)] bg-[hsl(var(--arda-blue)/0.06)] px-3 py-2 text-xs text-[hsl(var(--arda-blue))]">
-                Next we&apos;ll scan 6 months of purchase emails, detect likely suppliers, and let you choose which vendors to import from.
+                Next we&apos;ll scan 6 months of industrial supplier receipts/shipping/delivery emails, detect likely suppliers, and let you choose which vendors to import from.
               </div>
 
               <Button className="w-full" onClick={handleContinue}>
@@ -455,7 +455,7 @@ export function ConnectEmailModule({ onConnected, onContinue }: ConnectEmailModu
           <div className="mt-4 rounded-lg bg-muted p-3">
             <p className="text-xs text-muted-foreground">
               <ShieldCheck className="mr-1 inline h-3.5 w-3.5" />
-              We only read purchase-related emails. Your personal messages are never accessed or stored.
+              We only read industrial supplier receipt/shipping/delivery emails and ignore personal, marketing, subscription, calendar, and financial messages.
             </p>
           </div>
         </CardContent>

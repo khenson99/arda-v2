@@ -125,14 +125,22 @@ function toItemsServicePayload(item: EnrichedProduct, externalGuid: string) {
     typeof item.imageUrl === "string" && /^https?:\/\//i.test(item.imageUrl)
       ? item.imageUrl
       : null;
+  const recommendedMinQty = Math.max(
+    0,
+    Math.trunc(item.recommendedMinQuantity ?? item.moq ?? 0),
+  );
+  const recommendedOrderQty = Math.max(
+    0,
+    Math.trunc(item.recommendedOrderQuantity ?? item.moq ?? 0),
+  );
   return {
     externalGuid,
     name: item.name?.trim() || externalGuid,
     orderMechanism: item.orderCadenceDays ? "recurring" : "unspecified",
     location: null,
-    minQty: Math.max(0, Math.trunc(item.moq || 0)),
+    minQty: recommendedMinQty,
     minQtyUnit: "each",
-    orderQty: item.moq ? Math.max(0, Math.trunc(item.moq)) : null,
+    orderQty: recommendedOrderQty > 0 ? recommendedOrderQty : null,
     orderQtyUnit: "each",
     primarySupplier: item.vendorName?.trim() || "Unknown supplier",
     primarySupplierLink: item.productUrl?.trim() || null,
@@ -376,11 +384,43 @@ export function ReconcileSyncModule({ onSync }: ReconcileSyncModuleProps) {
                             <span className="name-value-pair-label">MOQ:</span>
                             <span className="name-value-pair-value">{item.moq}</span>
                           </div>
+                          {item.recommendedMinQuantity && (
+                            <div className="name-value-pair">
+                              <span className="name-value-pair-label">Min:</span>
+                              <span className="name-value-pair-value">
+                                {item.recommendedMinQuantity}
+                              </span>
+                            </div>
+                          )}
+                          {item.recommendedOrderQuantity && (
+                            <div className="name-value-pair">
+                              <span className="name-value-pair-label">Order:</span>
+                              <span className="name-value-pair-value">
+                                {item.recommendedOrderQuantity}
+                              </span>
+                            </div>
+                          )}
                           {item.orderCadenceDays && (
                             <div className="name-value-pair">
                               <span className="name-value-pair-label">Cadence:</span>
                               <span className="name-value-pair-value">
                                 {item.orderCadenceDays}d
+                              </span>
+                            </div>
+                          )}
+                          {item.statedLeadTimeDays && (
+                            <div className="name-value-pair">
+                              <span className="name-value-pair-label">Lead:</span>
+                              <span className="name-value-pair-value">
+                                {item.statedLeadTimeDays}d
+                              </span>
+                            </div>
+                          )}
+                          {item.safetyStockDays && (
+                            <div className="name-value-pair">
+                              <span className="name-value-pair-label">Safety:</span>
+                              <span className="name-value-pair-value">
+                                {item.safetyStockDays}d
                               </span>
                             </div>
                           )}

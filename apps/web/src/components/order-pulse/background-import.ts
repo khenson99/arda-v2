@@ -62,8 +62,15 @@ function toDetectedOrders(orders: GmailDiscoveredOrder[]): DetectedOrder[] {
       name: item.name,
       sku: item.sku,
       asin: item.asin,
+      upc: item.upc,
       quantity: item.quantity,
+      quantityOrdered: item.quantityOrdered,
       unitPrice: item.unitPrice,
+      lineTotal: item.lineTotal,
+      packSize: item.packSize,
+      imageUrl: item.imageUrl,
+      dateOrdered: item.dateOrdered,
+      messageType: item.messageType,
       url: item.url,
     })),
   }));
@@ -84,6 +91,11 @@ function toEnrichedProducts(products: Awaited<ReturnType<typeof enrichEmailOrder
     unitPrice: product.unitPrice,
     moq: product.moq,
     orderCadenceDays: product.orderCadenceDays,
+    recommendedOrderQuantity: product.recommendedOrderQuantity,
+    recommendedMinQuantity: product.recommendedMinQuantity,
+    statedLeadTimeDays: product.statedLeadTimeDays,
+    safetyStockDays: product.safetyStockDays,
+    orderHistorySampleSize: product.orderHistorySampleSize,
     source: "email-import",
     confidence: product.confidence,
     needsReview: product.needsReview,
@@ -154,7 +166,7 @@ export async function runBackgroundImportPipeline(
     status: "running",
     phase: "analyzing",
     progress: 8,
-    message: "Pulling and analyzing Gmail purchase activity in the background.",
+    message: "Pulling and analyzing industrial supplier order emails in the background.",
   });
   dispatch({ type: "SET_ANALYZING", value: true });
 
@@ -162,7 +174,7 @@ export async function runBackgroundImportPipeline(
     await runProgressFrames(
       dispatch,
       [18, 32, 45],
-      "Pulling and analyzing Gmail purchase activity in the background.",
+      "Pulling and analyzing industrial supplier order emails in the background.",
       "analyzing",
     );
 
@@ -209,7 +221,7 @@ export async function runBackgroundImportPipeline(
         progress: 100,
         message:
           discovery.analysisWarning ||
-          "No purchase-related Gmail orders were found during background import.",
+          "No qualifying industrial supplier order emails were found during background import.",
       });
       return;
     }

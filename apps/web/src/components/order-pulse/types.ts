@@ -160,8 +160,15 @@ export interface DetectedOrderItem {
   name: string;
   sku?: string;
   asin?: string;
+  upc?: string;
   quantity: number;
+  quantityOrdered?: number;
   unitPrice?: number;
+  lineTotal?: number;
+  packSize?: string;
+  imageUrl?: string;
+  dateOrdered?: string;
+  messageType?: "receipt" | "shipping" | "delivery";
   url?: string;
 }
 
@@ -183,6 +190,11 @@ export interface EnrichedProduct {
   unitPrice?: number;
   moq: number;
   orderCadenceDays?: number;
+  recommendedOrderQuantity?: number;
+  recommendedMinQuantity?: number;
+  statedLeadTimeDays?: number;
+  safetyStockDays?: number;
+  orderHistorySampleSize?: number;
   source: ProductSource;
   confidence: number;        // 0-100
   needsReview: boolean;
