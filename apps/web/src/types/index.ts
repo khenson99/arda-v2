@@ -261,3 +261,298 @@ export interface NotificationRecord {
   isRead: boolean;
   createdAt: string;
 }
+
+/* ── Kanban stages ───────────────────────────────────────────── */
+
+export type CardStage =
+  | "created"
+  | "triggered"
+  | "ordered"
+  | "in_transit"
+  | "received"
+  | "restocked";
+
+export const CARD_STAGES: CardStage[] = [
+  "created",
+  "triggered",
+  "ordered",
+  "in_transit",
+  "received",
+  "restocked",
+];
+
+export const CARD_STAGE_META: Record<
+  CardStage,
+  { label: string; color: string; bgClass: string; textClass: string }
+> = {
+  created: { label: "Created", color: "#6b7280", bgClass: "bg-gray-100", textClass: "text-gray-700" },
+  triggered: { label: "Triggered", color: "#f59e0b", bgClass: "bg-amber-50", textClass: "text-amber-700" },
+  ordered: { label: "Ordered", color: "#3b82f6", bgClass: "bg-blue-50", textClass: "text-blue-700" },
+  in_transit: { label: "In Transit", color: "#8b5cf6", bgClass: "bg-violet-50", textClass: "text-violet-700" },
+  received: { label: "Received", color: "#10b981", bgClass: "bg-emerald-50", textClass: "text-emerald-700" },
+  restocked: { label: "Restocked", color: "#059669", bgClass: "bg-green-50", textClass: "text-green-700" },
+};
+
+/* ── Kanban loop & card models ───────────────────────────────── */
+
+export interface KanbanLoop {
+  id: string;
+  tenantId: string;
+  partId: string;
+  facilityId: string;
+  loopType: LoopType;
+  cardMode: string;
+  status: string;
+  numberOfCards: number;
+  minQuantity: number;
+  orderQuantity: number;
+  leadTimeDays: number | null;
+  safetyStockDays: number | null;
+  reorderPoint: number | null;
+  createdAt: string;
+  updatedAt: string;
+  partName?: string;
+  facilityName?: string;
+}
+
+export interface KanbanCard {
+  id: string;
+  tenantId: string;
+  loopId: string;
+  cardNumber: number;
+  currentStage: CardStage;
+  currentStageEnteredAt: string;
+  completedCycles: number;
+  lastPrintedAt: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  /* Joined/denormalized data (may come from API) */
+  loopType?: LoopType;
+  partId?: string;
+  partName?: string;
+  facilityId?: string;
+  facilityName?: string;
+  minQuantity?: number;
+  orderQuantity?: number;
+  numberOfCards?: number;
+}
+
+export interface CardTransition {
+  id: string;
+  cardId: string;
+  fromStage: CardStage;
+  toStage: CardStage;
+  method: string;
+  performedBy: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface KanbanParameterChange {
+  id: string;
+  loopId: string;
+  parameter: string;
+  oldValue: string;
+  newValue: string;
+  reason: string | null;
+  changedBy: string | null;
+  createdAt: string;
+}
+
+export interface LoopCardSummary {
+  loopId: string;
+  totalCards: number;
+  byStage: Partial<Record<CardStage, number>>;
+}
+
+export interface LoopVelocity {
+  loopId: string;
+  avgCycleTimeHours: number | null;
+  avgLeadTimeHours: number | null;
+  completedCyclesLast30d: number;
+  throughputPerDay: number | null;
+}
+
+/* ── Purchase Order statuses ─────────────────────────────────── */
+
+export type POStatus =
+  | "draft"
+  | "pending_approval"
+  | "approved"
+  | "sent"
+  | "acknowledged"
+  | "partially_received"
+  | "received"
+  | "closed"
+  | "cancelled";
+
+export const PO_STATUS_META: Record<
+  POStatus,
+  { label: string; variant: "default" | "secondary" | "outline" | "destructive" }
+> = {
+  draft: { label: "Draft", variant: "secondary" },
+  pending_approval: { label: "Pending Approval", variant: "outline" },
+  approved: { label: "Approved", variant: "default" },
+  sent: { label: "Sent", variant: "default" },
+  acknowledged: { label: "Acknowledged", variant: "default" },
+  partially_received: { label: "Partially Received", variant: "outline" },
+  received: { label: "Received", variant: "default" },
+  closed: { label: "Closed", variant: "secondary" },
+  cancelled: { label: "Cancelled", variant: "destructive" },
+};
+
+/* ── Purchase Order ──────────────────────────────────────────── */
+
+export interface PurchaseOrder {
+  id: string;
+  tenantId: string;
+  poNumber: string;
+  status: POStatus;
+  supplierId: string | null;
+  supplierName: string | null;
+  facilityId: string;
+  totalAmount: number | null;
+  currency: string;
+  notes: string | null;
+  expectedDeliveryDate: string | null;
+  orderedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  lines?: PurchaseOrderLine[];
+}
+
+export interface PurchaseOrderLine {
+  id: string;
+  purchaseOrderId: string;
+  partId: string;
+  partName?: string;
+  quantityOrdered: number;
+  quantityReceived: number;
+  unitPrice: number | null;
+  currency: string;
+  notes: string | null;
+}
+
+/* ── Work Order ──────────────────────────────────────────────── */
+
+export type WOStatus = "draft" | "scheduled" | "in_progress" | "completed" | "cancelled";
+
+export interface WorkOrder {
+  id: string;
+  tenantId: string;
+  woNumber: string;
+  status: WOStatus;
+  facilityId: string;
+  partId: string;
+  partName?: string;
+  quantityOrdered: number;
+  quantityCompleted: number;
+  scheduledDate: string | null;
+  completedAt: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/* ── Transfer Order ──────────────────────────────────────────── */
+
+export type TOStatus = "draft" | "approved" | "in_transit" | "received" | "cancelled";
+
+export interface TransferOrder {
+  id: string;
+  tenantId: string;
+  toNumber: string;
+  status: TOStatus;
+  fromFacilityId: string;
+  toFacilityId: string;
+  fromFacilityName?: string;
+  toFacilityName?: string;
+  notes: string | null;
+  shippedAt: string | null;
+  receivedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  lines?: TransferOrderLine[];
+}
+
+export interface TransferOrderLine {
+  id: string;
+  transferOrderId: string;
+  partId: string;
+  partName?: string;
+  quantityOrdered: number;
+  quantityReceived: number;
+  notes: string | null;
+}
+
+/* ── Receiving ───────────────────────────────────────────────── */
+
+export type ReceiptStatus = "pending" | "completed" | "rejected";
+export type ExceptionType = "overage" | "shortage" | "damage" | "wrong_item" | "quality" | "other";
+export type ExceptionSeverity = "low" | "medium" | "high" | "critical";
+export type ExceptionResolution = "accepted" | "rejected" | "returned" | "credited";
+
+export interface Receipt {
+  id: string;
+  tenantId: string;
+  orderId: string;
+  orderType: string;
+  status: ReceiptStatus;
+  receivedBy: string | null;
+  receivedAt: string;
+  notes: string | null;
+  createdAt: string;
+  lines?: ReceiptLine[];
+}
+
+export interface ReceiptLine {
+  id: string;
+  receiptId: string;
+  partId: string;
+  partName?: string;
+  quantityAccepted: number;
+  quantityDamaged: number;
+  quantityRejected: number;
+  notes: string | null;
+}
+
+export interface ReceivingException {
+  id: string;
+  tenantId: string;
+  receiptId: string | null;
+  orderId: string | null;
+  type: ExceptionType;
+  severity: ExceptionSeverity;
+  resolution: ExceptionResolution | null;
+  description: string;
+  resolvedBy: string | null;
+  resolvedAt: string | null;
+  createdAt: string;
+}
+
+export interface ReceivingMetrics {
+  totalReceipts: number;
+  totalExceptions: number;
+  avgReceivingTimeHours: number | null;
+  onTimeDeliveryRate: number | null;
+  exceptionRate: number | null;
+  receiptsByDay: Array<{ date: string; count: number }>;
+}
+
+/* ── Unified Order (for combined views) ──────────────────────── */
+
+export type OrderType = "purchase" | "work" | "transfer";
+
+export interface UnifiedOrder {
+  id: string;
+  orderNumber: string;
+  type: OrderType;
+  status: string;
+  sourceName: string | null;
+  totalAmount: number | null;
+  currency: string;
+  createdAt: string;
+  updatedAt: string;
+  expectedDate: string | null;
+}

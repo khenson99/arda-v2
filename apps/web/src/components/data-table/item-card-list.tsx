@@ -25,6 +25,7 @@ export interface ItemCardListProps {
   parts: PartRecord[];
   selectedIds: Set<string>;
   onToggleSelect: (id: string) => void;
+  onOpenItemDetail?: (part: PartRecord) => void;
   queueStatsByPartId: Map<string, QueueStatsEntry>;
   orderLineByItem: Record<string, OrderLineByItemSummary>;
   session: AuthSession;
@@ -46,6 +47,7 @@ interface ItemCardProps {
   part: PartRecord;
   isSelected: boolean;
   onToggleSelect: (id: string) => void;
+  onOpenItemDetail?: (part: PartRecord) => void;
   queueStats: QueueStatsEntry | undefined;
   orderLineSummary: OrderLineByItemSummary | undefined;
   session: AuthSession;
@@ -55,6 +57,7 @@ const ItemCard = React.memo(function ItemCard({
   part,
   isSelected,
   onToggleSelect,
+  onOpenItemDetail,
   queueStats,
   orderLineSummary,
   session,
@@ -117,7 +120,13 @@ const ItemCard = React.memo(function ItemCard({
       className={cn(
         "rounded-xl border border-border bg-card px-4 py-3 shadow-sm",
         isSelected && "ring-2 ring-[hsl(var(--link)/0.4)]",
+        onOpenItemDetail && "cursor-pointer hover:border-primary/45",
       )}
+      onClick={(event) => {
+        const target = event.target as HTMLElement;
+        if (target.closest("button,input,label,[role='button']")) return;
+        onOpenItemDetail?.(part);
+      }}
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
@@ -228,6 +237,7 @@ export function ItemCardList({
   parts,
   selectedIds,
   onToggleSelect,
+  onOpenItemDetail,
   queueStatsByPartId,
   orderLineByItem,
   session,
@@ -240,6 +250,7 @@ export function ItemCardList({
           part={part}
           isSelected={selectedIds.has(part.id)}
           onToggleSelect={onToggleSelect}
+          onOpenItemDetail={onOpenItemDetail}
           queueStats={queueStatsByPartId.get(part.id)}
           orderLineSummary={orderLineByItem[part.eId ?? part.id]}
           session={session}

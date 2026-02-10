@@ -12,7 +12,11 @@ import { DashboardRoute } from "@/pages/dashboard";
 import { QueueRoute } from "@/pages/queue";
 import { ScanRoute } from "@/pages/scan";
 import { PartsRoute } from "@/pages/parts";
-import { NotificationsRoute } from "@/pages/notifications";
+import { BoardRoute } from "@/pages/board";
+import { CardsRoute } from "@/pages/cards";
+import { LoopsRoute } from "@/pages/loops";
+import { OrderHistoryRoute } from "@/pages/order-history";
+import { ReceivingRoute } from "@/pages/receiving";
 import type { AuthResponse, AuthSession } from "@/types";
 
 function detectGuestMobileImportLink(): boolean {
@@ -121,11 +125,17 @@ function App() {
       <Routes>
         <Route path="/" element={<AppShell session={session} onSignOut={clearSession} />}>
           <Route index element={<ErrorBoundary><DashboardRoute session={session} onUnauthorized={clearSession} /></ErrorBoundary>} />
+          <Route path="board" element={<ErrorBoundary><BoardRoute session={session} onUnauthorized={clearSession} /></ErrorBoundary>} />
+          <Route path="cards" element={<ErrorBoundary><CardsRoute session={session} onUnauthorized={clearSession} /></ErrorBoundary>} />
+          <Route path="loops" element={<ErrorBoundary><LoopsRoute session={session} onUnauthorized={clearSession} /></ErrorBoundary>} />
+          <Route path="parts" element={<ErrorBoundary><PartsRoute session={session} onUnauthorized={clearSession} /></ErrorBoundary>} />
           <Route path="queue" element={<ErrorBoundary><QueueRoute session={session} onUnauthorized={clearSession} /></ErrorBoundary>} />
+          <Route path="orders" element={<ErrorBoundary><OrderHistoryRoute session={session} onUnauthorized={clearSession} /></ErrorBoundary>} />
+          <Route path="receiving" element={<ErrorBoundary><ReceivingRoute session={session} onUnauthorized={clearSession} /></ErrorBoundary>} />
           <Route path="scan" element={<ErrorBoundary><ScanRoute session={session} onUnauthorized={clearSession} /></ErrorBoundary>} />
           <Route path="scan/:cardId" element={<ErrorBoundary><ScanRoute session={session} onUnauthorized={clearSession} /></ErrorBoundary>} />
-          <Route path="parts" element={<ErrorBoundary><PartsRoute session={session} onUnauthorized={clearSession} /></ErrorBoundary>} />
-          <Route path="notifications" element={<ErrorBoundary><NotificationsRoute session={session} onUnauthorized={clearSession} /></ErrorBoundary>} />
+          {/* Legacy redirects */}
+          <Route path="notifications" element={<Navigate to="/orders" replace />} />
           <Route path="order-pulse" element={<Navigate to="/" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

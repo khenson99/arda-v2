@@ -33,8 +33,9 @@ export function SelectVendorsModule() {
   const [isDiscovering, setIsDiscovering] = React.useState(false);
   const [discoveryError, setDiscoveryError] = React.useState<string | null>(null);
   const customVendorIdsRef = React.useRef<Set<string>>(new Set());
+  const hasAttemptedDiscovery = React.useRef(false);
 
-  const allVendors = [...PRESET_VENDORS, ...customVendors];
+  const allVendors = React.useMemo(() => [...PRESET_VENDORS, ...customVendors], [customVendors]);
   const vendorById = React.useMemo(
     () => new Map(allVendors.map((vendor) => [vendor.id, vendor])),
     [allVendors],
@@ -75,13 +76,13 @@ export function SelectVendorsModule() {
     const linkedGmail =
       emailConnection?.status === "connected" && emailConnection.provider === "gmail";
     if (!linkedGmail) return;
-    if (discoveredSuppliers.length > 0) return;
-    if (isDiscovering) return;
+    if (hasAttemptedDiscovery.current) return;
 
     const session = readStoredSession();
     const accessToken = session?.tokens.accessToken;
     if (!accessToken) return;
 
+    hasAttemptedDiscovery.current = true;
     let cancelled = false;
     setIsDiscovering(true);
     setDiscoveryError(null);
@@ -130,13 +131,7 @@ export function SelectVendorsModule() {
     return () => {
       cancelled = true;
     };
-  }, [
-    customVendors,
-    dispatch,
-    discoveredSuppliers.length,
-    emailConnection,
-    isDiscovering,
-  ]);
+  }, [customVendors, dispatch, emailConnection]);
 
   const addCustom = () => {
     if (!customName.trim() || !customDomain.trim()) return;

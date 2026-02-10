@@ -326,9 +326,7 @@ export function ConnectEmailModule({ onConnected, onContinue }: ConnectEmailModu
               </div>
 
               <Button className="w-full" onClick={handleContinue}>
-                {state.guidedStep === "connect-email"
-                  ? "Continue to vendor selection"
-                  : "Continue to vendor selection"}
+                Continue to vendor selection
                 <ArrowRight className="h-4 w-4" />
               </Button>
             </div>

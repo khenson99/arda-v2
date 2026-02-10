@@ -5,10 +5,15 @@ import {
   Bell,
   Boxes,
   CircleHelp,
+  ClipboardList,
+  CreditCard,
   HardHat,
+  LayoutDashboard,
   LogOut,
   Menu,
+  PackageCheck,
   QrCode,
+  Repeat2,
   Search,
   SquareKanban,
 } from "lucide-react";
@@ -37,11 +42,14 @@ export function AppShell({ session, onSignOut }: AppShellProps) {
 
   const navItems = React.useMemo(
     () => [
-      { to: "/", label: "Dashboard", icon: Activity },
-      { to: "/parts", label: "Items", icon: Boxes },
-      { to: "/queue", label: "Order Queue", icon: SquareKanban },
-      { to: "/notifications", label: "Order History", icon: Bell },
-      { to: "/scan", label: "Receiving", icon: QrCode },
+      { to: "/", label: "Dashboard", icon: Activity, section: "kanban" as const },
+      { to: "/board", label: "Kanban Board", icon: LayoutDashboard, section: "kanban" as const },
+      { to: "/cards", label: "Cards", icon: CreditCard, section: "kanban" as const },
+      { to: "/loops", label: "Loops", icon: Repeat2, section: "kanban" as const },
+      { to: "/parts", label: "Items", icon: Boxes, section: "operations" as const },
+      { to: "/queue", label: "Order Queue", icon: SquareKanban, section: "operations" as const },
+      { to: "/orders", label: "Order History", icon: ClipboardList, section: "operations" as const },
+      { to: "/receiving", label: "Receiving", icon: PackageCheck, section: "operations" as const },
     ],
     [],
   );
@@ -62,19 +70,26 @@ export function AppShell({ session, onSignOut }: AppShellProps) {
           </div>
         </div>
 
-        <nav className="flex-1 space-y-0.5 px-2 py-3">
-          {navItems.map((item) => {
+        <nav className="flex-1 px-2 py-3">
+          {navItems.map((item, index) => {
             const ItemIcon = item.icon;
+            const prevSection = index > 0 ? navItems[index - 1].section : null;
+            const showSeparator = prevSection && prevSection !== item.section;
+
             return (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.to === "/"}
-                className={({ isActive }) => cn("sidebar-nav-item", isActive && "active")}
-              >
-                <ItemIcon className="h-4 w-4" />
-                <span>{item.label}</span>
-              </NavLink>
+              <React.Fragment key={item.to}>
+                {showSeparator && (
+                  <div className="my-2 border-t border-sidebar-border/40" />
+                )}
+                <NavLink
+                  to={item.to}
+                  end={item.to === "/"}
+                  className={({ isActive }) => cn("sidebar-nav-item", isActive && "active")}
+                >
+                  <ItemIcon className="h-4 w-4" />
+                  <span>{item.label}</span>
+                </NavLink>
+              </React.Fragment>
             );
           })}
         </nav>

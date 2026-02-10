@@ -18,6 +18,20 @@ import type {
   ItemsServicePayload,
   ItemsServiceInputPayload,
   OrdersServiceOrderLinePayload,
+  KanbanLoop,
+  KanbanCard,
+  CardStage,
+  CardTransition,
+  LoopCardSummary,
+  LoopVelocity,
+  PurchaseOrder,
+  POStatus,
+  WorkOrder,
+  TransferOrder,
+  Receipt,
+  ReceivingMetrics,
+  ReceivingException,
+  ExceptionResolution,
 } from "@/types";
 
 /* ── Error handling ──────────────────────────────────────────── */
@@ -856,4 +870,248 @@ export async function createPurchaseOrderFromCards(
     token,
     body: input,
   });
+}
+
+/* ── Kanban Loops ─────────────────────────────────────────────── */
+
+export async function fetchLoops(
+  token: string,
+  params?: { loopType?: string; page?: number; pageSize?: number },
+): Promise<{ data: KanbanLoop[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }> {
+  const qs = new URLSearchParams();
+  if (params?.loopType) qs.set("loopType", params.loopType);
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.pageSize) qs.set("pageSize", String(params.pageSize));
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return apiRequest(`/api/kanban/loops${suffix}`, { token });
+}
+
+export async function fetchLoop(
+  token: string,
+  loopId: string,
+): Promise<KanbanLoop & { cards?: KanbanCard[]; parameterHistory?: Array<{ parameter: string; oldValue: string; newValue: string; changedAt: string }> }> {
+  return apiRequest(`/api/kanban/loops/${encodeURIComponent(loopId)}`, { token });
+}
+
+export async function createLoop(
+  token: string,
+  input: {
+    partId: string;
+    facilityId: string;
+    loopType: string;
+    cardMode?: string;
+    numberOfCards?: number;
+    minQuantity?: number;
+    orderQuantity?: number;
+    leadTimeDays?: number;
+  },
+): Promise<KanbanLoop> {
+  return apiRequest("/api/kanban/loops", {
+    method: "POST",
+    token,
+    body: input,
+  });
+}
+
+export async function updateLoopParameters(
+  token: string,
+  loopId: string,
+  input: {
+    minQuantity?: number;
+    orderQuantity?: number;
+    numberOfCards?: number;
+    leadTimeDays?: number;
+    safetyStockDays?: number;
+    reason?: string;
+  },
+): Promise<KanbanLoop> {
+  return apiRequest(`/api/kanban/loops/${encodeURIComponent(loopId)}/parameters`, {
+    method: "PATCH",
+    token,
+    body: input,
+  });
+}
+
+export async function fetchLoopCardSummary(
+  token: string,
+  loopId: string,
+): Promise<LoopCardSummary> {
+  return apiRequest(`/api/kanban/lifecycle/loops/${encodeURIComponent(loopId)}/card-summary`, { token });
+}
+
+export async function fetchLoopVelocity(
+  token: string,
+  loopId: string,
+): Promise<LoopVelocity> {
+  return apiRequest(`/api/kanban/velocity/${encodeURIComponent(loopId)}`, { token });
+}
+
+/* ── Kanban Cards ─────────────────────────────────────────────── */
+
+export async function fetchCards(
+  token: string,
+  params?: { stage?: CardStage; loopId?: string; page?: number; pageSize?: number },
+): Promise<{ data: KanbanCard[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }> {
+  const qs = new URLSearchParams();
+  if (params?.stage) qs.set("stage", params.stage);
+  if (params?.loopId) qs.set("loopId", params.loopId);
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.pageSize) qs.set("pageSize", String(params.pageSize));
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return apiRequest(`/api/kanban/cards${suffix}`, { token });
+}
+
+export async function fetchCard(token: string, cardId: string): Promise<KanbanCard> {
+  return apiRequest(`/api/kanban/cards/${encodeURIComponent(cardId)}`, { token });
+}
+
+export async function transitionCard(
+  token: string,
+  cardId: string,
+  input: { toStage: CardStage; method?: string; notes?: string },
+): Promise<{ card: KanbanCard; transition: CardTransition }> {
+  return apiRequest(`/api/kanban/lifecycle/cards/${encodeURIComponent(cardId)}/transition`, {
+    method: "POST",
+    token,
+    body: input,
+  });
+}
+
+export async function fetchCardHistory(
+  token: string,
+  cardId: string,
+): Promise<CardTransition[]> {
+  const response = await apiRequest<{ data: CardTransition[] }>(
+    `/api/kanban/lifecycle/cards/${encodeURIComponent(cardId)}/events`,
+    { token },
+  );
+  return response.data ?? [];
+}
+
+export async function fetchCardQR(
+  token: string,
+  cardId: string,
+): Promise<{ qrDataUrl: string }> {
+  return apiRequest(`/api/kanban/cards/${encodeURIComponent(cardId)}/qr`, { token });
+}
+
+/* ── Purchase Orders ──────────────────────────────────────────── */
+
+export async function fetchPurchaseOrders(
+  token: string,
+  params?: { status?: POStatus; page?: number; pageSize?: number },
+): Promise<{ data: PurchaseOrder[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }> {
+  const qs = new URLSearchParams();
+  if (params?.status) qs.set("status", params.status);
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.pageSize) qs.set("pageSize", String(params.pageSize));
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return apiRequest(`/api/orders/purchase-orders${suffix}`, { token });
+}
+
+export async function fetchPurchaseOrder(
+  token: string,
+  poId: string,
+): Promise<PurchaseOrder> {
+  return apiRequest(`/api/orders/purchase-orders/${encodeURIComponent(poId)}`, { token });
+}
+
+export async function updatePurchaseOrderStatus(
+  token: string,
+  poId: string,
+  input: { status: POStatus; notes?: string },
+): Promise<PurchaseOrder> {
+  return apiRequest(`/api/orders/purchase-orders/${encodeURIComponent(poId)}/status`, {
+    method: "PATCH",
+    token,
+    body: input,
+  });
+}
+
+/* ── Work Orders ──────────────────────────────────────────────── */
+
+export async function fetchWorkOrders(
+  token: string,
+  params?: { page?: number; pageSize?: number },
+): Promise<{ data: WorkOrder[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }> {
+  const qs = new URLSearchParams();
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.pageSize) qs.set("pageSize", String(params.pageSize));
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return apiRequest(`/api/orders/work-orders${suffix}`, { token });
+}
+
+/* ── Transfer Orders ──────────────────────────────────────────── */
+
+export async function fetchTransferOrders(
+  token: string,
+  params?: { page?: number; pageSize?: number },
+): Promise<{ data: TransferOrder[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }> {
+  const qs = new URLSearchParams();
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.pageSize) qs.set("pageSize", String(params.pageSize));
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return apiRequest(`/api/orders/transfer-orders${suffix}`, { token });
+}
+
+/* ── Receiving ────────────────────────────────────────────────── */
+
+export async function createReceipt(
+  token: string,
+  input: {
+    orderId: string;
+    orderType: string;
+    lines: Array<{
+      partId: string;
+      quantityAccepted: number;
+      quantityDamaged?: number;
+      quantityRejected?: number;
+      notes?: string;
+    }>;
+    notes?: string;
+  },
+): Promise<Receipt> {
+  return apiRequest("/api/orders/receiving", {
+    method: "POST",
+    token,
+    body: input,
+  });
+}
+
+export async function fetchReceivingMetrics(token: string): Promise<ReceivingMetrics> {
+  return apiRequest("/api/orders/receiving/metrics", { token });
+}
+
+export async function fetchReceivingExceptions(
+  token: string,
+  params?: { page?: number; pageSize?: number },
+): Promise<{ data: ReceivingException[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }> {
+  const qs = new URLSearchParams();
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.pageSize) qs.set("pageSize", String(params.pageSize));
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return apiRequest(`/api/orders/receiving/exceptions${suffix}`, { token });
+}
+
+export async function resolveReceivingException(
+  token: string,
+  exceptionId: string,
+  input: { resolution: ExceptionResolution; notes?: string },
+): Promise<ReceivingException> {
+  return apiRequest(`/api/orders/receiving/exceptions/${encodeURIComponent(exceptionId)}/resolve`, {
+    method: "PATCH",
+    token,
+    body: { resolutionType: input.resolution, resolutionNotes: input.notes },
+  });
+}
+
+export async function fetchReceiptsForOrder(
+  token: string,
+  orderId: string,
+): Promise<Receipt[]> {
+  const response = await apiRequest<{ data: Receipt[] }>(
+    `/api/orders/receiving/order/${encodeURIComponent(orderId)}`,
+    { token },
+  );
+  return response.data ?? [];
 }

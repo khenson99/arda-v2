@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { z } from 'zod';
 import type { AuthRequest } from '@arda/auth-utils';
 import { serviceUrls } from '@arda/config';
+import { db, schema } from '@arda/db';
+import { and, asc, eq, sql } from 'drizzle-orm';
 
 interface HttpLikeError extends Error {
   status?: number;
@@ -47,6 +49,26 @@ type CatalogPart = {
   updatedAt?: string;
   createdAt?: string;
 };
+
+function requireTenantId(req: AuthRequest): string {
+  const tenantId = req.user?.tenantId?.trim();
+  if (!tenantId) {
+    const error = new Error('Unauthorized') as HttpLikeError;
+    error.status = 401;
+    throw error;
+  }
+  return tenantId;
+}
+
+function normalizeOptionalString(input?: string | null): string | null {
+  const normalized = input?.trim();
+  return normalized ? normalized : null;
+}
+
+function toPositiveInt(input?: number | null, fallback = 1): number {
+  if (!Number.isFinite(input)) return fallback;
+  return Math.max(1, Math.trunc(input as number));
+}
 
 function normalizeToken(req: AuthRequest): string {
   const header = req.headers.authorization;
@@ -187,9 +209,149 @@ async function updateCatalogPart(input: {
   return (await response.json()) as CatalogPart;
 }
 
+async function getOrCreateDefaultFacilityId(tenantId: string): Promise<string> {
+  const existing = await db.query.facilities.findFirst({
+    where: and(eq(schema.facilities.tenantId, tenantId), eq(schema.facilities.isActive, true)),
+    orderBy: asc(schema.facilities.createdAt),
+  });
+  if (existing) return existing.id;
+
+  try {
+    const [created] = await db
+      .insert(schema.facilities)
+      .values({
+        tenantId,
+        name: 'Default Facility',
+        code: 'DEFAULT',
+        type: 'warehouse',
+      })
+      .returning({ id: schema.facilities.id });
+    if (created) return created.id;
+  } catch {
+    // Another request may have created the default facility concurrently.
+  }
+
+  const fallback = await db.query.facilities.findFirst({
+    where: and(
+      eq(schema.facilities.tenantId, tenantId),
+      eq(schema.facilities.code, 'DEFAULT')
+    ),
+  });
+  if (fallback) return fallback.id;
+
+  const error = new Error('Unable to provision a default facility for this tenant') as HttpLikeError;
+  error.status = 500;
+  throw error;
+}
+
+async function getOrCreateDefaultSupplierId(
+  tenantId: string,
+  preferredName?: string | null
+): Promise<string> {
+  const normalizedPreferredName = normalizeOptionalString(preferredName);
+  if (normalizedPreferredName) {
+    const exactNameMatch = await db.query.suppliers.findFirst({
+      where: and(
+        eq(schema.suppliers.tenantId, tenantId),
+        eq(schema.suppliers.isActive, true),
+        sql`lower(${schema.suppliers.name}) = lower(${normalizedPreferredName})`
+      ),
+      orderBy: asc(schema.suppliers.createdAt),
+    });
+    if (exactNameMatch) return exactNameMatch.id;
+  }
+
+  const existing = await db.query.suppliers.findFirst({
+    where: and(eq(schema.suppliers.tenantId, tenantId), eq(schema.suppliers.isActive, true)),
+    orderBy: asc(schema.suppliers.createdAt),
+  });
+  if (existing) return existing.id;
+
+  try {
+    const [created] = await db
+      .insert(schema.suppliers)
+      .values({
+        tenantId,
+        name: normalizedPreferredName ?? 'Default Supplier',
+        code: 'DEFAULT',
+      })
+      .returning({ id: schema.suppliers.id });
+    if (created) return created.id;
+  } catch {
+    // Another request may have created the default supplier concurrently.
+  }
+
+  const fallback = await db.query.suppliers.findFirst({
+    where: and(
+      eq(schema.suppliers.tenantId, tenantId),
+      eq(schema.suppliers.code, 'DEFAULT')
+    ),
+  });
+  if (fallback) return fallback.id;
+
+  const error = new Error('Unable to provision a default supplier for this tenant') as HttpLikeError;
+  error.status = 500;
+  throw error;
+}
+
+async function ensureDefaultLoopWithCard(input: {
+  token: string;
+  tenantId: string;
+  partId: string;
+  minQty?: number | null;
+  orderQty?: number | null;
+  preferredSupplierName?: string | null;
+}): Promise<boolean> {
+  const existingLoop = await db.query.kanbanLoops.findFirst({
+    where: and(
+      eq(schema.kanbanLoops.tenantId, input.tenantId),
+      eq(schema.kanbanLoops.partId, input.partId),
+      eq(schema.kanbanLoops.isActive, true)
+    ),
+  });
+  if (existingLoop) return false;
+
+  const [facilityId, primarySupplierId] = await Promise.all([
+    getOrCreateDefaultFacilityId(input.tenantId),
+    getOrCreateDefaultSupplierId(input.tenantId, input.preferredSupplierName),
+  ]);
+
+  const minQuantity = toPositiveInt(input.minQty, 1);
+  const orderQuantity = toPositiveInt(input.orderQty, minQuantity);
+
+  const response = await fetch(`${serviceUrls.kanban}/loops`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${input.token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      partId: input.partId,
+      facilityId,
+      loopType: 'procurement',
+      cardMode: 'single',
+      numberOfCards: 1,
+      minQuantity,
+      orderQuantity,
+      primarySupplierId,
+      notes: 'Auto-created from item upsert',
+    }),
+  });
+
+  if (response.ok) return true;
+  if (response.status === 409) return false;
+
+  const bodyText = await response.text();
+  const message = bodyText?.trim() || `Loop create failed (${response.status})`;
+  const error = new Error(message) as HttpLikeError;
+  error.status = response.status;
+  throw error;
+}
+
 itemsCompatRouter.put('/item/:entityId', async (req: AuthRequest, res, next) => {
   try {
     const token = normalizeToken(req);
+    const tenantId = requireTenantId(req);
     const input = upsertItemSchema.parse(req.body ?? {});
     const entityIdRaw = req.params.entityId;
     const entityId = (Array.isArray(entityIdRaw) ? entityIdRaw[0] : entityIdRaw || '').trim();
@@ -226,10 +388,20 @@ itemsCompatRouter.put('/item/:entityId', async (req: AuthRequest, res, next) => 
           imageUrl: input.payload.imageUrl,
         });
 
+    const cardEnsured = await ensureDefaultLoopWithCard({
+      token,
+      tenantId,
+      partId: part.id,
+      minQty: input.payload.minQty,
+      orderQty: input.payload.orderQty,
+      preferredSupplierName: input.payload.primarySupplier,
+    });
+
     res.json({
       accepted: true,
       entityId,
       partId: part.id,
+      cardEnsured,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
