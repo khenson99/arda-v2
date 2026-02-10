@@ -43,6 +43,11 @@ import {
   formatStatus,
 } from "@/lib/formatters";
 import { ITEMS_PAGE_SIZE_STORAGE_KEY, ITEMS_VISIBLE_COLUMNS_STORAGE_KEY } from "@/lib/constants";
+import {
+  normalizePartLinkId,
+  partMatchesLinkId,
+  resolvePartLinkedValue,
+} from "@/lib/part-linking";
 import { cn } from "@/lib/utils";
 import type { AuthSession, InlineEditableField, ItemTableColumnKey, LoopType, PartRecord } from "@/types";
 import {
@@ -277,7 +282,10 @@ export function PartsRoute({
     >();
 
     for (const card of queueCards) {
-      const existing = stats.get(card.partId) ?? {
+      const normalizedPartId = normalizePartLinkId(card.partId);
+      if (!normalizedPartId) continue;
+
+      const existing = stats.get(normalizedPartId) ?? {
         cards: 0,
         cardIds: [],
         minUnits: null,
@@ -300,27 +308,32 @@ export function PartsRoute({
       }
       existing.loopTypes.add(card.loopType);
 
-      stats.set(card.partId, existing);
+      stats.set(normalizedPartId, existing);
     }
 
     return stats;
   }, [queueCards]);
+
+  const findQueueStatsForPart = React.useCallback(
+    (part: PartRecord) => resolvePartLinkedValue(part, queueStatsByPartId),
+    [queueStatsByPartId],
+  );
 
   const activeItemsCount = React.useMemo(
     () => effectiveParts.filter((part) => part.isActive).length,
     [effectiveParts],
   );
   const recentlyImportedCount = React.useMemo(
-    () => effectiveParts.filter((part) => queueStatsByPartId.has(part.id)).length,
-    [effectiveParts, queueStatsByPartId],
+    () => effectiveParts.filter((part) => Boolean(findQueueStatsForPart(part))).length,
+    [effectiveParts, findQueueStatsForPart],
   );
 
   const scopedParts = React.useMemo(
     () =>
       activeTab === "recentlyImported"
-        ? effectiveParts.filter((part) => queueStatsByPartId.has(part.id))
+        ? effectiveParts.filter((part) => Boolean(findQueueStatsForPart(part)))
         : effectiveParts.filter((part) => part.isActive),
-    [activeTab, effectiveParts, queueStatsByPartId],
+    [activeTab, effectiveParts, findQueueStatsForPart],
   );
 
   const filteredParts = scopedParts;
@@ -359,15 +372,22 @@ export function PartsRoute({
     );
   }, [pagedParts]);
 
+  const selectedPartsById = React.useMemo(
+    () => new Map(effectiveParts.map((part) => [part.id, part])),
+    [effectiveParts],
+  );
+
   // Aggregate card IDs from selected parts for bulk actions
   const selectedCardIds = React.useMemo(() => {
     const ids: string[] = [];
-    for (const partId of selectedIds) {
-      const stats = queueStatsByPartId.get(partId);
+    for (const selectedPartId of selectedIds) {
+      const part = selectedPartsById.get(selectedPartId);
+      if (!part) continue;
+      const stats = findQueueStatsForPart(part);
       if (stats) ids.push(...stats.cardIds);
     }
     return ids;
-  }, [selectedIds, queueStatsByPartId]);
+  }, [findQueueStatsForPart, selectedIds, selectedPartsById]);
 
   // ── Optimistic update handler ────────────────────────────────
 
@@ -687,7 +707,7 @@ function QuickActions({
     setCreateCardState("loading");
     try {
       const loopsResult = await fetchLoops(session.tokens.accessToken, { page: 1, pageSize: 200 });
-      const partLoops = loopsResult.data.filter((loop) => loop.partId === part.id);
+      const partLoops = loopsResult.data.filter((loop) => partMatchesLinkId(part, loop.partId));
       if (partLoops.length === 0) {
         if (!part.eId) {
           setCreateCardState("idle");
@@ -863,7 +883,7 @@ const ItemRow = React.memo(function ItemRow({
   onOpenDetail,
   onCardCreated,
 }: ItemRowProps) {
-  const queueStats = queueStatsByPartId.get(part.id);
+  const queueStats = resolvePartLinkedValue(part, queueStatsByPartId);
   const orderLineSummary = orderLineByItem[part.eId ?? part.id];
   const queueUpdatedAt = queueStats?.queueUpdatedAt ?? null;
   const itemCode = part.externalGuid || part.partNumber || part.id;
