@@ -9,6 +9,9 @@ import type {
   LoopType,
   PartsResponse,
   PartRecord,
+  FacilityRecord,
+  StorageLocationRecord,
+  SupplierRecord,
   OrderLineByItemSummary,
   NotificationRecord,
   DataAuthorityTimeCoordinates,
@@ -660,6 +663,55 @@ export async function fetchItemsDataAuthority(token: string): Promise<PartsRespo
 
 export async function fetchCatalogParts(token: string): Promise<PartsResponse> {
   return apiRequest<PartsResponse>("/api/catalog/parts?page=1&pageSize=100", { token });
+}
+
+export async function fetchFacilities(
+  token: string,
+  params?: { search?: string; page?: number; pageSize?: number },
+): Promise<{
+  data: FacilityRecord[];
+  pagination: { page: number; pageSize: number; total: number; totalPages: number };
+}> {
+  const qs = new URLSearchParams();
+  if (params?.search) qs.set("search", params.search);
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.pageSize) qs.set("pageSize", String(params.pageSize));
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return apiRequest(`/api/catalog/facilities${suffix}`, { token });
+}
+
+export async function fetchStorageLocations(
+  token: string,
+  facilityId: string,
+  params?: { search?: string; page?: number; pageSize?: number },
+): Promise<{
+  data: StorageLocationRecord[];
+  pagination: { page: number; pageSize: number; total: number; totalPages: number };
+}> {
+  const qs = new URLSearchParams();
+  if (params?.search) qs.set("search", params.search);
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.pageSize) qs.set("pageSize", String(params.pageSize));
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return apiRequest(
+    `/api/catalog/facilities/${encodeURIComponent(facilityId)}/storage-locations${suffix}`,
+    { token },
+  );
+}
+
+export async function fetchSuppliers(
+  token: string,
+  params?: { search?: string; page?: number; pageSize?: number },
+): Promise<{
+  data: SupplierRecord[];
+  pagination: { page: number; pageSize: number; total: number; totalPages: number };
+}> {
+  const qs = new URLSearchParams();
+  if (params?.search) qs.set("search", params.search);
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.pageSize) qs.set("pageSize", String(params.pageSize));
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return apiRequest(`/api/catalog/suppliers${suffix}`, { token });
 }
 
 export interface CatalogPartUpsertInput {

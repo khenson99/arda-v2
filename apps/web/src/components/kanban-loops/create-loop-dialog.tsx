@@ -15,22 +15,56 @@ import {
   isUnauthorized,
   parseApiError,
   createLoop,
+  fetchFacilities,
+  fetchParts,
+  fetchStorageLocations,
+  fetchSuppliers,
 } from "@/lib/api-client";
-import type { LoopType } from "@/types";
+import type {
+  FacilityRecord,
+  LoopType,
+  PartRecord,
+  StorageLocationRecord,
+  SupplierRecord,
+} from "@/types";
 import { LOOP_ORDER, LOOP_META } from "@/types";
-
-/* ── Card mode options ──────────────────────────────────────── */
 
 const CARD_MODE_OPTIONS = [
   { value: "single", label: "Single Card" },
   { value: "multi", label: "Multi Card" },
 ] as const;
 
-/* ── UUID validation ─────────────────────────────────────────── */
-
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/* ── Main component ─────────────────────────────────────────── */
+const SELECT_CLASS_NAME =
+  "mt-1 h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
+
+function getPartLabel(part: PartRecord): string {
+  const name = part.name?.trim() || part.partNumber || part.id;
+  const partNumber = part.partNumber?.trim();
+  if (partNumber && partNumber !== name) {
+    return `${name} (${partNumber})`;
+  }
+  return name;
+}
+
+function getFacilityLabel(facility: FacilityRecord): string {
+  const code = facility.code?.trim();
+  if (code) return `${facility.name} (${code})`;
+  return facility.name;
+}
+
+function getSupplierLabel(supplier: SupplierRecord): string {
+  const code = supplier.code?.trim();
+  if (code) return `${supplier.name} (${code})`;
+  return supplier.name;
+}
+
+function getStorageLocationLabel(location: StorageLocationRecord): string {
+  const code = location.code?.trim();
+  if (code) return `${location.name} (${code})`;
+  return location.name;
+}
 
 interface CreateLoopDialogProps {
   token: string;
@@ -48,7 +82,6 @@ export function CreateLoopDialog({
   const [open, setOpen] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
 
-  // Form state
   const [partId, setPartId] = React.useState("");
   const [facilityId, setFacilityId] = React.useState("");
   const [loopType, setLoopType] = React.useState<LoopType>("procurement");
@@ -63,7 +96,14 @@ export function CreateLoopDialog({
   const [storageLocationId, setStorageLocationId] = React.useState("");
   const [notes, setNotes] = React.useState("");
 
-  const resetForm = () => {
+  const [parts, setParts] = React.useState<PartRecord[]>([]);
+  const [facilities, setFacilities] = React.useState<FacilityRecord[]>([]);
+  const [suppliers, setSuppliers] = React.useState<SupplierRecord[]>([]);
+  const [storageLocations, setStorageLocations] = React.useState<StorageLocationRecord[]>([]);
+  const [isOptionsLoading, setIsOptionsLoading] = React.useState(false);
+  const [isStorageLocationsLoading, setIsStorageLocationsLoading] = React.useState(false);
+
+  const resetForm = React.useCallback(() => {
     setPartId("");
     setFacilityId("");
     setLoopType("procurement");
@@ -77,34 +117,141 @@ export function CreateLoopDialog({
     setSourceFacilityId("");
     setStorageLocationId("");
     setNotes("");
-  };
+  }, []);
 
-  // When cardMode switches to single, lock numberOfCards to 1
   React.useEffect(() => {
     if (cardMode === "single") {
       setNumberOfCards("1");
     }
   }, [cardMode]);
 
+  React.useEffect(() => {
+    if (!open) return;
+
+    let cancelled = false;
+    const loadOptions = async () => {
+      setIsOptionsLoading(true);
+      try {
+        const [partsResult, facilitiesResult, suppliersResult] = await Promise.all([
+          fetchParts(token),
+          fetchFacilities(token, { page: 1, pageSize: 100 }),
+          fetchSuppliers(token, { page: 1, pageSize: 100 }),
+        ]);
+
+        if (cancelled) return;
+
+        const validParts = partsResult.data.filter((part) => UUID_RE.test(part.id));
+        const dedupedParts = Array.from(
+          new Map(validParts.map((part) => [part.id, part])).values(),
+        ).sort((a, b) => getPartLabel(a).localeCompare(getPartLabel(b)));
+
+        const sortedFacilities = [...facilitiesResult.data].sort((a, b) =>
+          getFacilityLabel(a).localeCompare(getFacilityLabel(b)),
+        );
+        const sortedSuppliers = [...suppliersResult.data].sort((a, b) =>
+          getSupplierLabel(a).localeCompare(getSupplierLabel(b)),
+        );
+
+        setParts(dedupedParts);
+        setFacilities(sortedFacilities);
+        setSuppliers(sortedSuppliers);
+
+        setPartId((current) => (dedupedParts.some((part) => part.id === current) ? current : ""));
+        setFacilityId((current) =>
+          sortedFacilities.some((facility) => facility.id === current) ? current : "",
+        );
+        setPrimarySupplierId((current) =>
+          sortedSuppliers.some((supplier) => supplier.id === current) ? current : "",
+        );
+        setSourceFacilityId((current) =>
+          sortedFacilities.some((facility) => facility.id === current) ? current : "",
+        );
+      } catch (err) {
+        if (isUnauthorized(err)) {
+          onUnauthorized();
+          return;
+        }
+        toast.error(`Failed to load form options: ${parseApiError(err)}`);
+      } finally {
+        if (!cancelled) {
+          setIsOptionsLoading(false);
+        }
+      }
+    };
+
+    void loadOptions();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, onUnauthorized, token]);
+
+  React.useEffect(() => {
+    if (!open || !facilityId) {
+      setStorageLocations([]);
+      setStorageLocationId("");
+      setIsStorageLocationsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const loadStorageLocations = async () => {
+      setIsStorageLocationsLoading(true);
+      try {
+        const result = await fetchStorageLocations(token, facilityId, { page: 1, pageSize: 100 });
+        if (cancelled) return;
+        const sorted = [...result.data].sort((a, b) =>
+          getStorageLocationLabel(a).localeCompare(getStorageLocationLabel(b)),
+        );
+        setStorageLocations(sorted);
+        setStorageLocationId((current) =>
+          sorted.some((location) => location.id === current) ? current : "",
+        );
+      } catch (err) {
+        if (isUnauthorized(err)) {
+          onUnauthorized();
+          return;
+        }
+        toast.error(`Failed to load storage locations: ${parseApiError(err)}`);
+        if (!cancelled) {
+          setStorageLocations([]);
+          setStorageLocationId("");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsStorageLocationsLoading(false);
+        }
+      }
+    };
+
+    void loadStorageLocations();
+    return () => {
+      cancelled = true;
+    };
+  }, [facilityId, onUnauthorized, open, token]);
+
+  const transferSourceFacilities = React.useMemo(
+    () => facilities.filter((facility) => facility.id !== facilityId),
+    [facilities, facilityId],
+  );
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // ── Validation ────────────────────────────────────────────
-    if (!partId.trim()) {
-      toast.error("Part ID is required.");
+    if (!partId) {
+      toast.error("Item is required.");
       return;
     }
-    if (!UUID_RE.test(partId.trim())) {
-      toast.error("Part ID must be a valid UUID.");
+    if (!UUID_RE.test(partId)) {
+      toast.error("Selected item has an invalid ID.");
       return;
     }
 
-    if (!facilityId.trim()) {
-      toast.error("Facility ID is required.");
+    if (!facilityId) {
+      toast.error("Facility is required.");
       return;
     }
-    if (!UUID_RE.test(facilityId.trim())) {
-      toast.error("Facility ID must be a valid UUID.");
+    if (!UUID_RE.test(facilityId)) {
+      toast.error("Selected facility has an invalid ID.");
       return;
     }
 
@@ -120,36 +267,34 @@ export function CreateLoopDialog({
       return;
     }
 
-    if (loopType === "procurement" && !primarySupplierId.trim()) {
-      toast.error("Primary Supplier ID is required for procurement loops.");
+    if (loopType === "procurement" && !primarySupplierId) {
+      toast.error("Supplier is required for procurement loops.");
       return;
     }
-    if (loopType === "procurement" && primarySupplierId.trim() && !UUID_RE.test(primarySupplierId.trim())) {
-      toast.error("Primary Supplier ID must be a valid UUID.");
-      return;
-    }
-
-    if (loopType === "transfer" && !sourceFacilityId.trim()) {
-      toast.error("Source Facility ID is required for transfer loops.");
-      return;
-    }
-    if (loopType === "transfer" && sourceFacilityId.trim() && !UUID_RE.test(sourceFacilityId.trim())) {
-      toast.error("Source Facility ID must be a valid UUID.");
+    if (loopType === "procurement" && primarySupplierId && !UUID_RE.test(primarySupplierId)) {
+      toast.error("Selected supplier has an invalid ID.");
       return;
     }
 
-    if (storageLocationId.trim() && !UUID_RE.test(storageLocationId.trim())) {
-      toast.error("Storage Location ID must be a valid UUID.");
+    if (loopType === "transfer" && !sourceFacilityId) {
+      toast.error("Source facility is required for transfer loops.");
+      return;
+    }
+    if (loopType === "transfer" && sourceFacilityId && !UUID_RE.test(sourceFacilityId)) {
+      toast.error("Selected source facility has an invalid ID.");
       return;
     }
 
-    // ── Build input ──────────────────────────────────────────
+    if (storageLocationId && !UUID_RE.test(storageLocationId)) {
+      toast.error("Selected storage location has an invalid ID.");
+      return;
+    }
+
     setIsSaving(true);
-
     try {
       const input: Parameters<typeof createLoop>[1] = {
-        partId: partId.trim(),
-        facilityId: facilityId.trim(),
+        partId,
+        facilityId,
         loopType,
         cardMode,
         minQuantity: minQtyNum,
@@ -170,16 +315,16 @@ export function CreateLoopDialog({
         input.safetyStockDays = safetyStockDays.trim();
       }
 
-      if (loopType === "procurement" && primarySupplierId.trim()) {
-        input.primarySupplierId = primarySupplierId.trim();
+      if (loopType === "procurement" && primarySupplierId) {
+        input.primarySupplierId = primarySupplierId;
       }
 
-      if (loopType === "transfer" && sourceFacilityId.trim()) {
-        input.sourceFacilityId = sourceFacilityId.trim();
+      if (loopType === "transfer" && sourceFacilityId) {
+        input.sourceFacilityId = sourceFacilityId;
       }
 
-      if (storageLocationId.trim()) {
-        input.storageLocationId = storageLocationId.trim();
+      if (storageLocationId) {
+        input.storageLocationId = storageLocationId;
       }
 
       if (notes.trim()) {
@@ -233,37 +378,62 @@ export function CreateLoopDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} noValidate className="space-y-4">
-          {/* Part ID */}
           <div>
             <label className="text-xs font-medium text-muted-foreground" htmlFor="create-partId">
-              Part ID <span className="text-destructive">*</span>
+              Item <span className="text-destructive">*</span>
             </label>
-            <Input
+            <select
               id="create-partId"
               value={partId}
               onChange={(e) => setPartId(e.target.value)}
-              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
               required
-              className="mt-1 h-9 text-sm"
-            />
+              className={SELECT_CLASS_NAME}
+              disabled={isOptionsLoading}
+            >
+              <option value="">
+                {isOptionsLoading ? "Loading items..." : "Select an item"}
+              </option>
+              {!isOptionsLoading && parts.length === 0 ? (
+                <option value="" disabled>
+                  No items available
+                </option>
+              ) : null}
+              {parts.map((part) => (
+                <option key={part.id} value={part.id}>
+                  {getPartLabel(part)}
+                </option>
+              ))}
+            </select>
           </div>
 
-          {/* Facility */}
           <div>
             <label className="text-xs font-medium text-muted-foreground" htmlFor="create-facility">
-              Facility ID <span className="text-destructive">*</span>
+              Facility <span className="text-destructive">*</span>
             </label>
-            <Input
+            <select
               id="create-facility"
               value={facilityId}
               onChange={(e) => setFacilityId(e.target.value)}
-              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
               required
-              className="mt-1 h-9 text-sm"
-            />
+              className={SELECT_CLASS_NAME}
+              disabled={isOptionsLoading}
+            >
+              <option value="">
+                {isOptionsLoading ? "Loading facilities..." : "Select a facility"}
+              </option>
+              {!isOptionsLoading && facilities.length === 0 ? (
+                <option value="" disabled>
+                  No facilities available
+                </option>
+              ) : null}
+              {facilities.map((facility) => (
+                <option key={facility.id} value={facility.id}>
+                  {getFacilityLabel(facility)}
+                </option>
+              ))}
+            </select>
           </div>
 
-          {/* Loop Type */}
           <div>
             <label className="text-xs font-medium text-muted-foreground">
               Loop Type
@@ -292,41 +462,66 @@ export function CreateLoopDialog({
             </div>
           </div>
 
-          {/* Primary Supplier ID — shown for procurement loops */}
           {loopType === "procurement" && (
             <div>
               <label className="text-xs font-medium text-muted-foreground" htmlFor="create-supplierId">
-                Primary Supplier ID <span className="text-destructive">*</span>
+                Supplier <span className="text-destructive">*</span>
               </label>
-              <Input
+              <select
                 id="create-supplierId"
                 value={primarySupplierId}
                 onChange={(e) => setPrimarySupplierId(e.target.value)}
-                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                 required
-                className="mt-1 h-9 text-sm"
-              />
+                className={SELECT_CLASS_NAME}
+                disabled={isOptionsLoading}
+              >
+                <option value="">
+                  {isOptionsLoading ? "Loading suppliers..." : "Select a supplier"}
+                </option>
+                {!isOptionsLoading && suppliers.length === 0 ? (
+                  <option value="" disabled>
+                    No suppliers available
+                  </option>
+                ) : null}
+                {suppliers.map((supplier) => (
+                  <option key={supplier.id} value={supplier.id}>
+                    {getSupplierLabel(supplier)}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
 
-          {/* Source Facility ID — shown for transfer loops */}
           {loopType === "transfer" && (
             <div>
               <label className="text-xs font-medium text-muted-foreground" htmlFor="create-sourceFacility">
-                Source Facility ID <span className="text-destructive">*</span>
+                Source Facility <span className="text-destructive">*</span>
               </label>
-              <Input
+              <select
                 id="create-sourceFacility"
                 value={sourceFacilityId}
                 onChange={(e) => setSourceFacilityId(e.target.value)}
-                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                 required
-                className="mt-1 h-9 text-sm"
-              />
+                className={SELECT_CLASS_NAME}
+                disabled={isOptionsLoading}
+              >
+                <option value="">
+                  {isOptionsLoading ? "Loading facilities..." : "Select a source facility"}
+                </option>
+                {!isOptionsLoading && transferSourceFacilities.length === 0 ? (
+                  <option value="" disabled>
+                    No alternate facilities available
+                  </option>
+                ) : null}
+                {transferSourceFacilities.map((facility) => (
+                  <option key={facility.id} value={facility.id}>
+                    {getFacilityLabel(facility)}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
 
-          {/* Card Mode */}
           <div>
             <label className="text-xs font-medium text-muted-foreground">
               Card Mode
@@ -352,7 +547,6 @@ export function CreateLoopDialog({
             </div>
           </div>
 
-          {/* Numeric fields row */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-muted-foreground" htmlFor="create-cards">
@@ -414,21 +608,37 @@ export function CreateLoopDialog({
             </div>
           </div>
 
-          {/* Storage Location ID */}
           <div>
             <label className="text-xs font-medium text-muted-foreground" htmlFor="create-storageLocation">
-              Storage Location ID
+              Storage Location
             </label>
-            <Input
+            <select
               id="create-storageLocation"
               value={storageLocationId}
               onChange={(e) => setStorageLocationId(e.target.value)}
-              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-              className="mt-1 h-9 text-sm"
-            />
+              className={SELECT_CLASS_NAME}
+              disabled={!facilityId || isStorageLocationsLoading}
+            >
+              <option value="">
+                {!facilityId
+                  ? "Select a facility first"
+                  : isStorageLocationsLoading
+                    ? "Loading storage locations..."
+                    : "Select a storage location (optional)"}
+              </option>
+              {facilityId && !isStorageLocationsLoading && storageLocations.length === 0 ? (
+                <option value="" disabled>
+                  No storage locations available
+                </option>
+              ) : null}
+              {storageLocations.map((location) => (
+                <option key={location.id} value={location.id}>
+                  {getStorageLocationLabel(location)}
+                </option>
+              ))}
+            </select>
           </div>
 
-          {/* Safety Stock Days */}
           <div>
             <label className="text-xs font-medium text-muted-foreground" htmlFor="create-safetyStock">
               Safety Stock Days
@@ -442,7 +652,6 @@ export function CreateLoopDialog({
             />
           </div>
 
-          {/* Notes */}
           <div>
             <label className="text-xs font-medium text-muted-foreground" htmlFor="create-notes">
               Notes
@@ -457,7 +666,6 @@ export function CreateLoopDialog({
             />
           </div>
 
-          {/* Actions */}
           <div className="flex items-center justify-end gap-2 pt-2">
             <Button
               type="button"
@@ -468,8 +676,8 @@ export function CreateLoopDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" size="sm" disabled={isSaving}>
-              {isSaving && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+            <Button type="submit" size="sm" disabled={isSaving || isOptionsLoading}>
+              {(isSaving || isOptionsLoading) && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
               Create Loop
             </Button>
           </div>

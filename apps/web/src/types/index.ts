@@ -145,6 +145,40 @@ export interface PartRecord {
   updatedAt: string;
 }
 
+export interface FacilityRecord {
+  id: string;
+  tenantId: string;
+  name: string;
+  code: string;
+  type: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StorageLocationRecord {
+  id: string;
+  tenantId: string;
+  facilityId: string;
+  name: string;
+  code: string;
+  zone?: string | null;
+  description?: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SupplierRecord {
+  id: string;
+  tenantId: string;
+  name: string;
+  code?: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /* ── Data Authority (bitemporal records) ──────────────────────── */
 
 export interface DataAuthorityTimeCoordinates {
