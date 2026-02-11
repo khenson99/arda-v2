@@ -417,6 +417,8 @@ itemsCompatRouter.put('/item/:entityId', async (req: AuthRequest, res, next) => 
       ? mergeNotesIntoSpecifications(existing?.specifications, input.payload.notes)
       : sanitizeSpecifications(existing?.specifications);
 
+    const isNewPart = !existing;
+
     const part = existing
       ? await updateCatalogPart({
           token,
@@ -440,22 +442,26 @@ itemsCompatRouter.put('/item/:entityId', async (req: AuthRequest, res, next) => 
         });
 
     let cardEnsured = false;
-    try {
-      cardEnsured = await ensureDefaultLoopWithCard({
-        token,
-        tenantId,
-        partId: part.id,
-        minQty: input.payload.minQty,
-        orderQty: input.payload.orderQty,
-        preferredSupplierName: input.payload.primarySupplier,
-      });
-    } catch (loopError) {
-      // Notes/item updates should not fail just because auto-loop provisioning failed.
-      console.warn('Failed to auto-provision default loop/card during item upsert', {
-        entityId,
-        partId: part.id,
-        error: loopError instanceof Error ? loopError.message : String(loopError),
-      });
+    // Auto-bootstrap loops/cards only when a new catalog part is created.
+    // Existing item updates (like notes edits) should be fast and side-effect free.
+    if (isNewPart) {
+      try {
+        cardEnsured = await ensureDefaultLoopWithCard({
+          token,
+          tenantId,
+          partId: part.id,
+          minQty: input.payload.minQty,
+          orderQty: input.payload.orderQty,
+          preferredSupplierName: input.payload.primarySupplier,
+        });
+      } catch (loopError) {
+        // Item creation should still succeed even when loop bootstrap is unavailable.
+        console.warn('Failed to auto-provision default loop/card during item upsert', {
+          entityId,
+          partId: part.id,
+          error: loopError instanceof Error ? loopError.message : String(loopError),
+        });
+      }
     }
 
     res.json({
