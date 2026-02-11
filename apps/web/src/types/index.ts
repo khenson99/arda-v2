@@ -584,6 +584,33 @@ export interface TransferOrderLine {
   notes: string | null;
 }
 
+/* ── Source Recommendation ────────────────────────────────────── */
+
+export interface SourceRecommendation {
+  facilityId: string;
+  facilityName: string;
+  qtyAvailable: number;
+  avgLeadTimeDays: number | null;
+  distanceKm: number | null;
+  score: number;
+}
+
+/* ── Inventory Ledger ─────────────────────────────────────────── */
+
+export interface InventoryLedgerEntry {
+  id: string;
+  tenantId: string;
+  facilityId: string;
+  partId: string;
+  partName?: string;
+  qtyOnHand: number;
+  qtyReserved: number;
+  qtyInTransit: number;
+  reorderPoint: number | null;
+  reorderQty: number | null;
+  updatedAt: string;
+}
+
 /* ── Receiving ───────────────────────────────────────────────── */
 
 export type ReceiptStatus = "pending" | "completed" | "rejected";

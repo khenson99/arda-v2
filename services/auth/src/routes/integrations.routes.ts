@@ -32,7 +32,7 @@ integrationsRouter.post(
       const input = createApiKeySchema.parse(req.body);
       const result = await integrationService.createApiKey({
         tenantId: req.user!.tenantId,
-        userId: req.user!.id,
+        userId: req.user!.sub,
         name: input.name,
         permissions: input.permissions,
         expiresInDays: input.expiresInDays,

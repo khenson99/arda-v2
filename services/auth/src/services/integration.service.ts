@@ -175,13 +175,27 @@ export async function updateWebhookSettings(input: UpdateWebhookInput) {
     throw new Error('Tenant not found');
   }
 
-  const currentSettings = (tenant.settings || {}) as Record<string, unknown>;
-  const updatedSettings = {
-    ...currentSettings,
-    ...(webhookUrl !== undefined && { webhookUrl }),
-    ...(webhookSecret !== undefined && { webhookSecret }),
-    ...(webhookEvents !== undefined && { webhookEvents }),
-  };
+  const updatedSettings: schema.TenantSettings = { ...(tenant.settings ?? {}) };
+
+  if (webhookUrl !== undefined) {
+    if (webhookUrl === null) {
+      delete updatedSettings.webhookUrl;
+    } else {
+      updatedSettings.webhookUrl = webhookUrl;
+    }
+  }
+
+  if (webhookSecret !== undefined) {
+    if (webhookSecret === null) {
+      delete updatedSettings.webhookSecret;
+    } else {
+      updatedSettings.webhookSecret = webhookSecret;
+    }
+  }
+
+  if (webhookEvents !== undefined) {
+    updatedSettings.webhookEvents = webhookEvents;
+  }
 
   const [updated] = await db
     .update(schema.tenants)
@@ -192,8 +206,8 @@ export async function updateWebhookSettings(input: UpdateWebhookInput) {
   log.info({ tenantId, hasWebhookUrl: !!webhookUrl }, 'Webhook settings updated');
 
   return {
-    webhookUrl: updatedSettings.webhookUrl as string | null | undefined,
-    webhookEvents: updatedSettings.webhookEvents as string[] | undefined,
+    webhookUrl: updatedSettings.webhookUrl ?? null,
+    webhookEvents: updatedSettings.webhookEvents ?? [],
     // Never return webhookSecret for security
   };
 }
