@@ -15,6 +15,7 @@ import { orderQueueRouter } from './routes/order-queue.routes.js';
 import { auditRouter } from './routes/audit.routes.js';
 import { receivingRouter } from './routes/receiving.routes.js';
 import { productionQueueRouter } from './routes/production-queue.routes.js';
+import { automationRouter } from './routes/automation.routes.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { startQueueRiskScheduler } from './services/queue-risk-scheduler.service.js';
 
@@ -55,6 +56,7 @@ app.use('/queue', orderQueueRouter);
 app.use('/audit', auditRouter);
 app.use('/receiving', receivingRouter);
 app.use('/production-queue', productionQueueRouter);
+app.use('/automation', automationRouter);
 
 app.use(errorHandler);
 

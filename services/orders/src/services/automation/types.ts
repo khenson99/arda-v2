@@ -228,6 +228,7 @@ export interface PurchaseOrderContext {
   tenantId: string;
   cardId: string;
   loopId: string;
+  partId: string;
   supplierId: string;
   facilityId: string;
   orderQuantity: number;

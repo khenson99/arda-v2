@@ -26,6 +26,14 @@ import type {
   ExportOrderType,
 } from './data-export.worker.js';
 
+import {
+  startAutomationWorker,
+  createAutomationQueue,
+  enqueueAutomationJob,
+} from './automation.worker.js';
+import type { AutomationWorkerPayload } from './automation.worker.js';
+import type { AutomationOrchestrator } from '../services/automation/index.js';
+
 // ─── Re-exports ─────────────────────────────────────────────────────
 
 export {
@@ -37,6 +45,10 @@ export {
   startDataExportWorker,
   createDataExportQueue,
   enqueueDataExport,
+  // Automation
+  startAutomationWorker,
+  createAutomationQueue,
+  enqueueAutomationJob,
 };
 
 export type {
@@ -45,6 +57,7 @@ export type {
   DataExportResult,
   ExportFormat,
   ExportOrderType,
+  AutomationWorkerPayload,
 };
 
 // ─── Combined Startup ───────────────────────────────────────────────
@@ -57,6 +70,11 @@ export interface OrderWorkerInstances {
   dataExport: {
     worker: Worker<JobEnvelope<DataExportPayload>>;
     queue: Queue<JobEnvelope<DataExportPayload>>;
+  };
+  automation: {
+    worker: Worker<JobEnvelope<AutomationWorkerPayload>>;
+    queue: Queue<JobEnvelope<AutomationWorkerPayload>>;
+    orchestrator: AutomationOrchestrator;
   };
 }
 
@@ -81,17 +99,18 @@ export function startOrderWorkers(redisUrl: string): OrderWorkerInstances {
 
   const orderAging = startOrderAgingWorker(redisUrl);
   const dataExport = startDataExportWorker(redisUrl);
+  const automation = startAutomationWorker(redisUrl);
 
   console.log(
     JSON.stringify({
       level: 'info',
       service: 'orders',
-      workers: ['order-aging', 'data-export'],
+      workers: ['order-aging', 'data-export', 'automation'],
       msg: 'All orders workers started',
     }),
   );
 
-  return { orderAging, dataExport };
+  return { orderAging, dataExport, automation };
 }
 
 /**
@@ -113,11 +132,16 @@ export async function stopOrderWorkers(instances: OrderWorkerInstances): Promise
   await Promise.allSettled([
     instances.orderAging.worker.close(),
     instances.dataExport.worker.close(),
+    instances.automation.worker.close(),
   ]);
+
+  // Shut down the automation orchestrator (closes its Redis connections)
+  await instances.automation.orchestrator.shutdown();
 
   await Promise.allSettled([
     instances.orderAging.queue.close(),
     instances.dataExport.queue.close(),
+    instances.automation.queue.close(),
   ]);
 
   console.log(

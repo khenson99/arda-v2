@@ -260,6 +260,86 @@ export interface ProductionReworkEvent {
   timestamp: string;
 }
 
+// ─── Automation Events ──────────────────────────────────────────────
+export interface AutomationPOCreatedEvent {
+  type: 'automation.po_created';
+  tenantId: string;
+  purchaseOrderId: string;
+  poNumber: string;
+  source: 'automation';
+  timestamp: string;
+}
+
+export interface AutomationTOCreatedEvent {
+  type: 'automation.to_created';
+  tenantId: string;
+  transferOrderId: string;
+  toNumber: string;
+  source: 'automation';
+  timestamp: string;
+}
+
+export interface AutomationEmailDispatchedEvent {
+  type: 'automation.email_dispatched';
+  tenantId: string;
+  purchaseOrderId: string;
+  supplierId: string;
+  supplierEmail: string;
+  totalAmount: number;
+  source: 'automation';
+  timestamp: string;
+}
+
+export interface AutomationShoppingListItemAddedEvent {
+  type: 'automation.shopping_list_item_added';
+  tenantId: string;
+  partId: string;
+  quantity: number;
+  source: 'automation';
+  timestamp: string;
+}
+
+export interface AutomationCardStageChangedEvent {
+  type: 'automation.card_stage_changed';
+  tenantId: string;
+  cardId: string;
+  loopId: string;
+  fromStage: string;
+  toStage: string;
+  cycleNumber: number;
+  source: 'automation';
+  timestamp: string;
+}
+
+export interface AutomationEscalatedEvent {
+  type: 'automation.escalated';
+  tenantId: string;
+  reason: string;
+  entityType?: string;
+  entityId?: string;
+  source: 'automation';
+  timestamp: string;
+}
+
+// ─── Inventory Events ──────────────────────────────────────────────
+
+export interface InventoryUpdatedEvent {
+  type: 'inventory:updated';
+  tenantId: string;
+  facilityId: string;
+  partId: string;
+  field: 'qtyOnHand' | 'qtyReserved' | 'qtyInTransit';
+  adjustmentType: 'set' | 'increment' | 'decrement';
+  quantity: number;
+  previousValue: number;
+  newValue: number;
+  /** Present when the adjustment comes from a cycle count. */
+  variance?: number;
+  /** Source of the adjustment (e.g. 'cycle_count'). */
+  source?: string;
+  timestamp: string;
+}
+
 // Re-export security events
 export {
   type SecurityEvent,
@@ -300,7 +380,14 @@ export type ArdaEvent =
   | ProductionResumeEvent
   | ProductionExpediteEvent
   | ProductionSplitEvent
-  | ProductionReworkEvent;
+  | ProductionReworkEvent
+  | AutomationPOCreatedEvent
+  | AutomationTOCreatedEvent
+  | AutomationEmailDispatchedEvent
+  | AutomationShoppingListItemAddedEvent
+  | AutomationCardStageChangedEvent
+  | AutomationEscalatedEvent
+  | InventoryUpdatedEvent;
 
 // ─── Event Channel Names ────────────────────────────────────────────
 const CHANNEL_PREFIX = 'arda:events';
