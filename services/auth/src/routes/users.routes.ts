@@ -79,7 +79,7 @@ usersRouter.post('/invite', requireRole('tenant_admin'), async (req: AuthRequest
 // Update a user's role (tenant_admin only)
 usersRouter.put('/:id/role', requireRole('tenant_admin'), async (req: AuthRequest, res, next) => {
   try {
-    const userId = req.params.id;
+    const userId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     if (!userId) {
       res.status(400).json({ error: 'User ID is required' });
       return;
@@ -113,7 +113,7 @@ usersRouter.put('/:id/role', requireRole('tenant_admin'), async (req: AuthReques
 // Deactivate a user account (tenant_admin only)
 usersRouter.put('/:id/deactivate', requireRole('tenant_admin'), async (req: AuthRequest, res, next) => {
   try {
-    const userId = req.params.id;
+    const userId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     if (!userId) {
       res.status(400).json({ error: 'User ID is required' });
       return;
