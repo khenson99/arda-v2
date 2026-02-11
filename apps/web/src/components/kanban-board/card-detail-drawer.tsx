@@ -17,9 +17,9 @@ import {
   isUnauthorized,
   fetchCardHistory,
   fetchCardQR,
-  createPrintJob,
   createPurchaseOrderFromCards,
 } from "@/lib/api-client";
+import { printCardsFromIds } from "@/lib/kanban-printing";
 import type { KanbanCard, CardTransition, CardStage } from "@/types";
 import { CARD_STAGE_META } from "@/types";
 
@@ -73,6 +73,8 @@ function TimelineItem({ transition }: { transition: CardTransition }) {
 interface CardDetailDrawerProps {
   card: KanbanCard | null;
   token: string;
+  tenantName: string;
+  tenantLogoUrl?: string;
   onUnauthorized: () => void;
   onClose: () => void;
 }
@@ -80,6 +82,8 @@ interface CardDetailDrawerProps {
 export function CardDetailDrawer({
   card,
   token,
+  tenantName,
+  tenantLogoUrl,
   onUnauthorized,
   onClose,
 }: CardDetailDrawerProps) {
@@ -147,8 +151,17 @@ export function CardDetailDrawer({
     if (!card) return;
     setIsPrinting(true);
     try {
-      await createPrintJob(token, { cardIds: [card.id] });
-      toast.success("Print job queued");
+      const result = await printCardsFromIds({
+        token,
+        cardIds: [card.id],
+        tenantName,
+        tenantLogoUrl,
+        onUnauthorized,
+      });
+      toast.success("Print dialog opened");
+      if (result.auditError) {
+        toast.warning(`Printed, but audit logging failed: ${result.auditError}`);
+      }
     } catch (err) {
       if (isUnauthorized(err)) {
         onUnauthorized();
@@ -158,7 +171,7 @@ export function CardDetailDrawer({
     } finally {
       setIsPrinting(false);
     }
-  }, [card, token, onUnauthorized]);
+  }, [card, token, tenantName, tenantLogoUrl, onUnauthorized]);
 
   const handleCreateOrder = React.useCallback(async () => {
     if (!card) return;

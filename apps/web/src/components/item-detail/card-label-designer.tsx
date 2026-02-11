@@ -5,10 +5,10 @@ import { Badge, Button } from "@/components/ui";
 import {
   fetchCards,
   fetchCardQR,
-  createPrintJob,
   isUnauthorized,
   parseApiError,
 } from "@/lib/api-client";
+import { printCardsFromIds } from "@/lib/kanban-printing";
 import { fetchLoopsForPart } from "@/lib/kanban-loops";
 import type { KanbanCard, PartRecord } from "@/types";
 import { CARD_STAGE_META, LOOP_META } from "@/types";
@@ -19,6 +19,8 @@ import { formatReadableLabel } from "@/lib/formatters";
 interface CardLabelDesignerProps {
   part: PartRecord;
   token: string;
+  tenantName: string;
+  tenantLogoUrl?: string;
   onUnauthorized: () => void;
   onOpenLoopsTab?: () => void;
 }
@@ -62,6 +64,8 @@ export function resolveLoopLabel(loopType?: string | null): string | null {
 export function CardLabelDesigner({
   part,
   token,
+  tenantName,
+  tenantLogoUrl,
   onUnauthorized,
   onOpenLoopsTab,
 }: CardLabelDesignerProps) {
@@ -157,8 +161,17 @@ export function CardLabelDesigner({
     if (!selectedCard) return;
     setIsPrinting(true);
     try {
-      await createPrintJob(token, { cardIds: [selectedCard.id] });
-      toast.success(`Print job created for card #${selectedCard.cardNumber}`);
+      const result = await printCardsFromIds({
+        token,
+        cardIds: [selectedCard.id],
+        tenantName,
+        tenantLogoUrl,
+        onUnauthorized,
+      });
+      toast.success(`Print dialog opened for card #${selectedCard.cardNumber}`);
+      if (result.auditError) {
+        toast.warning(`Printed, but audit logging failed: ${result.auditError}`);
+      }
     } catch (error) {
       if (isUnauthorized(error)) {
         onUnauthorized();
@@ -168,7 +181,7 @@ export function CardLabelDesigner({
     } finally {
       setIsPrinting(false);
     }
-  }, [selectedCard, token, onUnauthorized]);
+  }, [selectedCard, token, tenantName, tenantLogoUrl, onUnauthorized]);
 
   if (isLoading) {
     return (

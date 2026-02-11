@@ -1,7 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import type { CardFormat } from '@arda/shared-types';
-import { getDefaultSettings, calculateCardsPerPage, buildPrintStylesheet } from '../print-pipeline';
+import {
+  getDefaultSettings,
+  calculateCardsPerPage,
+  buildPrintStylesheet,
+  dispatchPrint,
+} from '../print-pipeline';
 import { FORMAT_CONFIGS } from '../types';
+import type { KanbanPrintData } from '../types';
 
 // ─── Print Pipeline Utility Tests ─────────────────────────────────────
 // Tests for the non-DOM utility functions in the print pipeline.
@@ -156,5 +162,109 @@ describe('buildPrintStylesheet', () => {
     const css = buildPrintStylesheet(settings, config);
 
     expect(css).toContain('box-shadow: none');
+  });
+});
+
+describe('dispatchPrint', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    delete (globalThis as Record<string, unknown>).window;
+    delete (globalThis as Record<string, unknown>).DOMParser;
+  });
+
+  const sampleCard: KanbanPrintData = {
+    cardId: '3c82402b-5f53-4a6c-bbb7-76416519a02f',
+    cardNumber: 1,
+    totalCards: 3,
+    partNumber: 'PN-100',
+    partDescription: 'Widget',
+    loopType: 'procurement',
+    currentStage: 'created',
+    facilityName: 'Plant A',
+    orderQuantity: 10,
+    minQuantity: 5,
+    qrCodeDataUrl: 'data:image/png;base64,abc123',
+    scanUrl: '',
+    tenantName: 'Arda',
+    showArdaWatermark: false,
+  };
+
+  function installDomParserStub() {
+    class FakeDOMParser {
+      parseFromString() {
+        return {
+          head: { childNodes: [{ id: 'head-node' }] },
+          body: { childNodes: [{ id: 'body-node' }] },
+        };
+      }
+    }
+
+    (globalThis as Record<string, unknown>).DOMParser = FakeDOMParser;
+  }
+
+  function createPrintWindowStub() {
+    const headAppend = vi.fn();
+    const bodyAppend = vi.fn();
+    const importNode = vi.fn((node: unknown) => node);
+    const print = vi.fn();
+    const close = vi.fn();
+
+    return {
+      window: {
+        document: {
+          head: { appendChild: headAppend },
+          body: { appendChild: bodyAppend },
+          importNode,
+        },
+        print,
+        close,
+      },
+      spies: { headAppend, bodyAppend, importNode, print, close },
+    };
+  }
+
+  it('uses provided printWindow and honors closeWindowAfterPrint=false', () => {
+    vi.useFakeTimers();
+    installDomParserStub();
+
+    const provided = createPrintWindowStub();
+    const openSpy = vi.fn();
+    (globalThis as Record<string, unknown>).window = { open: openSpy };
+
+    dispatchPrint(
+      [sampleCard],
+      '3x5_card',
+      getDefaultSettings('3x5_card'),
+      { printWindow: provided.window as unknown as Window, closeWindowAfterPrint: false },
+    );
+
+    vi.runAllTimers();
+
+    expect(openSpy).not.toHaveBeenCalled();
+    expect(provided.spies.importNode).toHaveBeenCalled();
+    expect(provided.spies.print).toHaveBeenCalledTimes(1);
+    expect(provided.spies.close).not.toHaveBeenCalled();
+  });
+
+  it('opens a window when no printWindow is passed and closes after print by default', () => {
+    vi.useFakeTimers();
+    installDomParserStub();
+
+    const opened = createPrintWindowStub();
+    const openSpy = vi.fn(() => opened.window);
+    (globalThis as Record<string, unknown>).window = { open: openSpy, alert: vi.fn() };
+
+    dispatchPrint(
+      [sampleCard],
+      '3x5_card',
+      getDefaultSettings('3x5_card'),
+    );
+
+    vi.runAllTimers();
+
+    expect(openSpy).toHaveBeenCalledTimes(1);
+    expect(opened.spies.print).toHaveBeenCalledTimes(1);
+    expect(opened.spies.close).toHaveBeenCalledTimes(1);
   });
 });

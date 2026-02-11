@@ -4,7 +4,8 @@ import { toast } from "sonner";
 import { Badge, Button, Checkbox } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { formatStatus, formatQuantity, formatDateTime } from "@/lib/formatters";
-import { createPrintJob, createPurchaseOrderFromCards, parseApiError } from "@/lib/api-client";
+import { createPurchaseOrderFromCards, parseApiError } from "@/lib/api-client";
+import { printCardsFromIds } from "@/lib/kanban-printing";
 import { resolvePartLinkedValue } from "@/lib/part-linking";
 import type { PartRecord, LoopType, OrderLineByItemSummary, AuthSession } from "@/types";
 
@@ -92,15 +93,23 @@ const ItemCard = React.memo(function ItemCard({
     if (!hasCards || printState === "loading") return;
     setPrintState("loading");
     try {
-      await createPrintJob(session.tokens.accessToken, { cardIds });
+      const result = await printCardsFromIds({
+        token: session.tokens.accessToken,
+        cardIds,
+        tenantName: session.user.tenantName,
+        tenantLogoUrl: session.user.tenantLogo,
+      });
       setPrintState("done");
-      toast.success("Print job created");
+      toast.success("Print dialog opened");
+      if (result.auditError) {
+        toast.warning(`Printed, but audit logging failed: ${result.auditError}`);
+      }
       setTimeout(() => setPrintState("idle"), 1500);
     } catch (err) {
       setPrintState("idle");
       toast.error(parseApiError(err));
     }
-  }, [hasCards, printState, session.tokens.accessToken, cardIds]);
+  }, [hasCards, printState, session.tokens.accessToken, session.user.tenantName, session.user.tenantLogo, cardIds]);
 
   const handleCreatePo = React.useCallback(async () => {
     if (!hasCards || poState === "loading") return;
