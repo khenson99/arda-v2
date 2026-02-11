@@ -103,7 +103,6 @@ export const BoardCard = React.memo(function BoardCard({
           e.stopPropagation();
           onClick(card);
         }}
-        onPointerDown={(e) => e.stopPropagation()}
       >
         {/* Top row: card number + age */}
         <div className="flex items-center justify-between gap-2">

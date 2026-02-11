@@ -7,21 +7,6 @@ import {
   transitionCard,
 } from "@/lib/api-client";
 
-/* ── Stage index map (for transition validation) ────────────── */
-
-const STAGE_INDEX: Record<CardStage, number> = {
-  created: 0,
-  triggered: 1,
-  ordered: 2,
-  in_transit: 3,
-  received: 4,
-  restocked: 5,
-};
-
-export function isValidTransition(from: CardStage, to: CardStage): boolean {
-  return STAGE_INDEX[to] === STAGE_INDEX[from] + 1;
-}
-
 /* ── Grouped cards type ─────────────────────────────────────── */
 
 export type GroupedCards = Record<CardStage, KanbanCard[]>;
@@ -134,11 +119,6 @@ export function useKanbanBoard(
       const card = allCards.find((c) => c.id === cardId);
       if (!card) return false;
 
-      // Validate transition
-      if (!isValidTransition(card.currentStage, toStage)) {
-        return false;
-      }
-
       // Optimistic update
       const previousCards = [...allCards];
       setAllCards((prev) =>
@@ -152,7 +132,7 @@ export function useKanbanBoard(
       try {
         await transitionCard(token, cardId, {
           toStage,
-          method: "drag_drop",
+          method: "manual",
         });
         return true;
       } catch (err) {

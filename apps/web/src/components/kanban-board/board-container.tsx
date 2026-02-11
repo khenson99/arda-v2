@@ -13,7 +13,6 @@ import { toast } from "sonner";
 import { parseApiError } from "@/lib/api-client";
 import { StageColumn } from "./stage-column";
 import { BoardCard } from "./board-card";
-import { isValidTransition } from "@/hooks/use-kanban-board";
 import type { GroupedCards } from "@/hooks/use-kanban-board";
 import type { KanbanCard, CardStage } from "@/types";
 import { CARD_STAGES, CARD_STAGE_META } from "@/types";
@@ -66,22 +65,17 @@ export function BoardContainer({
       if (!over) return;
 
       const cardId = active.id as string;
+      if (typeof over.id !== "string" || !CARD_STAGES.includes(over.id as CardStage)) {
+        return;
+      }
       const toStage = over.id as CardStage;
 
-      // Find the card to validate the transition
+      // Find the card for no-op handling and toast content.
       const card = allCards.find((c) => c.id === cardId);
       if (!card) return;
 
       // Same column -- no-op
       if (card.currentStage === toStage) return;
-
-      // Validate: only forward-adjacent transitions allowed
-      if (!isValidTransition(card.currentStage, toStage)) {
-        const fromLabel = CARD_STAGE_META[card.currentStage].label;
-        const toLabel = CARD_STAGE_META[toStage].label;
-        toast.error(`Cannot move directly from ${fromLabel} to ${toLabel}. Only forward transitions to the next stage are allowed.`);
-        return;
-      }
 
       try {
         await moveCard(cardId, toStage);

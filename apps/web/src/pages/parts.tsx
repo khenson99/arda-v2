@@ -26,7 +26,6 @@ import { ErrorBanner } from "@/components/error-banner";
 import { useWorkspaceData } from "@/hooks/use-workspace-data";
 import type { AppShellOutletContext } from "@/layouts/app-shell";
 import {
-  createPrintJob,
   createPurchaseOrderFromCards,
   isUnauthorized,
   normalizeOptionalString,
@@ -35,6 +34,7 @@ import {
   updateLoopParameters,
   updateItemRecord,
 } from "@/lib/api-client";
+import { printCardsFromIds } from "@/lib/kanban-printing";
 import { fetchLoopsForPart } from "@/lib/kanban-loops";
 import {
   formatDateTime,
@@ -685,9 +685,17 @@ function QuickActions({
     }
     setPrintState("loading");
     try {
-      await createPrintJob(session.tokens.accessToken, { cardIds });
+      const result = await printCardsFromIds({
+        token: session.tokens.accessToken,
+        cardIds,
+        tenantName: session.user.tenantName,
+        tenantLogoUrl: session.user.tenantLogo,
+      });
       setPrintState("done");
-      toast.success(`Print job queued for ${cardIds.length} card${cardIds.length > 1 ? "s" : ""}`);
+      toast.success(`Print dialog opened for ${cardIds.length} card${cardIds.length > 1 ? "s" : ""}`);
+      if (result.auditError) {
+        toast.warning(`Printed, but audit logging failed: ${result.auditError}`);
+      }
       setTimeout(() => setPrintState("idle"), 1500);
     } catch (err) {
       setPrintState("idle");

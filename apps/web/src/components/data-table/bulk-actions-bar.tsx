@@ -9,7 +9,8 @@ import {
   TooltipProvider,
 } from "@/components/ui";
 import { cn } from "@/lib/utils";
-import { createPrintJob, createPurchaseOrderFromCards, parseApiError } from "@/lib/api-client";
+import { createPurchaseOrderFromCards, parseApiError } from "@/lib/api-client";
+import { printCardsFromIds } from "@/lib/kanban-printing";
 import type { AuthSession } from "@/types";
 
 /* ── Types ──────────────────────────────────────────────────── */
@@ -52,11 +53,17 @@ export function BulkActionsBar({
 
     setPrintState("loading");
     try {
-      await createPrintJob(session.tokens.accessToken, {
+      const result = await printCardsFromIds({
+        token: session.tokens.accessToken,
         cardIds: selectedCardIds,
+        tenantName: session.user.tenantName,
+        tenantLogoUrl: session.user.tenantLogo,
       });
       setPrintState("done");
-      toast.success("Print job created");
+      toast.success("Print dialog opened");
+      if (result.auditError) {
+        toast.warning(`Printed, but audit logging failed: ${result.auditError}`);
+      }
 
       setTimeout(() => {
         onComplete();
@@ -66,7 +73,7 @@ export function BulkActionsBar({
       setPrintState("idle");
       toast.error(parseApiError(err));
     }
-  }, [hasCards, printState, session.tokens.accessToken, selectedCardIds, onComplete]);
+  }, [hasCards, printState, session.tokens.accessToken, session.user.tenantName, session.user.tenantLogo, selectedCardIds, onComplete]);
 
   const handleCreatePo = React.useCallback(async () => {
     if (!hasCards || poState === "loading") return;

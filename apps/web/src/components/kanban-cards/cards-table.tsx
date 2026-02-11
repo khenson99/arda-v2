@@ -16,8 +16,8 @@ import {
   isUnauthorized,
   parseApiError,
   transitionCard,
-  createPrintJob,
 } from "@/lib/api-client";
+import { printCardsFromIds } from "@/lib/kanban-printing";
 import { toast } from "sonner";
 
 /* ── Helpers ─────────────────────────────────────────────────── */
@@ -61,6 +61,8 @@ interface CardsTableProps {
   cards: KanbanCard[];
   isLoading: boolean;
   token: string;
+  tenantName: string;
+  tenantLogoUrl?: string;
   onUnauthorized: () => void;
   onRefresh: () => Promise<void>;
   onCardClick?: (card: KanbanCard) => void;
@@ -72,6 +74,8 @@ export function CardsTable({
   cards,
   isLoading,
   token,
+  tenantName,
+  tenantLogoUrl,
   onUnauthorized,
   onRefresh,
   onCardClick,
@@ -108,8 +112,17 @@ export function CardsTable({
     async (card: KanbanCard) => {
       setActionLoading(card.id);
       try {
-        await createPrintJob(token, { cardIds: [card.id] });
-        toast.success(`Print job created for card #${card.cardNumber}`);
+        const result = await printCardsFromIds({
+          token,
+          cardIds: [card.id],
+          tenantName,
+          tenantLogoUrl,
+          onUnauthorized,
+        });
+        toast.success(`Print dialog opened for card #${card.cardNumber}`);
+        if (result.auditError) {
+          toast.warning(`Printed, but audit logging failed: ${result.auditError}`);
+        }
         await onRefresh();
       } catch (err) {
         if (isUnauthorized(err)) {
@@ -121,7 +134,7 @@ export function CardsTable({
         setActionLoading(null);
       }
     },
-    [token, onUnauthorized, onRefresh],
+    [token, tenantName, tenantLogoUrl, onUnauthorized, onRefresh],
   );
 
   /* ── Loading skeleton ───────────────────────────────────────── */

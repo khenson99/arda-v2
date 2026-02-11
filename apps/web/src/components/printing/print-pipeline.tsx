@@ -244,10 +244,21 @@ export function PrintPipeline({ cards, format }: PrintPipelineProps) {
 // Opens a new window and renders cards using safe DOM manipulation.
 // Uses DOMParser + importNode rather than document.write (XSS-safe).
 
+export interface DispatchPrintOptions {
+  printWindow?: Window | null;
+  closeWindowAfterPrint?: boolean;
+}
+
+export function openPrintWindow(): Window | null {
+  if (typeof window === 'undefined') return null;
+  return window.open('', '_blank', 'width=800,height=600');
+}
+
 export function dispatchPrint(
   cards: KanbanPrintData[],
   format: CardFormat,
   settings: PrintSettings,
+  options: DispatchPrintOptions = {},
 ): void {
   const config = FORMAT_CONFIGS[format];
   const stylesheet = buildPrintStylesheet(settings, config);
@@ -291,9 +302,11 @@ export function dispatchPrint(
 </html>`;
 
   // Open window and use safe DOM manipulation
-  const printWindow = window.open('', '_blank', 'width=800,height=600');
+  const printWindow = options.printWindow ?? openPrintWindow();
   if (!printWindow) {
-    alert('Pop-up blocked. Please allow pop-ups for this site to print.');
+    if (typeof window !== 'undefined') {
+      alert('Pop-up blocked. Please allow pop-ups for this site to print.');
+    }
     return;
   }
 
@@ -320,7 +333,9 @@ export function dispatchPrint(
   // Wait for images to load, then print
   setTimeout(() => {
     printWindow.print();
-    printWindow.close();
+    if (options.closeWindowAfterPrint ?? true) {
+      printWindow.close();
+    }
   }, 500);
 }
 

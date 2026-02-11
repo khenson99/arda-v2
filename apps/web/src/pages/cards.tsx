@@ -171,6 +171,8 @@ export function CardsRoute({ session, onUnauthorized }: Props) {
             cards={tableData.cards}
             isLoading={tableData.isLoading}
             token={token}
+            tenantName={session.user.tenantName}
+            tenantLogoUrl={session.user.tenantLogo}
             onUnauthorized={onUnauthorized}
             onRefresh={tableData.refresh}
             onCardClick={setSelectedCard}
@@ -237,6 +239,8 @@ export function CardsRoute({ session, onUnauthorized }: Props) {
       <CardDetailDrawer
         card={selectedCard}
         token={token}
+        tenantName={session.user.tenantName}
+        tenantLogoUrl={session.user.tenantLogo}
         onUnauthorized={onUnauthorized}
         onClose={() => setSelectedCard(null)}
       />

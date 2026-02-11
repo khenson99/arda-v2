@@ -97,6 +97,8 @@ export function ItemDetailPanel({
             <CardLabelDesigner
               part={part}
               token={session.tokens.accessToken}
+              tenantName={session.user.tenantName}
+              tenantLogoUrl={session.user.tenantLogo}
               onUnauthorized={onUnauthorized}
               onOpenLoopsTab={() => setActiveTab("loops")}
             />
