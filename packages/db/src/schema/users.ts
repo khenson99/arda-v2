@@ -7,6 +7,7 @@ import {
   index,
   uniqueIndex,
   pgEnum,
+  jsonb,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 import { authSchema, tenants } from './tenants.js';
@@ -116,6 +117,33 @@ export const passwordResetTokens = authSchema.table(
   ]
 );
 
+// ─── API Keys ──────────────────────────────────────────────────────────
+export const apiKeys = authSchema.table(
+  'api_keys',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 255 }).notNull(),
+    keyHash: varchar('key_hash', { length: 255 }).notNull().unique(),
+    keyPrefix: varchar('key_prefix', { length: 32 }).notNull(),
+    permissions: jsonb('permissions').$type<string[]>().notNull().default([]),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    isActive: boolean('is_active').notNull().default(true),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('api_keys_tenant_idx').on(table.tenantId),
+    index('api_keys_created_by_idx').on(table.createdBy),
+    index('api_keys_active_idx').on(table.isActive),
+    index('api_keys_prefix_idx').on(table.keyPrefix),
+  ]
+);
+
 // ─── Relations ────────────────────────────────────────────────────────
 export const usersRelations = relations(users, ({ one, many }) => ({
   tenant: one(tenants, {
@@ -125,6 +153,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   oauthAccounts: many(oauthAccounts),
   refreshTokens: many(refreshTokens),
   passwordResetTokens: many(passwordResetTokens),
+  apiKeys: many(apiKeys),
 }));
 
 export const oauthAccountsRelations = relations(oauthAccounts, ({ one }) => ({
@@ -144,6 +173,17 @@ export const refreshTokensRelations = relations(refreshTokens, ({ one }) => ({
 export const passwordResetTokensRelations = relations(passwordResetTokens, ({ one }) => ({
   user: one(users, {
     fields: [passwordResetTokens.userId],
+    references: [users.id],
+  }),
+}));
+
+export const apiKeysRelations = relations(apiKeys, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [apiKeys.tenantId],
+    references: [tenants.id],
+  }),
+  creator: one(users, {
+    fields: [apiKeys.createdBy],
     references: [users.id],
   }),
 }));

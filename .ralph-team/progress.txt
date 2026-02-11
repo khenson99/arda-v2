@@ -3,3 +3,27 @@
 # It serves as cumulative memory across fresh-context Ralph iterations.
 # =====================================================================
 
+
+--- Backend Agent Iteration 3 | Issue #111 ---
+Timestamp: 2026-02-11T08:16:00Z
+Status: completed
+Changes:
+  - packages/db/src/schema/users.ts (added apiKeys table with relations)
+  - packages/db/src/schema/tenants.ts (added webhook fields to TenantSettings)
+  - services/auth/src/services/integration.service.ts (new)
+  - services/auth/src/services/integration.service.test.ts (new, 14 tests passing)
+  - services/auth/src/routes/integrations.routes.ts (new)
+  - services/auth/src/index.ts (registered users and integrations routers)
+  - services/api-gateway/src/routes/proxy.ts (added /api/users and /api/integrations routes)
+Tests: 14 new integration tests, all passing
+Learnings:
+  - Integration settings backend complete: API key management + webhook configuration
+  - API keys use crypto.randomBytes for secure generation, SHA-256 for hashing
+  - Key format: arda_<8hex-prefix>_<64hex-secret>, only full key shown on creation
+  - Webhook settings stored in tenant.settings JSONB: webhookUrl, webhookSecret, webhookEvents
+  - Security: never return webhookSecret in GET responses, only indicate presence with hasWebhookSecret
+  - Schema patterns: apiKeys table in auth schema with foreign keys to tenants and users
+  - Relations: added apiKeys to usersRelations for Drizzle relational queries
+  - All routes require tenant_admin role via requireRole() middleware
+  - Gateway routing: both /api/users and /api/integrations proxy to auth service
+  - Test patterns: mock crypto functions would require vi.mock('crypto'), accepted test behavior for actual crypto use
