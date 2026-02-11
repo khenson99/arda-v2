@@ -67,7 +67,7 @@ function woToUnified(wo: WorkOrder): UnifiedOrder {
     currency: "USD",
     createdAt: wo.createdAt,
     updatedAt: wo.updatedAt,
-    expectedDate: wo.scheduledDate,
+    expectedDate: wo.scheduledStartDate,
   };
 }
 

@@ -293,14 +293,14 @@ function StatusTimeline({ order, detail }: { order: UnifiedOrder; detail: Purcha
   } else if (order.type === "work") {
     const wo = detail as WorkOrder;
     items.push({ label: "Created", date: wo.createdAt, active: false, completed: true });
-    if (wo.scheduledDate) {
-      items.push({ label: "Scheduled", date: wo.scheduledDate, active: wo.status === "scheduled", completed: wo.status !== "draft" && wo.status !== "scheduled" });
+    if (wo.scheduledStartDate) {
+      items.push({ label: "Scheduled", date: wo.scheduledStartDate, active: wo.status === "scheduled", completed: wo.status !== "draft" && wo.status !== "scheduled" });
     }
     if (wo.status === "in_progress" || wo.status === "completed") {
       items.push({ label: "In Progress", date: wo.updatedAt, active: wo.status === "in_progress", completed: wo.status === "completed" });
     }
-    if (wo.completedAt) {
-      items.push({ label: "Completed", date: wo.completedAt, active: true, completed: true });
+    if (wo.actualEndDate) {
+      items.push({ label: "Completed", date: wo.actualEndDate, active: true, completed: true });
     }
   } else {
     const to = detail as TransferOrder;
@@ -538,12 +538,12 @@ export function OrderDetailDrawer({
                 <Separator />
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
-                    <span className="text-muted-foreground text-xs">Qty Ordered</span>
-                    <p className="font-semibold">{(detail as WorkOrder).quantityOrdered}</p>
+                    <span className="text-muted-foreground text-xs">Qty to Produce</span>
+                    <p className="font-semibold">{(detail as WorkOrder).quantityToProduce}</p>
                   </div>
                   <div>
-                    <span className="text-muted-foreground text-xs">Qty Completed</span>
-                    <p className="font-semibold">{(detail as WorkOrder).quantityCompleted}</p>
+                    <span className="text-muted-foreground text-xs">Qty Produced</span>
+                    <p className="font-semibold">{(detail as WorkOrder).quantityProduced}</p>
                   </div>
                 </div>
               </>
