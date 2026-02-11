@@ -6,12 +6,81 @@ patterns, gotchas, and conventions.
 
 ## Discovered Patterns
 
+### Service Architecture
+- Auth service follows service + routes pattern: business logic in `services/*.service.ts`, HTTP layer in `routes/*.routes.ts`
+- RBAC enforced via `requireRole()` middleware from `@arda/auth-utils`
+- Tenant isolation: always filter by `req.user.tenantId` in queries
+
+### API Gateway Routing
+- Gateway proxies service endpoints via route configuration in `services/api-gateway/src/routes/proxy.ts`
+- Each route needs explicit `RouteConfig` entry with prefix, target service URL, pathRewrite rules, and auth flag
+- Express strips prefix from `req.url` when using `app.use(prefix, ...)`, so pathRewrite patterns match stripped URLs
+- Auth service endpoints exposed through gateway at `/api/<resource>` prefix
+
+### Testing
+- Vitest with hoisted mocks pattern: use `vi.hoisted()` to declare mocks before `vi.mock()` references
+- Mock reset strategy: add `beforeEach()` with `mockReset()` in nested describe blocks
+- Test coverage: each service function gets dedicated tests, including happy path + error cases
+
+### Database Schema
+- Use pgSchema for multi-schema databases (auth, catalog, kanban, orders, etc.)
+- Foreign key references use arrow functions: `.references(() => otherTable.id)`
+- Handle circular dependencies by placing tables in appropriate schema files
+- JSONB columns: use `.$type<YourType>()` for TypeScript type safety
+- Export relations for Drizzle relational queries
 
 ## Gotchas
 
+### TypeScript Types
+- Express `req.params` fields have type `string | string[]`, not just `string`
+- Handle with: `const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;`
+
+### Database Schema
+- User schema in `packages/db/src/schema/users.ts` defines 7 roles via `userRoleEnum`
+- Tenant schema includes `seatLimit` and `settings` JSONB column
+- API keys stored in auth schema, requires crypto for secure key generation
+
+### Error Handling
+- Throw `Error` with optional `.code` property for distinguishing error types (e.g., `SEAT_LIMIT_REACHED`)
+- Use Zod for request validation, return 400 with structured `{ error, details }` format
+- Security patterns: revoke refresh tokens on user deactivation, prevent last admin deactivation
+- Never expose sensitive data like API key hashes or webhook secrets in responses
+
+### Security
+- API keys use SHA-256 hashing, store only hash not the key itself
+- Return full API key ONLY on creation (one-time display)
+- Webhook secrets stored in tenant settings but never returned in GET responses
+- Use crypto.randomBytes for secure random generation
 
 ## Conventions
 
+### File Naming
+- Service files: `*.service.ts` (business logic)
+- Route files: `*.routes.ts` (HTTP handlers)
+- Test files: `*.test.ts` or `*.spec.ts`
+
+### Validation
+- Use Zod schemas for all request body validation
+- Return 400 with `{ error: 'Validation error', details: zodError.errors }` format
+
+### Logging
+- Use structured logging via `createLogger('service:component')`
+- Log key events: user invited, role updated, user deactivated, API key created/revoked
+
+### API Key Format
+- Format: `arda_<8-hex-prefix>_<64-hex-secret>`
+- Store: keyHash (SHA-256), keyPrefix (for display), never store full key
+- Display: Only show keyPrefix in lists, full key only on creation
 
 ## Stack-Specific Notes
 
+### Drizzle ORM
+- Query API: `db.query.users.findFirst({ where: eq(...) })`
+- Insert/Update: `.insert(...).values(...).returning()` / `.update(...).set(...).where(...).returning()`
+- Never expose `passwordHash` in API responses (exclude in query or omit in response object)
+- Use `.returning()` to get created/updated records in one query
+
+### Express Routes
+- Register routers in service index.ts with `app.use(prefix, router)`
+- Middleware order: helmet → cors → express.json → routes → errorHandler
+- Use route-level middleware for RBAC: `router.post('/path', requireRole('admin'), handler)`
