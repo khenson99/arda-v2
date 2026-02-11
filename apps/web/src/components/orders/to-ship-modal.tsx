@@ -1,8 +1,8 @@
 /**
  * TOShipModal — Mark transfer order as shipped
  *
- * Allows updating shipped quantities for each line item and transitioning
- * the transfer order to "shipped" or "in_transit" status.
+ * Displays line items for reference and transitions the transfer order
+ * to "in_transit" status with optional tracking number and notes.
  */
 
 import * as React from "react";
@@ -38,7 +38,6 @@ export function TOShipModal({
   onShipped,
   onUnauthorized,
 }: TOShipModalProps) {
-  const [lineQuantities, setLineQuantities] = React.useState<Record<string, number>>({});
   const [trackingNumber, setTrackingNumber] = React.useState("");
   const [shippingNotes, setShippingNotes] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
@@ -46,25 +45,22 @@ export function TOShipModal({
 
   React.useEffect(() => {
     if (open) {
-      const initial: Record<string, number> = {};
-      transferOrder.lines?.forEach((line) => {
-        initial[line.id] = line.quantityRequested - line.quantityShipped;
-      });
-      setLineQuantities(initial);
       setTrackingNumber("");
       setShippingNotes("");
       setError(null);
     }
-  }, [open, transferOrder.lines]);
+  }, [open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    // Validate that at least one line has quantity > 0
-    const hasQuantity = Object.values(lineQuantities).some((qty) => qty > 0);
-    if (!hasQuantity) {
-      setError("At least one line item must have a shipped quantity greater than 0");
+    // Check that there are lines with remaining quantity to ship
+    const hasRemainingQuantity = transferOrder.lines?.some(
+      (line) => line.quantityRequested - line.quantityShipped > 0
+    );
+    if (!hasRemainingQuantity) {
+      setError("No remaining quantity to ship on this transfer order");
       return;
     }
 
@@ -135,9 +131,9 @@ export function TOShipModal({
             </CardContent>
           </Card>
 
-          {/* Line items with quantities */}
+          {/* Line items summary */}
           <div className="space-y-2">
-            <Label>Shipped Quantities</Label>
+            <Label>Items to Ship</Label>
             <div className="space-y-2">
               {transferOrder.lines?.map((line) => {
                 const remaining = line.quantityRequested - line.quantityShipped;
@@ -148,23 +144,12 @@ export function TOShipModal({
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-sm truncate">{line.partName ?? line.partId}</p>
                           <p className="text-xs text-muted-foreground">
-                            Requested: {line.quantityRequested} | Already Shipped: {line.quantityShipped} | Remaining: {remaining}
+                            Requested: {line.quantityRequested} | Already Shipped: {line.quantityShipped}
                           </p>
                         </div>
-                        <div className="w-24">
-                          <Input
-                            type="number"
-                            min={0}
-                            max={remaining}
-                            value={lineQuantities[line.id] ?? 0}
-                            onChange={(e) =>
-                              setLineQuantities((prev) => ({
-                                ...prev,
-                                [line.id]: parseInt(e.target.value, 10) || 0,
-                              }))
-                            }
-                            className="text-center"
-                          />
+                        <div className="text-right">
+                          <p className="text-sm font-semibold">{remaining}</p>
+                          <p className="text-xs text-muted-foreground">to ship</p>
                         </div>
                       </div>
                     </CardContent>
