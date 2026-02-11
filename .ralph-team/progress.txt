@@ -1,0 +1,5 @@
+# Ralph Team Loop — Progress Log
+# This file is appended to by every agent after each iteration.
+# It serves as cumulative memory across fresh-context Ralph iterations.
+# =====================================================================
+

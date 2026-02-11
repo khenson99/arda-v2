@@ -1,0 +1,31 @@
+{
+  "project_url": "https://github.com/users/khenson99/projects/1",
+  "repo_type": "monorepo",
+  "repo_name": "arda-v2",
+  "repo_url": "https://github.com/khenson99/arda-v2.git",
+  "detected_stack": {
+    "package_manager": "npm",
+    "language": "typescript",
+    "framework": "react",
+    "server_framework": "hono",
+    "styling": "tailwind",
+    "test_framework": "vitest",
+    "orm": "drizzle",
+    "containerized": true
+  },
+  "max_iterations": {
+    "planner": 10,
+    "architect": 20,
+    "agent": 20,
+    "reviewer": 10,
+    "full_cycle": 3
+  },
+  "labels": {
+    "agent_routing": ["agent:backend", "agent:frontend", "agent:qa", "agent:design-system"],
+    "priority": ["priority:high", "priority:medium", "priority:low"],
+    "type": ["type:feature", "type:bug", "type:chore", "type:test"],
+    "repo": ["repo:backend", "repo:frontend", "repo:shared"],
+    "status": ["status:ready", "status:blocked", "status:in-progress", "status:done"]
+  },
+  "initialized_at": "2026-02-11T07:35:15Z"
+}
