@@ -1,12 +1,19 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { eq, and, sql, desc, asc } from 'drizzle-orm';
+import { eq, and, sql, desc, asc, inArray } from 'drizzle-orm';
 import { db, schema } from '@arda/db';
 import type { AuthRequest } from '@arda/auth-utils';
 import { getEventBus } from '@arda/events';
 import { config } from '@arda/config';
 import { AppError } from '../middleware/error-handler.js';
 import { getNextPONumber } from '../services/order-number.service.js';
+import {
+  SmtpEmailAdapter,
+  SimplePdfGenerator,
+  type EmailAttachment,
+  type EmailMessage,
+  type PurchaseOrderPdfData,
+} from '../services/po-dispatch.service.js';
 
 export const purchaseOrdersRouter = Router();
 
@@ -255,6 +262,15 @@ const ReceiveLinesSchema = z.object({
   lines: z.array(ReceiveLineSchema).min(1),
 });
 
+const SendEmailDraftSchema = z.object({
+  to: z.string().email().optional(),
+  cc: z.array(z.string().email()).optional(),
+  subject: z.string().min(1).max(255).optional(),
+  bodyText: z.string().min(1).max(10000).optional(),
+  bodyHtml: z.string().max(15000).optional(),
+  includeAttachment: z.boolean().default(true),
+});
+
 // Type definitions
 interface POLineInput {
   partId: string;
@@ -296,6 +312,50 @@ function isValidStatusTransition(currentStatus: string, newStatus: string): bool
   };
 
   return validTransitions[currentStatus]?.includes(newStatus) ?? false;
+}
+
+function formatAddress(input: {
+  addressLine1?: string | null;
+  addressLine2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
+  country?: string | null;
+}) {
+  const lineOne = input.addressLine1?.trim();
+  const lineTwo = input.addressLine2?.trim();
+  const locality = [input.city?.trim(), input.state?.trim(), input.postalCode?.trim()]
+    .filter(Boolean)
+    .join(', ');
+  const country = input.country?.trim();
+
+  return [lineOne, lineTwo, locality, country].filter(Boolean).join(', ') || 'N/A';
+}
+
+function defaultEmailBodyText(input: {
+  supplierName: string;
+  poNumber: string;
+  includeAttachment: boolean;
+}) {
+  return [
+    `Hello ${input.supplierName},`,
+    '',
+    input.includeAttachment
+      ? `Please find attached Purchase Order ${input.poNumber}.`
+      : `Purchase Order ${input.poNumber} details are included below.`,
+    '',
+    'Please confirm receipt and expected delivery timing.',
+    '',
+    'Thank you,',
+    'Arda Procurement',
+  ].join('\n');
+}
+
+function defaultEmailBodyHtml(bodyText: string) {
+  return bodyText
+    .split('\n')
+    .map((line) => `<p>${line || '&nbsp;'}</p>`)
+    .join('');
 }
 
 // GET / - List purchase orders with pagination and filters
@@ -594,6 +654,177 @@ purchaseOrdersRouter.post('/:id/lines', async (req: AuthRequest, res, next) => {
 
     res.status(201).json({
       data: newLine,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return next(new AppError(400, 'Invalid request body'));
+    }
+    next(error);
+  }
+});
+
+// POST /:id/send-email-draft - Send editable draft email for a purchase order
+purchaseOrdersRouter.post('/:id/send-email-draft', async (req: AuthRequest, res, next) => {
+  try {
+    const id = req.params.id as string;
+    const tenantId = req.user!.tenantId;
+    const payload = SendEmailDraftSchema.parse(req.body);
+
+    const [purchaseOrder] = await db
+      .select()
+      .from(schema.purchaseOrders)
+      .where(and(eq(schema.purchaseOrders.id, id), eq(schema.purchaseOrders.tenantId, tenantId)))
+      .limit(1)
+      .execute();
+
+    if (!purchaseOrder) {
+      throw new AppError(404, 'Purchase order not found');
+    }
+
+    const [supplier] = await db
+      .select()
+      .from(schema.suppliers)
+      .where(
+        and(
+          eq(schema.suppliers.id, purchaseOrder.supplierId),
+          eq(schema.suppliers.tenantId, tenantId)
+        )
+      )
+      .limit(1)
+      .execute();
+
+    if (!supplier) {
+      throw new AppError(404, 'Supplier not found for purchase order');
+    }
+
+    const lines = await db
+      .select()
+      .from(schema.purchaseOrderLines)
+      .where(
+        and(
+          eq(schema.purchaseOrderLines.purchaseOrderId, id),
+          eq(schema.purchaseOrderLines.tenantId, tenantId)
+        )
+      )
+      .orderBy(asc(schema.purchaseOrderLines.lineNumber))
+      .execute();
+
+    const partIds = Array.from(new Set(lines.map((line) => line.partId)));
+    const parts =
+      partIds.length > 0
+        ? await db
+            .select()
+            .from(schema.parts)
+            .where(and(eq(schema.parts.tenantId, tenantId), inArray(schema.parts.id, partIds)))
+            .execute()
+        : [];
+    const partsById = new Map(parts.map((part) => [part.id, part]));
+
+    const [facility] = await db
+      .select()
+      .from(schema.facilities)
+      .where(
+        and(
+          eq(schema.facilities.id, purchaseOrder.facilityId),
+          eq(schema.facilities.tenantId, tenantId)
+        )
+      )
+      .limit(1)
+      .execute();
+
+    const to = payload.to?.trim() || supplier.contactEmail?.trim() || undefined;
+    if (!to) {
+      throw new AppError(400, 'Recipient email is required');
+    }
+
+    const includeAttachment = payload.includeAttachment ?? true;
+    const subject = payload.subject?.trim() || `Purchase Order ${purchaseOrder.poNumber}`;
+    const bodyText =
+      payload.bodyText?.trim() ||
+      defaultEmailBodyText({
+        supplierName: supplier.name,
+        poNumber: purchaseOrder.poNumber,
+        includeAttachment,
+      });
+    const bodyHtml = payload.bodyHtml?.trim() || defaultEmailBodyHtml(bodyText);
+
+    const attachments: EmailAttachment[] = [];
+    if (includeAttachment) {
+      const pdfData: PurchaseOrderPdfData = {
+        poNumber: purchaseOrder.poNumber,
+        orderDate: (purchaseOrder.orderDate ?? purchaseOrder.createdAt).toISOString().slice(0, 10),
+        expectedDeliveryDate:
+          purchaseOrder.expectedDeliveryDate?.toISOString().slice(0, 10) || 'TBD',
+        supplierName: supplier.name,
+        supplierContact: supplier.contactName || 'Procurement',
+        supplierEmail: to,
+        supplierAddress: formatAddress(supplier),
+        buyerCompanyName: 'Arda',
+        buyerAddress:
+          facility?.name && facility?.code
+            ? `${facility.name} (${facility.code})`
+            : facility?.name || purchaseOrder.facilityId,
+        facilityName: facility?.name || purchaseOrder.facilityId,
+        lines: lines.map((line) => {
+          const part = partsById.get(line.partId);
+          return {
+            lineNumber: line.lineNumber,
+            partNumber: part?.partNumber || line.partId,
+            partName: line.description || part?.name || line.partId,
+            quantity: line.quantityOrdered,
+            unitCost: String(line.unitCost ?? '0'),
+            lineTotal: String(line.lineTotal ?? '0'),
+            uom: part?.uom || 'each',
+          };
+        }),
+        subtotal: String(purchaseOrder.subtotal ?? '0'),
+        taxAmount: String(purchaseOrder.taxAmount ?? '0'),
+        shippingAmount: String(purchaseOrder.shippingAmount ?? '0'),
+        totalAmount: String(purchaseOrder.totalAmount ?? '0'),
+        currency: purchaseOrder.currency || 'USD',
+        notes: purchaseOrder.notes ?? undefined,
+        terms: purchaseOrder.paymentTerms ?? undefined,
+      };
+
+      const pdfGenerator = new SimplePdfGenerator();
+      const pdfBuffer = await pdfGenerator.generatePurchaseOrderPdf(pdfData);
+      attachments.push({
+        filename: `${purchaseOrder.poNumber}.pdf`,
+        content: pdfBuffer,
+        contentType: 'application/pdf',
+      });
+    }
+
+    const emailAdapter = new SmtpEmailAdapter({
+      host: config.SMTP_HOST,
+      port: config.SMTP_PORT,
+      user: config.SMTP_USER,
+      pass: config.SMTP_PASS,
+      from: config.EMAIL_FROM,
+    });
+
+    const message: EmailMessage = {
+      to,
+      cc: payload.cc,
+      subject,
+      bodyText,
+      bodyHtml,
+      attachments,
+    };
+
+    const result = await emailAdapter.send(message);
+
+    res.json({
+      success: true,
+      data: {
+        messageId: result.messageId,
+        to,
+        cc: payload.cc ?? [],
+        subject,
+        attachmentIncluded: includeAttachment,
+        poId: purchaseOrder.id,
+        poNumber: purchaseOrder.poNumber,
+      },
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

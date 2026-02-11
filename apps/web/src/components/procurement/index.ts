@@ -31,3 +31,15 @@ export {
   type SupplierGradeBadgeProps,
   type SupplierPerformanceIndicatorProps,
 } from './supplier-grade-badge';
+
+// Vendor Automation Components
+export {
+  normalizeProcurementOrderMethod,
+  procurementOrderMethodLabel,
+  PROCUREMENT_ORDER_METHODS,
+  EMAIL_BASED_METHODS,
+} from './order-method';
+export { buildVendorQueueGroups, type VendorQueueGroup, type VendorQueueLine } from './vendor-queue';
+export { VendorOrderConfigDialog } from './vendor-order-config-dialog';
+export { VendorOrderExecutionPanel, type VendorExecutionSession } from './vendor-order-execution-panel';
+export { validateVendorOrderConfig, isExecutionComplete } from './vendor-order-workflow';

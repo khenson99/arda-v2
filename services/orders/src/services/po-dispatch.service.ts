@@ -6,6 +6,8 @@
  * PDF generation so that different implementations can be injected
  * for development, testing, and production.
  */
+import * as nodemailer from 'nodemailer';
+import { config } from '@arda/config';
 
 // ─── Adapter Interfaces ──────────────────────────────────────────────
 
@@ -91,6 +93,54 @@ export class ConsoleEmailAdapter implements EmailAdapter {
     // In development, log instead of sending
     console.log(`[ConsoleEmailAdapter] Would send to ${message.to}: ${message.subject}`);
     return { messageId, success: true };
+  }
+}
+
+// ─── SMTP Email Adapter (Production) ─────────────────────────────────
+
+export interface SmtpEmailAdapterOptions {
+  host?: string;
+  port?: number;
+  user?: string;
+  pass?: string;
+  from?: string;
+}
+
+export class SmtpEmailAdapter implements EmailAdapter {
+  private readonly transporter: nodemailer.Transporter;
+  private readonly from: string;
+
+  constructor(options: SmtpEmailAdapterOptions = {}) {
+    const host = options.host ?? config.SMTP_HOST;
+    const port = options.port ?? config.SMTP_PORT;
+    const user = options.user ?? config.SMTP_USER;
+    const pass = options.pass ?? config.SMTP_PASS;
+
+    this.transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure: false,
+      auth: user ? { user, pass } : undefined,
+    });
+    this.from = options.from ?? config.EMAIL_FROM;
+  }
+
+  async send(message: EmailMessage) {
+    const response = await this.transporter.sendMail({
+      from: this.from,
+      to: message.to,
+      cc: message.cc,
+      subject: message.subject,
+      text: message.bodyText,
+      html: message.bodyHtml,
+      attachments: message.attachments.map((attachment) => ({
+        filename: attachment.filename,
+        content: attachment.content,
+        contentType: attachment.contentType,
+      })),
+    });
+
+    return { messageId: response.messageId, success: true };
   }
 }
 

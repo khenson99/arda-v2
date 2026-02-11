@@ -22,6 +22,7 @@
     "@arda/jobs": "*",
     "@arda/observability": "*",
     "@arda/search": "*",
+    "nodemailer": "^6.10.1",
     "ioredis": "^5.4.0",
     "express": "^4.21.0",
     "cors": "^2.8.5",
@@ -32,6 +33,7 @@
   "devDependencies": {
     "@types/express": "^5.0.0",
     "@types/cors": "^2.8.17",
+    "@types/nodemailer": "^7.0.3",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"
   }

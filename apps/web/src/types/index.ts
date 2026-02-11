@@ -99,6 +99,11 @@ export interface QueueCard {
   loopType: LoopType;
   partId: string;
   facilityId: string;
+  primarySupplierId?: string | null;
+  supplierName?: string | null;
+  supplierContactEmail?: string | null;
+  supplierContactPhone?: string | null;
+  draftPurchaseOrderId?: string | null;
   minQuantity: number;
   orderQuantity: number;
   numberOfCards: number;
@@ -174,9 +179,57 @@ export interface SupplierRecord {
   tenantId: string;
   name: string;
   code?: string | null;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export type ProcurementOrderMethod =
+  | "email"
+  | "online"
+  | "purchase_order"
+  | "shopping"
+  | "rfq"
+  | "third_party"
+  | "phone";
+
+export interface ProcurementDraftLineInput {
+  cardId: string;
+  quantityOrdered: number;
+  description?: string | null;
+  orderMethod: ProcurementOrderMethod;
+  sourceUrl?: string | null;
+  notes?: string | null;
+}
+
+export interface CreateProcurementDraftsInput {
+  supplierId: string;
+  recipientEmail?: string | null;
+  paymentTerms?: string | null;
+  shippingTerms?: string | null;
+  notes?: string | null;
+  thirdPartyInstructions?: string | null;
+  lines: ProcurementDraftLineInput[];
+}
+
+export interface CreateProcurementDraftsResult {
+  supplierId: string;
+  recipientEmail: string | null;
+  drafts: Array<{
+    poId: string;
+    poNumber: string;
+    facilityId: string;
+    cardIds: string[];
+  }>;
+  totalDrafts: number;
+  totalCards: number;
+}
+
+export interface VerifyProcurementDraftsInput {
+  poIds: string[];
+  cardIds: string[];
 }
 
 /* ── Data Authority (bitemporal records) ──────────────────────── */
@@ -454,6 +507,9 @@ export interface PurchaseOrder {
   totalAmount: number | null;
   currency: string;
   notes: string | null;
+  paymentTerms?: string | null;
+  shippingTerms?: string | null;
+  sentToEmail?: string | null;
   expectedDeliveryDate: string | null;
   orderedAt: string | null;
   createdAt: string;
@@ -471,6 +527,9 @@ export interface PurchaseOrderLine {
   unitPrice: number | null;
   currency: string;
   notes: string | null;
+  description?: string | null;
+  orderMethod?: ProcurementOrderMethod | null;
+  sourceUrl?: string | null;
 }
 
 /* ── Work Order ──────────────────────────────────────────────── */

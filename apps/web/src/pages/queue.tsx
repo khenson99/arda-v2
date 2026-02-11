@@ -1,246 +1,82 @@
-import * as React from 'react';
-import { ChevronDown, Loader2, Printer, ShoppingCart } from 'lucide-react';
-import { useOutletContext } from 'react-router-dom';
-import { toast } from 'sonner';
-import { Badge, Button, Skeleton } from '@/components/ui';
-import { StageProgress } from '@/components/stage-progress';
-import { ErrorBanner } from '@/components/error-banner';
-import { NextActionBanner } from '@/components/next-action-banner';
-import { useWorkspaceData } from '@/hooks/use-workspace-data';
-import type { AppShellOutletContext, HeaderOption } from '@/layouts/app-shell';
-import { createPrintJob, createPurchaseOrderFromCards, parseApiError } from '@/lib/api-client';
-import { formatRelativeTime, formatStatus, queueAgingHours } from '@/lib/formatters';
-import { getPartLinkIds, normalizePartLinkId } from '@/lib/part-linking';
-import { cn } from '@/lib/utils';
-import type { AuthSession, PartRecord, QueueCard, QueueByLoop } from '@/types';
-import { LOOP_ORDER, LOOP_META } from '@/types';
-import type { LoopType } from '@/types';
+import * as React from "react";
+import { Loader2, Play, RefreshCw } from "lucide-react";
+import { useOutletContext } from "react-router-dom";
+import { toast } from "sonner";
+import { ErrorBanner } from "@/components/error-banner";
+import {
+  VendorOrderConfigDialog,
+  VendorOrderExecutionPanel,
+  buildVendorQueueGroups,
+  procurementOrderMethodLabel,
+  type VendorExecutionSession,
+  type VendorQueueGroup,
+} from "@/components/procurement";
+import { Badge, Button, Skeleton } from "@/components/ui";
+import { useWorkspaceData } from "@/hooks/use-workspace-data";
+import type { AppShellOutletContext, HeaderOption } from "@/layouts/app-shell";
+import {
+  createProcurementDrafts,
+  parseApiError,
+  sendPurchaseOrderEmailDraft,
+  verifyProcurementDrafts,
+} from "@/lib/api-client";
+import type { AuthSession } from "@/types";
 
-/* ── Expanded card detail panel ─────────────────────────────────────── */
+type QueueScope = "all" | "ready" | "draft";
+type QueueSort = "vendor" | "oldest" | "lines";
 
-function ExpandedCardPanel({
-  card,
-  part,
-  session,
-}: {
-  card: QueueCard;
-  part: PartRecord | undefined;
-  session: AuthSession;
-}) {
-  const [isPrinting, setIsPrinting] = React.useState(false);
-  const [isOrdering, setIsOrdering] = React.useState(false);
-
-  const handlePrint = React.useCallback(async () => {
-    setIsPrinting(true);
-    try {
-      await createPrintJob(session.tokens.accessToken, { cardIds: [card.id] });
-      toast.success('Print job queued');
-    } catch (err) {
-      toast.error(parseApiError(err));
-    } finally {
-      setIsPrinting(false);
-    }
-  }, [card.id, session.tokens.accessToken]);
-
-  const handleCreateOrder = React.useCallback(async () => {
-    setIsOrdering(true);
-    try {
-      const result = await createPurchaseOrderFromCards(session.tokens.accessToken, {
-        cardIds: [card.id],
-      });
-      toast.success(`Purchase order ${result.poNumber} created`);
-    } catch (err) {
-      toast.error(parseApiError(err));
-    } finally {
-      setIsOrdering(false);
-    }
-  }, [card.id, session.tokens.accessToken]);
-
-  return (
-    <div className="space-y-3 border-t border-border pt-3">
-      {/* Stage progress */}
-      <StageProgress currentStage={card.currentStage} />
-
-      {/* Part details (when we can resolve the part record) */}
-      {part && (
-        <div className="rounded-lg bg-muted/40 px-3 py-2 text-xs">
-          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Part Details
-          </p>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-            <div className="name-value-pair">
-              <span className="name-value-pair-label">Name:</span>
-              <span className="name-value-pair-value truncate">{part.name}</span>
-            </div>
-            <div className="name-value-pair">
-              <span className="name-value-pair-label">Supplier:</span>
-              <span className="name-value-pair-value truncate">{part.primarySupplier || '—'}</span>
-            </div>
-            <div className="name-value-pair">
-              <span className="name-value-pair-label">Location:</span>
-              <span className="name-value-pair-value truncate">{part.location || '—'}</span>
-            </div>
-            <div className="name-value-pair">
-              <span className="name-value-pair-label">Method:</span>
-              <span className="name-value-pair-value truncate">
-                {formatStatus(part.orderMechanism)}
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Action buttons */}
-      <div className="flex items-center gap-2">
-        <Button
-          size="sm"
-          variant="accent"
-          className="h-7 gap-1.5 text-xs"
-          disabled={isOrdering}
-          onClick={() => void handleCreateOrder()}
-        >
-          {isOrdering ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <ShoppingCart className="h-3.5 w-3.5" />
-          )}
-          Create Order
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-7 gap-1.5 text-xs"
-          disabled={isPrinting}
-          onClick={() => void handlePrint()}
-        >
-          {isPrinting ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <Printer className="h-3.5 w-3.5" />
-          )}
-          Print Label
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-/* ── Single queue card ──────────────────────────────────────────────── */
-
-const QueueCardItem = React.memo(function QueueCardItem({
-  card,
-  part,
-  session,
-}: {
-  card: QueueCard;
-  part: PartRecord | undefined;
-  session: AuthSession;
-}) {
-  const [isExpanded, setIsExpanded] = React.useState(false);
-  const ageHours = queueAgingHours(card);
-  const highRisk = ageHours >= 24;
-
-  const partName = part?.name ?? `Part ${card.partId.slice(0, 8)}...`;
-
-  return (
-    <article
-      className={cn(
-        'card-order-item transition-shadow',
-        isExpanded && 'ring-1 ring-[hsl(var(--link)/0.3)] shadow-md',
-      )}
-    >
-      {/* Clickable header */}
-      <button
-        type="button"
-        className="flex w-full items-start justify-between gap-2 text-left"
-        onClick={() => setIsExpanded((prev) => !prev)}
-        aria-expanded={isExpanded}
-        aria-label={`${isExpanded ? 'Collapse' : 'Expand'} card #${card.cardNumber}`}
-      >
-        <div className="min-w-0 space-y-1">
-          <p className="text-sm font-semibold">
-            <span className="link-arda">Card #{card.cardNumber}</span>
-          </p>
-          <p className="truncate text-xs text-muted-foreground">{partName}</p>
-        </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          <Badge variant={highRisk ? 'warning' : 'secondary'}>{ageHours}h</Badge>
-          <ChevronDown
-            className={cn(
-              'h-4 w-4 text-muted-foreground transition-transform duration-200',
-              isExpanded && 'rotate-180',
-            )}
-          />
-        </div>
-      </button>
-
-      {/* Summary row (always visible) */}
-      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-        <span>
-          <span className="text-muted-foreground">Qty:</span>{' '}
-          <span className="font-semibold">{card.orderQuantity}</span>
-        </span>
-        <span>
-          <span className="text-muted-foreground">Min:</span>{' '}
-          <span className="font-semibold">{card.minQuantity}</span>
-        </span>
-        <span>
-          <span className="text-muted-foreground">Stage:</span>{' '}
-          <Badge variant="accent" className="ml-0.5 text-[10px]">
-            {formatStatus(card.currentStage)}
-          </Badge>
-        </span>
-        <span className="ml-auto text-muted-foreground">
-          {formatRelativeTime(card.currentStageEnteredAt)}
-        </span>
-      </div>
-
-      {/* Expandable detail panel */}
-      {isExpanded && <ExpandedCardPanel card={card} part={part} session={session} />}
-    </article>
-  );
-});
-
-/* ── Sort helpers ───────────────────────────────────────────────────── */
-
-type QueueSortKey = 'age' | 'cardNumber' | 'stage' | 'quantity';
-
-const STAGE_ORDER: Record<string, number> = {
-  created: 0,
-  triggered: 1,
-  ordered: 2,
-  in_transit: 3,
-  received: 4,
-  restocked: 5,
-};
-
-function makeSortFn(sortKey: QueueSortKey) {
-  return (a: QueueCard, b: QueueCard): number => {
-    switch (sortKey) {
-      case 'age':
-        return (
-          new Date(a.currentStageEnteredAt).getTime() - new Date(b.currentStageEnteredAt).getTime()
-        );
-      case 'cardNumber':
-        return a.cardNumber - b.cardNumber;
-      case 'stage':
-        return (STAGE_ORDER[a.currentStage] ?? 99) - (STAGE_ORDER[b.currentStage] ?? 99);
-      case 'quantity':
-        return (b.orderQuantity ?? 0) - (a.orderQuantity ?? 0);
-      default:
-        return 0;
-    }
-  };
-}
-
-const QUEUE_SORT_OPTIONS: HeaderOption[] = [
-  { value: 'age', label: 'Oldest first' },
-  { value: 'cardNumber', label: 'Card #' },
-  { value: 'stage', label: 'Stage' },
-  { value: 'quantity', label: 'Qty (high→low)' },
+const QUEUE_SCOPE_OPTIONS: HeaderOption[] = [
+  { value: "all", label: "All vendors" },
+  { value: "ready", label: "Ready to run" },
+  { value: "draft", label: "Drafts only" },
 ];
 
-/* ── Queue route ────────────────────────────────────────────────────── */
+const QUEUE_SORT_OPTIONS: HeaderOption[] = [
+  { value: "vendor", label: "Vendor" },
+  { value: "oldest", label: "Oldest card" },
+  { value: "lines", label: "Most lines" },
+];
+
+function groupMatchesScope(group: VendorQueueGroup, scope: QueueScope) {
+  if (scope === "draft") return group.draftPurchaseOrderIds.length > 0;
+  if (scope === "ready") return group.draftPurchaseOrderIds.length === 0;
+  return true;
+}
+
+function groupMatchesSearch(group: VendorQueueGroup, search: string) {
+  const query = search.trim().toLowerCase();
+  if (!query) return true;
+
+  if (group.supplierName.toLowerCase().includes(query)) return true;
+  return group.lines.some((line) => {
+    return (
+      line.partName.toLowerCase().includes(query) ||
+      String(line.card.cardNumber).includes(query) ||
+      line.card.id.toLowerCase().includes(query)
+    );
+  });
+}
+
+function mapGroupToExecutionSession(group: VendorQueueGroup, poIds: string[]): VendorExecutionSession {
+  const methods = Array.from(new Set(group.lines.map((line) => line.orderMethod).filter(Boolean))) as VendorExecutionSession["methods"];
+
+  return {
+    supplierId: group.supplierId ?? "",
+    supplierName: group.supplierName,
+    recipientEmail: group.supplierContactEmail,
+    poIds,
+    cardIds: group.lines.map((line) => line.card.id),
+    methods,
+    lines: group.lines
+      .filter((line): line is typeof line & { orderMethod: NonNullable<typeof line.orderMethod> } => !!line.orderMethod)
+      .map((line) => ({
+        cardId: line.card.id,
+        partName: line.partName,
+        orderMethod: line.orderMethod,
+        sourceUrl: line.part?.primarySupplierLink ?? null,
+      })),
+  };
+}
 
 export function QueueRoute({
   session,
@@ -250,180 +86,276 @@ export function QueueRoute({
   onUnauthorized: () => void;
 }) {
   const { setQueueHeaderControls } = useOutletContext<AppShellOutletContext>();
-  const { isLoading, isRefreshing, error, queueSummary, queueByLoop, parts, refreshQueueOnly } =
-    useWorkspaceData(session.tokens.accessToken, onUnauthorized);
-
-  const [activeLoopFilter, setActiveLoopFilter] = React.useState<LoopType | 'all'>('all');
-  const [searchTerm, setSearchTerm] = React.useState('');
-  const [sortKey, setSortKey] = React.useState<QueueSortKey>('age');
-  const queueScopeOptions = React.useMemo<HeaderOption[]>(
-    () => [
-      { value: 'all', label: 'All loops' },
-      ...LOOP_ORDER.map((loopType) => ({
-        value: loopType,
-        label: LOOP_META[loopType].label,
-      })),
-    ],
-    [],
+  const { isLoading, isRefreshing, error, queueByLoop, parts, refreshQueueOnly } = useWorkspaceData(
+    session.tokens.accessToken,
+    onUnauthorized,
   );
-  const handleScopeChange = React.useCallback((nextScope: string) => {
-    setActiveLoopFilter(nextScope as LoopType | 'all');
-  }, []);
-  const handleSortChange = React.useCallback((nextSortKey: string) => {
-    setSortKey(nextSortKey as QueueSortKey);
-  }, []);
-  const handleRefresh = React.useCallback(() => {
-    void refreshQueueOnly();
-  }, [refreshQueueOnly]);
+
+  const [scope, setScope] = React.useState<QueueScope>("all");
+  const [searchTerm, setSearchTerm] = React.useState("");
+  const [sortKey, setSortKey] = React.useState<QueueSort>("vendor");
+  const [activeConfigGroup, setActiveConfigGroup] = React.useState<VendorQueueGroup | null>(null);
+  const [executionSession, setExecutionSession] = React.useState<VendorExecutionSession | null>(null);
+  const [isCreatingDrafts, setIsCreatingDrafts] = React.useState(false);
+  const [isVerifying, setIsVerifying] = React.useState(false);
+  const [isSendingEmail, setIsSendingEmail] = React.useState(false);
 
   React.useEffect(() => {
     setQueueHeaderControls({
       query: searchTerm,
       onQueryChange: setSearchTerm,
-      queryPlaceholder: 'Find by card number, part name, or loop',
-      scope: activeLoopFilter,
-      onScopeChange: handleScopeChange,
-      scopeOptions: queueScopeOptions,
+      queryPlaceholder: "Search vendor, part, card",
+      scope,
+      onScopeChange: (next) => setScope(next as QueueScope),
+      scopeOptions: QUEUE_SCOPE_OPTIONS,
       sortKey,
-      onSortKeyChange: handleSortChange,
+      onSortKeyChange: (next) => setSortKey(next as QueueSort),
       sortOptions: QUEUE_SORT_OPTIONS,
-      onRefresh: handleRefresh,
+      onRefresh: () => void refreshQueueOnly(),
       isRefreshing,
     });
 
-    return () => {
-      setQueueHeaderControls(null);
-    };
-  }, [
-    setQueueHeaderControls,
-    searchTerm,
-    activeLoopFilter,
-    handleScopeChange,
-    queueScopeOptions,
-    sortKey,
-    handleSortChange,
-    handleRefresh,
-    isRefreshing,
-  ]);
+    return () => setQueueHeaderControls(null);
+  }, [isRefreshing, refreshQueueOnly, scope, searchTerm, setQueueHeaderControls, sortKey]);
 
-  // Build part lookup by ID so expanded cards can show rich part data
-  const partById = React.useMemo(() => {
-    const map = new Map<string, PartRecord>();
-    for (const part of parts) {
-      for (const linkId of getPartLinkIds(part)) {
-        if (!map.has(linkId)) {
-          map.set(linkId, part);
-        }
+  const groups = React.useMemo(() => {
+    const allGroups = buildVendorQueueGroups({
+      cards: queueByLoop.procurement,
+      parts,
+    });
+
+    const filtered = allGroups
+      .filter((group) => groupMatchesScope(group, scope))
+      .filter((group) => groupMatchesSearch(group, searchTerm));
+
+    filtered.sort((a, b) => {
+      if (sortKey === "vendor") {
+        return a.supplierName.localeCompare(b.supplierName);
       }
-    }
-    return map;
-  }, [parts]);
+      if (sortKey === "lines") {
+        return b.lines.length - a.lines.length;
+      }
+      const aOldest = Math.min(...a.lines.map((line) => new Date(line.card.currentStageEnteredAt).getTime()));
+      const bOldest = Math.min(...b.lines.map((line) => new Date(line.card.currentStageEnteredAt).getTime()));
+      return aOldest - bOldest;
+    });
 
-  const resolvePartByCardPartId = React.useCallback(
-    (partId: string) => {
-      const normalizedCardPartId = normalizePartLinkId(partId);
-      return normalizedCardPartId ? partById.get(normalizedCardPartId) : undefined;
+    return filtered;
+  }, [parts, queueByLoop.procurement, scope, searchTerm, sortKey]);
+
+  const handleCreateDrafts = React.useCallback(
+    async (payload: Parameters<typeof createProcurementDrafts>[1]) => {
+      if (!activeConfigGroup) return;
+
+      setIsCreatingDrafts(true);
+      try {
+        const result = await createProcurementDrafts(session.tokens.accessToken, payload);
+
+        const methods = Array.from(new Set(payload.lines.map((line) => line.orderMethod)));
+        const linesByCardId = new Map(activeConfigGroup.lines.map((line) => [line.card.id, line]));
+
+        setExecutionSession({
+          supplierId: payload.supplierId,
+          supplierName: activeConfigGroup.supplierName,
+          recipientEmail: result.recipientEmail,
+          poIds: result.drafts.map((draft) => draft.poId),
+          cardIds: payload.lines.map((line) => line.cardId),
+          methods,
+          lines: payload.lines.map((line) => ({
+            cardId: line.cardId,
+            orderMethod: line.orderMethod,
+            sourceUrl: line.sourceUrl ?? null,
+            partName: linesByCardId.get(line.cardId)?.partName ?? line.cardId,
+          })),
+        });
+
+        setActiveConfigGroup(null);
+        await refreshQueueOnly();
+        toast.success(`Created ${result.totalDrafts} draft purchase order(s)`);
+      } catch (error) {
+        toast.error(parseApiError(error));
+      } finally {
+        setIsCreatingDrafts(false);
+      }
     },
-    [partById],
+    [activeConfigGroup, refreshQueueOnly, session.tokens.accessToken],
   );
 
-  const loopsToRender = activeLoopFilter === 'all' ? LOOP_ORDER : [activeLoopFilter];
+  const handleSendEmail = React.useCallback(
+    async (
+      method: "email" | "purchase_order" | "rfq",
+      input: {
+        to: string;
+        cc: string[];
+        subject: string;
+        bodyText: string;
+        includeAttachment: boolean;
+      },
+    ) => {
+      if (!executionSession) return;
 
-  const filteredQueue = React.useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase();
+      setIsSendingEmail(true);
+      try {
+        await Promise.all(
+          executionSession.poIds.map((poId) =>
+            sendPurchaseOrderEmailDraft(session.tokens.accessToken, poId, {
+              to: input.to,
+              cc: input.cc,
+              subject: input.subject,
+              bodyText: input.bodyText,
+              includeAttachment: method === "purchase_order",
+            }),
+          ),
+        );
+        toast.success(`Sent ${procurementOrderMethodLabel(method)} email draft(s)`);
+      } catch (error) {
+        toast.error(parseApiError(error));
+        throw error;
+      } finally {
+        setIsSendingEmail(false);
+      }
+    },
+    [executionSession, session.tokens.accessToken],
+  );
 
-    const matchesSearch = (card: QueueCard) => {
-      if (!normalizedSearch) return true;
-
-      // Also search against the resolved part name
-      const part = resolvePartByCardPartId(card.partId);
-      const partName = part?.name?.toLowerCase() ?? '';
-
-      return (
-        card.id.toLowerCase().includes(normalizedSearch) ||
-        card.partId.toLowerCase().includes(normalizedSearch) ||
-        card.loopId.toLowerCase().includes(normalizedSearch) ||
-        String(card.cardNumber).includes(normalizedSearch) ||
-        partName.includes(normalizedSearch)
-      );
-    };
-
-    const sortFn = makeSortFn(sortKey);
-
-    return {
-      procurement: queueByLoop.procurement.filter(matchesSearch).sort(sortFn),
-      production: queueByLoop.production.filter(matchesSearch).sort(sortFn),
-      transfer: queueByLoop.transfer.filter(matchesSearch).sort(sortFn),
-    } satisfies QueueByLoop;
-  }, [queueByLoop, searchTerm, resolvePartByCardPartId, sortKey]);
+  const handleVerify = React.useCallback(
+    async (input: { poIds: string[]; cardIds: string[] }) => {
+      setIsVerifying(true);
+      try {
+        await verifyProcurementDrafts(session.tokens.accessToken, input);
+        toast.success("Order verification complete");
+        setExecutionSession(null);
+        await refreshQueueOnly();
+      } catch (error) {
+        toast.error(parseApiError(error));
+      } finally {
+        setIsVerifying(false);
+      }
+    },
+    [refreshQueueOnly, session.tokens.accessToken],
+  );
 
   if (isLoading) {
     return (
-      <div className="space-y-5">
-        {/* Three loop columns skeleton */}
-        <div className="grid gap-4 xl:grid-cols-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="rounded-2xl border border-border/50 bg-muted/20 p-3">
-              <Skeleton className="mb-3 h-16 w-full rounded-xl" />
-              {Array.from({ length: 3 }).map((_, j) => (
-                <Skeleton key={j} className="mb-2 h-20 w-full rounded-xl" />
-              ))}
-            </div>
-          ))}
-        </div>
+      <div className="space-y-3">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <Skeleton key={index} className="h-28 w-full rounded-xl" />
+        ))}
       </div>
     );
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {error && <ErrorBanner message={error} onRetry={refreshQueueOnly} />}
 
-      <NextActionBanner queueSummary={queueSummary} queueByLoop={queueByLoop} />
-
-      <div className="grid gap-4 xl:grid-cols-3">
-        {loopsToRender.map((loopType) => {
-          const cards = filteredQueue[loopType];
-          const Icon = LOOP_META[loopType].icon;
-
-          return (
-            <section
-              key={loopType}
-              className="rounded-2xl border border-[hsl(var(--arda-blue)/0.25)] bg-[hsl(var(--arda-blue)/0.07)] p-3"
-            >
-              <header className="mb-3 rounded-xl bg-card px-3 py-3 shadow-xs">
-                <div className="flex items-center justify-between gap-2">
-                  <h3 className="flex items-center gap-2 text-sm font-semibold">
-                    <Icon className="h-4 w-4 text-accent" />
-                    {LOOP_META[loopType].label}
-                  </h3>
-                  <Badge variant="accent">{cards.length}</Badge>
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {queueSummary?.byLoopType[loopType] ?? cards.length} cards awaiting action
-                </p>
-              </header>
-
-              <div className="space-y-2">
-                {cards.length === 0 && (
-                  <div className="rounded-xl border border-dashed border-border bg-card px-3 py-8 text-center text-sm text-muted-foreground">
-                    No cards for this filter.
-                  </div>
-                )}
-
-                {cards.map((card) => (
-                  <QueueCardItem
-                    key={card.id}
-                    card={card}
-                    part={resolvePartByCardPartId(card.partId)}
-                    session={session}
-                  />
-                ))}
-              </div>
-            </section>
-          );
-        })}
+      <div className="rounded-xl border bg-card px-4 py-3">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <h2 className="text-base font-semibold">Procurement Vendor Queue</h2>
+            <p className="text-sm text-muted-foreground">
+              Triggered procurement cards grouped by vendor with verify-to-send workflow.
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => void refreshQueueOnly()}>
+            {isRefreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            Refresh
+          </Button>
+        </div>
       </div>
+
+      {executionSession && (
+        <VendorOrderExecutionPanel
+          session={executionSession}
+          isVerifying={isVerifying || isSendingEmail}
+          onClose={() => setExecutionSession(null)}
+          onVerify={handleVerify}
+          onSendEmail={handleSendEmail}
+        />
+      )}
+
+      <div className="space-y-3">
+        {groups.length === 0 && (
+          <div className="rounded-xl border border-dashed bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
+            No triggered procurement cards match this filter.
+          </div>
+        )}
+
+        {groups.map((group) => (
+          <section key={group.supplierId ?? group.supplierName} className="rounded-xl border bg-card p-4">
+            <header className="mb-3 flex flex-wrap items-start justify-between gap-2">
+              <div className="space-y-1">
+                <h3 className="text-sm font-semibold">{group.supplierName}</h3>
+                <p className="text-xs text-muted-foreground">
+                  {group.lines.length} line(s) • {Object.keys(group.facilityCounts).length} facility(ies)
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {group.draftPurchaseOrderIds.length > 0 && (
+                  <Badge variant="warning">Drafts: {group.draftPurchaseOrderIds.length}</Badge>
+                )}
+                {group.hasUnknownMethods && <Badge variant="destructive">Unknown order method</Badge>}
+
+                {group.draftPurchaseOrderIds.length > 0 ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={group.hasUnknownMethods || !group.supplierId}
+                    onClick={() =>
+                      setExecutionSession(mapGroupToExecutionSession(group, group.draftPurchaseOrderIds))
+                    }
+                  >
+                    Resume Draft
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    disabled={group.hasUnknownMethods || !group.supplierId}
+                    onClick={() => setActiveConfigGroup(group)}
+                  >
+                    <Play className="h-4 w-4" />
+                    Run Vendor Automation
+                  </Button>
+                )}
+              </div>
+            </header>
+
+            <div className="mb-3 flex flex-wrap gap-2">
+              {group.methods.map((method) => (
+                <Badge key={method} variant="outline">
+                  {procurementOrderMethodLabel(method)}
+                </Badge>
+              ))}
+            </div>
+
+            <div className="space-y-1 text-xs">
+              {group.lines.map((line) => (
+                <div key={line.card.id} className="flex items-center justify-between rounded-md bg-muted/25 px-2 py-1.5">
+                  <span>
+                    Card #{line.card.cardNumber} • {line.partName}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {line.orderMethod ? procurementOrderMethodLabel(line.orderMethod) : line.orderMethodError}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+
+      <VendorOrderConfigDialog
+        open={!!activeConfigGroup}
+        group={activeConfigGroup}
+        isSubmitting={isCreatingDrafts}
+        onOpenChange={(open) => {
+          if (!open) {
+            setActiveConfigGroup(null);
+          }
+        }}
+        onSubmit={handleCreateDrafts}
+      />
     </div>
   );
 }

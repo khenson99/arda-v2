@@ -45,6 +45,7 @@ const schemaMock = vi.hoisted(() => {
   return {
     kanbanCards: makeTable('kanban_cards'),
     kanbanLoops: makeTable('kanban_loops'),
+    suppliers: makeTable('suppliers'),
     auditLog: makeTable('audit_log'),
     purchaseOrders: makeTable('purchase_orders'),
     purchaseOrderLines: makeTable('purchase_order_lines'),
@@ -63,6 +64,7 @@ const { dbMock, resetDbMockCalls } = vi.hoisted(() => {
     const builder: any = {};
     builder.from = () => builder;
     builder.innerJoin = () => builder;
+    builder.leftJoin = () => builder;
     builder.where = () => builder;
     builder.orderBy = () => builder;
     builder.groupBy = () => builder;
@@ -74,6 +76,13 @@ const { dbMock, resetDbMockCalls } = vi.hoisted(() => {
 
   function makeTx() {
     const tx: any = {};
+    tx.update = vi.fn(() => {
+      const builder: any = {};
+      builder.set = () => builder;
+      builder.where = () => builder;
+      builder.execute = async () => [];
+      return builder;
+    });
     tx.insert = vi.fn((table: unknown) => {
       const valuesBuilder: any = {};
       valuesBuilder.values = (values: unknown) => {
@@ -159,7 +168,8 @@ vi.mock('../services/card-lifecycle.service.js', () => ({
   transitionTriggeredCardToOrdered: transitionTriggeredCardToOrderedMock,
 }));
 
-import { orderQueueRouter } from './order-queue.routes.js';
+// @ts-expect-error Vitest resolves TS source for route modules in tests.
+import { orderQueueRouter } from './order-queue.routes.ts';
 
 function createTestApp() {
   const app = express();
@@ -392,5 +402,222 @@ describe('order queue endpoint integration', () => {
       (row) => row.action === 'kanban_card.transitioned_to_ordered'
     );
     expect(cardAudits).toHaveLength(2);
+  });
+
+  it('procurement/create-drafts creates facility-grouped draft POs without transitioning cards', async () => {
+    const supplierId = '00000000-0000-4000-8000-000000000111';
+    const cardOneId = '00000000-0000-4000-8000-000000000201';
+    const cardTwoId = '00000000-0000-4000-8000-000000000202';
+
+    testState.selectResults = [
+      [
+        {
+          id: cardOneId,
+          currentStage: 'triggered',
+          loopId: 'loop-p-1',
+          cardNumber: 1,
+          loopType: 'procurement',
+          partId: 'part-1',
+          facilityId: 'fac-1',
+          primarySupplierId: supplierId,
+          supplierName: 'Acme',
+          supplierContactEmail: 'buyer@acme.com',
+          supplierContactPhone: '555-0100',
+        },
+        {
+          id: cardTwoId,
+          currentStage: 'triggered',
+          loopId: 'loop-p-2',
+          cardNumber: 2,
+          loopType: 'procurement',
+          partId: 'part-2',
+          facilityId: 'fac-2',
+          primarySupplierId: supplierId,
+          supplierName: 'Acme',
+          supplierContactEmail: 'buyer@acme.com',
+          supplierContactPhone: '555-0100',
+        },
+      ],
+      [],
+    ];
+
+    const app = createTestApp();
+    const response = await postJson(app, '/queue/procurement/create-drafts', {
+      supplierId,
+      recipientEmail: 'buyer@acme.com',
+      lines: [
+        {
+          cardId: cardOneId,
+          quantityOrdered: 5,
+          description: 'Widget A',
+          orderMethod: 'email',
+        },
+        {
+          cardId: cardTwoId,
+          quantityOrdered: 3,
+          description: 'Widget B',
+          orderMethod: 'online',
+          sourceUrl: 'https://vendor.example/item-b',
+        },
+      ],
+    });
+
+    expect(response.status).toBe(201);
+    expect(response.body.data).toEqual(
+      expect.objectContaining({
+        totalDrafts: 2,
+        totalCards: 2,
+      })
+    );
+    expect(transitionTriggeredCardToOrderedMock).not.toHaveBeenCalled();
+    expect(publishMock).toHaveBeenCalledTimes(2);
+    expect(
+      testState.insertedAuditRows.filter(
+        (row) => row.action === 'order_queue.procurement_draft_created'
+      )
+    ).toHaveLength(2);
+  });
+
+  it('procurement/create-drafts rejects duplicate open draft cards', async () => {
+    const supplierId = '00000000-0000-4000-8000-000000000112';
+    const cardId = '00000000-0000-4000-8000-000000000211';
+
+    testState.selectResults = [
+      [
+        {
+          id: cardId,
+          currentStage: 'triggered',
+          loopId: 'loop-p-1',
+          cardNumber: 1,
+          loopType: 'procurement',
+          partId: 'part-1',
+          facilityId: 'fac-1',
+          primarySupplierId: supplierId,
+          supplierName: 'Acme',
+          supplierContactEmail: 'buyer@acme.com',
+          supplierContactPhone: '555-0100',
+        },
+      ],
+      [{ cardId, purchaseOrderId: 'po-draft-1', poNumber: 'PO-0001' }],
+    ];
+
+    const app = createTestApp();
+    const response = await postJson(app, '/queue/procurement/create-drafts', {
+      supplierId,
+      lines: [
+        {
+          cardId,
+          quantityOrdered: 5,
+          description: 'Widget A',
+          orderMethod: 'email',
+        },
+      ],
+    });
+
+    expect(response.status).toBe(409);
+    expect(response.body.error).toContain('open draft');
+    expect(transitionTriggeredCardToOrderedMock).not.toHaveBeenCalled();
+  });
+
+  it('procurement/create-drafts enforces method-specific validation', async () => {
+    const supplierId = '00000000-0000-4000-8000-000000000113';
+    const cardId = '00000000-0000-4000-8000-000000000221';
+
+    testState.selectResults = [
+      [
+        {
+          id: cardId,
+          currentStage: 'triggered',
+          loopId: 'loop-p-1',
+          cardNumber: 1,
+          loopType: 'procurement',
+          partId: 'part-1',
+          facilityId: 'fac-1',
+          primarySupplierId: supplierId,
+          supplierName: 'Acme',
+          supplierContactEmail: null,
+          supplierContactPhone: null,
+        },
+      ],
+      [],
+    ];
+
+    const app = createTestApp();
+    const response = await postJson(app, '/queue/procurement/create-drafts', {
+      supplierId,
+      lines: [
+        {
+          cardId,
+          quantityOrdered: 5,
+          description: 'Widget A',
+          orderMethod: 'online',
+        },
+      ],
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain('Method-specific validation');
+    expect(response.body.details.fields).toEqual(
+      expect.arrayContaining([expect.objectContaining({ field: 'lines[0].sourceUrl' })])
+    );
+  });
+
+  it('procurement/verify marks drafts sent and transitions cards to ordered', async () => {
+    const poOneId = '00000000-0000-4000-8000-000000000301';
+    const poTwoId = '00000000-0000-4000-8000-000000000302';
+    const cardOneId = '00000000-0000-4000-8000-000000000401';
+    const cardTwoId = '00000000-0000-4000-8000-000000000402';
+
+    testState.selectResults = [
+      [
+        {
+          id: poOneId,
+          poNumber: 'PO-1',
+          status: 'draft',
+          supplierId: 'sup-1',
+          sentToEmail: null,
+          supplierContactEmail: 'buyer@acme.com',
+        },
+        {
+          id: poTwoId,
+          poNumber: 'PO-2',
+          status: 'draft',
+          supplierId: 'sup-1',
+          sentToEmail: null,
+          supplierContactEmail: 'buyer@acme.com',
+        },
+      ],
+      [
+        { poId: poOneId, cardId: cardOneId },
+        { poId: poTwoId, cardId: cardTwoId },
+      ],
+      [
+        { id: cardOneId, currentStage: 'triggered' },
+        { id: cardTwoId, currentStage: 'triggered' },
+      ],
+    ];
+    testState.loopByCardId = { [cardOneId]: 'loop-v-1', [cardTwoId]: 'loop-v-2' };
+
+    const app = createTestApp();
+    const response = await postJson(app, '/queue/procurement/verify', {
+      poIds: [poOneId, poTwoId],
+      cardIds: [cardOneId, cardTwoId],
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual(
+      expect.objectContaining({
+        poIds: [poOneId, poTwoId],
+        transitionedCards: 2,
+      })
+    );
+    expect(transitionTriggeredCardToOrderedMock).toHaveBeenCalledTimes(2);
+    expect(publishMock).toHaveBeenCalledTimes(4);
+    expect(
+      testState.insertedAuditRows.filter((row) => row.action === 'purchase_order.status_changed')
+    ).toHaveLength(2);
+    expect(
+      testState.insertedAuditRows.filter((row) => row.action === 'order_queue.procurement_verified')
+    ).toHaveLength(2);
   });
 });

@@ -7,6 +7,9 @@ import type {
   QueueByLoop,
   QueueCard,
   LoopType,
+  CreateProcurementDraftsInput,
+  CreateProcurementDraftsResult,
+  VerifyProcurementDraftsInput,
   PartsResponse,
   PartRecord,
   FacilityRecord,
@@ -578,6 +581,38 @@ export async function fetchQueueByLoop(token: string): Promise<QueueByLoop> {
     production: response.data.production ?? [],
     transfer: response.data.transfer ?? [],
   };
+}
+
+export async function createProcurementDrafts(
+  token: string,
+  input: CreateProcurementDraftsInput,
+): Promise<CreateProcurementDraftsResult> {
+  const response = await apiRequest<{
+    success: boolean;
+    data: CreateProcurementDraftsResult;
+  }>("/api/orders/queue/procurement/create-drafts", {
+    method: "POST",
+    token,
+    body: input,
+  });
+
+  return response.data;
+}
+
+export async function verifyProcurementDrafts(
+  token: string,
+  input: VerifyProcurementDraftsInput,
+): Promise<{ poIds: string[]; cardIds: string[]; transitionedCards: number }> {
+  const response = await apiRequest<{
+    success: boolean;
+    data: { poIds: string[]; cardIds: string[]; transitionedCards: number };
+  }>("/api/orders/queue/procurement/verify", {
+    method: "POST",
+    token,
+    body: input,
+  });
+
+  return response.data;
 }
 
 /* ── Data Authority helpers ──────────────────────────────────── */
@@ -1264,6 +1299,46 @@ export async function updatePurchaseOrderStatus(
     token,
     body: input,
   });
+}
+
+export async function sendPurchaseOrderEmailDraft(
+  token: string,
+  poId: string,
+  input: {
+    to?: string;
+    cc?: string[];
+    subject?: string;
+    bodyText?: string;
+    bodyHtml?: string;
+    includeAttachment?: boolean;
+  },
+): Promise<{
+  messageId: string;
+  to: string;
+  cc: string[];
+  subject: string;
+  attachmentIncluded: boolean;
+  poId: string;
+  poNumber: string;
+}> {
+  const response = await apiRequest<{
+    success: boolean;
+    data: {
+      messageId: string;
+      to: string;
+      cc: string[];
+      subject: string;
+      attachmentIncluded: boolean;
+      poId: string;
+      poNumber: string;
+    };
+  }>(`/api/orders/purchase-orders/${encodeURIComponent(poId)}/send-email-draft`, {
+    method: "POST",
+    token,
+    body: input,
+  });
+
+  return response.data;
 }
 
 /* ── Work Orders ──────────────────────────────────────────────── */

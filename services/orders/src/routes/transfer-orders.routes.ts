@@ -5,8 +5,14 @@ import { db, schema } from '@arda/db';
 import type { AuthRequest } from '@arda/auth-utils';
 import { getEventBus } from '@arda/events';
 import { config } from '@arda/config';
+import type { UserRole, TransferStatus } from '@arda/shared-types';
 import { AppError } from '../middleware/error-handler.js';
 import { getNextTONumber } from '../services/order-number.service.js';
+import {
+  validateTransferTransition,
+  getValidNextTransferStatuses,
+} from '../services/transfer-lifecycle.service.js';
+import { recommendSources } from '../services/source-recommendation.service.js';
 
 export const transferOrdersRouter = Router();
 const { transferOrders, transferOrderLines } = schema;
@@ -201,6 +207,7 @@ const createTransferOrderSchema = z.object({
 
 const statusTransitionSchema = z.object({
   status: z.enum(['draft', 'requested', 'approved', 'picking', 'shipped', 'in_transit', 'received', 'closed', 'cancelled']),
+  reason: z.string().optional(),
 });
 
 const shipLinesSchema = z.object({
@@ -411,12 +418,47 @@ transferOrdersRouter.post('/', async (req: AuthRequest, res, next) => {
   }
 });
 
-// PATCH /:id/status - Update transfer order status with transitions
+// GET /:id/transitions - Get valid next statuses for current user's role
+transferOrdersRouter.get('/:id/transitions', async (req: AuthRequest, res, next) => {
+  try {
+    const id = req.params.id as string;
+    const tenantId = req.user!.tenantId;
+    const userRole = req.user!.role as UserRole;
+
+    if (!tenantId) {
+      throw new AppError(401, 'Unauthorized');
+    }
+
+    const [order] = await db
+      .select()
+      .from(transferOrders)
+      .where(and(eq(transferOrders.id, id), eq(transferOrders.tenantId, tenantId)));
+
+    if (!order) {
+      throw new AppError(404, 'Transfer order not found');
+    }
+
+    const validNextStatuses = getValidNextTransferStatuses(
+      order.status as TransferStatus,
+      userRole
+    );
+
+    res.json({
+      currentStatus: order.status,
+      validTransitions: validNextStatuses,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /:id/status - Update transfer order status with lifecycle validation
 transferOrdersRouter.patch('/:id/status', async (req: AuthRequest, res, next) => {
   try {
     const id = req.params.id as string;
-    const { status: newStatus } = statusTransitionSchema.parse(req.body);
+    const { status: newStatus, reason } = statusTransitionSchema.parse(req.body);
     const tenantId = req.user!.tenantId;
+    const userRole = req.user!.role as UserRole;
     const auditContext = getRequestAuditContext(req);
 
     if (!tenantId) {
@@ -432,35 +474,30 @@ transferOrdersRouter.patch('/:id/status', async (req: AuthRequest, res, next) =>
       throw new AppError(404, 'Transfer order not found');
     }
 
-    // Validate status transitions
-    const validTransitions: Record<string, string[]> = {
-      draft: ['requested', 'cancelled'],
-      requested: ['approved', 'cancelled'],
-      approved: ['picking', 'cancelled'],
-      picking: ['shipped', 'cancelled'],
-      shipped: ['in_transit', 'cancelled'],
-      in_transit: ['received', 'cancelled'],
-      received: ['closed', 'cancelled'],
-      closed: [],
-      cancelled: [],
-    };
+    // Validate transition using the lifecycle service (role + reason checks)
+    const transition = validateTransferTransition({
+      currentStatus: order.status as TransferStatus,
+      targetStatus: newStatus as TransferStatus,
+      userRole,
+      reason,
+    });
 
-    if (!validTransitions[order.status]?.includes(newStatus)) {
-      throw new AppError(400, `Cannot transition from ${order.status} to ${newStatus}`);
+    if (!transition.valid) {
+      throw new AppError(400, transition.error!);
     }
 
     const updateData: Record<string, any> = {
       status: newStatus,
       updatedAt: new Date(),
+      // Spread auto-populated fields (e.g. requestedDate, shippedDate, receivedDate)
+      ...transition.autoFields,
     };
 
-    // Set timestamps based on status transition
-    if (newStatus === 'requested') {
-      updateData.requestedDate = new Date();
-    } else if (newStatus === 'shipped') {
-      updateData.shippedDate = new Date();
-    } else if (newStatus === 'received') {
-      updateData.receivedDate = new Date();
+    // If cancelling, store the reason in notes
+    if (newStatus === 'cancelled' && reason) {
+      updateData.notes = order.notes
+        ? `${order.notes}\n[Cancelled] ${reason}`
+        : `[Cancelled] ${reason}`;
     }
 
     const [updatedOrder] = await db
@@ -483,6 +520,7 @@ transferOrdersRouter.patch('/:id/status', async (req: AuthRequest, res, next) =>
       context: auditContext,
       metadata: {
         source: 'transfer_orders.status',
+        ...(reason && { reason }),
       },
     });
 
