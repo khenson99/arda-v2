@@ -34,6 +34,9 @@ import type {
   POStatus,
   WorkOrder,
   TransferOrder,
+  TOStatus,
+  SourceRecommendation,
+  InventoryLedgerEntry,
   Receipt,
   ReceivingMetrics,
   ReceivingException,
@@ -1289,10 +1292,65 @@ export async function fetchPurchaseOrder(
   return apiRequest(`/api/orders/purchase-orders/${encodeURIComponent(poId)}`, { token });
 }
 
+export async function createPurchaseOrder(
+  token: string,
+  input: {
+    supplierId: string;
+    facilityId: string;
+    orderDate?: string;
+    expectedDeliveryDate: string;
+    currency?: string;
+    notes?: string | null;
+    internalNotes?: string | null;
+    paymentTerms?: string | null;
+    shippingTerms?: string | null;
+    lines: Array<{
+      partId: string;
+      kanbanCardId?: string | null;
+      lineNumber: number;
+      quantityOrdered: number;
+      unitCost: number;
+      notes?: string | null;
+    }>;
+  },
+): Promise<PurchaseOrder> {
+  const response = await apiRequest<{ data: PurchaseOrder }>(
+    "/api/orders/purchase-orders",
+    {
+      method: "POST",
+      token,
+      body: input,
+    }
+  );
+  return response.data;
+}
+
+export async function updatePurchaseOrder(
+  token: string,
+  poId: string,
+  input: {
+    expectedDeliveryDate?: string;
+    paymentTerms?: string | null;
+    shippingTerms?: string | null;
+    notes?: string | null;
+    internalNotes?: string | null;
+  },
+): Promise<PurchaseOrder> {
+  const response = await apiRequest<{ data: PurchaseOrder }>(
+    `/api/orders/purchase-orders/${encodeURIComponent(poId)}`,
+    {
+      method: "PATCH",
+      token,
+      body: input,
+    }
+  );
+  return response.data;
+}
+
 export async function updatePurchaseOrderStatus(
   token: string,
   poId: string,
-  input: { status: POStatus; notes?: string },
+  input: { status: POStatus; notes?: string; cancelReason?: string },
 ): Promise<PurchaseOrder> {
   return apiRequest(`/api/orders/purchase-orders/${encodeURIComponent(poId)}/status`, {
     method: "PATCH",
@@ -1358,13 +1416,84 @@ export async function fetchWorkOrders(
 
 export async function fetchTransferOrders(
   token: string,
-  params?: { page?: number; pageSize?: number },
+  params?: { page?: number; pageSize?: number; status?: TOStatus },
 ): Promise<{ data: TransferOrder[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }> {
   const qs = new URLSearchParams();
   if (params?.page) qs.set("page", String(params.page));
   if (params?.pageSize) qs.set("pageSize", String(params.pageSize));
+  if (params?.status) qs.set("status", params.status);
   const suffix = qs.toString() ? `?${qs.toString()}` : "";
   return apiRequest(`/api/orders/transfer-orders${suffix}`, { token });
+}
+
+export async function fetchTransferOrder(
+  token: string,
+  id: string,
+): Promise<{ data: TransferOrder }> {
+  return apiRequest(`/api/orders/transfer-orders/${encodeURIComponent(id)}`, { token });
+}
+
+export async function createTransferOrder(
+  token: string,
+  input: {
+    sourceFacilityId: string;
+    destinationFacilityId: string;
+    notes?: string;
+    lines: Array<{
+      partId: string;
+      quantityRequested: number;
+      notes?: string;
+    }>;
+  },
+): Promise<{ data: TransferOrder }> {
+  return apiRequest("/api/orders/transfer-orders", {
+    method: "POST",
+    token,
+    body: input,
+  });
+}
+
+export async function updateTransferOrderStatus(
+  token: string,
+  id: string,
+  input: { status: TOStatus; reason?: string },
+): Promise<{ data: TransferOrder }> {
+  return apiRequest(`/api/orders/transfer-orders/${encodeURIComponent(id)}/status`, {
+    method: "PATCH",
+    token,
+    body: input,
+  });
+}
+
+export async function fetchTransferOrderTransitions(
+  token: string,
+  id: string,
+): Promise<{ data: { currentStatus: TOStatus; validTransitions: TOStatus[] } }> {
+  return apiRequest(`/api/orders/transfer-orders/${encodeURIComponent(id)}/transitions`, { token });
+}
+
+export async function fetchSourceRecommendations(
+  token: string,
+  params: { destinationFacilityId: string; partId: string; minQty?: number; limit?: number },
+): Promise<{ data: SourceRecommendation[] }> {
+  const qs = new URLSearchParams();
+  qs.set("destinationFacilityId", params.destinationFacilityId);
+  qs.set("partId", params.partId);
+  if (params.minQty != null) qs.set("minQty", String(params.minQty));
+  if (params.limit != null) qs.set("limit", String(params.limit));
+  return apiRequest(`/api/inventory/source-recommendations?${qs.toString()}`, { token });
+}
+
+export async function fetchInventoryByFacility(
+  token: string,
+  facilityId: string,
+  params?: { page?: number; pageSize?: number },
+): Promise<{ data: InventoryLedgerEntry[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }> {
+  const qs = new URLSearchParams();
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.pageSize) qs.set("pageSize", String(params.pageSize));
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return apiRequest(`/api/inventory/facility/${encodeURIComponent(facilityId)}${suffix}`, { token });
 }
 
 /* ── Receiving ────────────────────────────────────────────────── */

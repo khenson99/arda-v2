@@ -17,9 +17,13 @@ const WO_STATUS_META: Record<WOStatus, { label: string; colorClass: string }> = 
 
 const TO_STATUS_META: Record<TOStatus, { label: string; colorClass: string }> = {
   draft: { label: "Draft", colorClass: "bg-gray-100 text-gray-700 border-gray-200" },
+  requested: { label: "Requested", colorClass: "bg-amber-50 text-amber-700 border-amber-200" },
   approved: { label: "Approved", colorClass: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  picking: { label: "Picking", colorClass: "bg-violet-50 text-violet-700 border-violet-200" },
+  shipped: { label: "Shipped", colorClass: "bg-cyan-50 text-cyan-700 border-cyan-200" },
   in_transit: { label: "In Transit", colorClass: "bg-blue-50 text-blue-700 border-blue-200" },
   received: { label: "Received", colorClass: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  closed: { label: "Closed", colorClass: "bg-gray-100 text-gray-700 border-gray-200" },
   cancelled: { label: "Cancelled", colorClass: "bg-red-50 text-red-700 border-red-200" },
 };
 

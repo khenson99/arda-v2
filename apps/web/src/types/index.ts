@@ -555,20 +555,31 @@ export interface WorkOrder {
 
 /* ── Transfer Order ──────────────────────────────────────────── */
 
-export type TOStatus = "draft" | "approved" | "in_transit" | "received" | "cancelled";
+export type TOStatus =
+  | "draft"
+  | "requested"
+  | "approved"
+  | "picking"
+  | "shipped"
+  | "in_transit"
+  | "received"
+  | "closed"
+  | "cancelled";
 
 export interface TransferOrder {
   id: string;
   tenantId: string;
   toNumber: string;
   status: TOStatus;
-  fromFacilityId: string;
-  toFacilityId: string;
-  fromFacilityName?: string;
-  toFacilityName?: string;
+  sourceFacilityId: string;
+  destinationFacilityId: string;
+  sourceFacilityName?: string;
+  destinationFacilityName?: string;
   notes: string | null;
-  shippedAt: string | null;
-  receivedAt: string | null;
+  requestedDate: string | null;
+  shippedDate: string | null;
+  receivedDate: string | null;
+  createdBy: string | null;
   createdAt: string;
   updatedAt: string;
   lines?: TransferOrderLine[];
@@ -579,9 +590,37 @@ export interface TransferOrderLine {
   transferOrderId: string;
   partId: string;
   partName?: string;
-  quantityOrdered: number;
+  quantityRequested: number;
+  quantityShipped: number;
   quantityReceived: number;
   notes: string | null;
+}
+
+/* ── Source Recommendation ────────────────────────────────────── */
+
+export interface SourceRecommendation {
+  facilityId: string;
+  facilityName: string;
+  qtyAvailable: number;
+  avgLeadTimeDays: number | null;
+  distanceKm: number | null;
+  score: number;
+}
+
+/* ── Inventory Ledger ─────────────────────────────────────────── */
+
+export interface InventoryLedgerEntry {
+  id: string;
+  tenantId: string;
+  facilityId: string;
+  partId: string;
+  partName?: string;
+  qtyOnHand: number;
+  qtyReserved: number;
+  qtyInTransit: number;
+  reorderPoint: number | null;
+  reorderQty: number | null;
+  updatedAt: string;
 }
 
 /* ── Receiving ───────────────────────────────────────────────── */

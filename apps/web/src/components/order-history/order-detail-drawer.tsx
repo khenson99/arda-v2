@@ -170,11 +170,11 @@ function TransferOrderLines({ to }: { to: TransferOrder }) {
           {to.lines.map((line) => (
             <tr key={line.id} className="hover:bg-muted/30">
               <td className="px-3 py-2 font-medium">{line.partName ?? line.partId}</td>
-              <td className="px-3 py-2 text-right tabular-nums">{line.quantityOrdered}</td>
+              <td className="px-3 py-2 text-right tabular-nums">{line.quantityRequested}</td>
               <td className="px-3 py-2 text-right tabular-nums">
                 <span
                   className={cn(
-                    line.quantityReceived >= line.quantityOrdered
+                    line.quantityReceived >= line.quantityRequested
                       ? "text-emerald-600"
                       : line.quantityReceived > 0
                         ? "text-amber-600"
@@ -308,11 +308,11 @@ function StatusTimeline({ order, detail }: { order: UnifiedOrder; detail: Purcha
     if (to.status !== "draft") {
       items.push({ label: "Approved", date: to.updatedAt, active: to.status === "approved", completed: to.status !== "approved" });
     }
-    if (to.shippedAt) {
-      items.push({ label: "Shipped", date: to.shippedAt, active: to.status === "in_transit", completed: to.status === "received" });
+    if (to.shippedDate) {
+      items.push({ label: "Shipped", date: to.shippedDate, active: to.status === "in_transit", completed: to.status === "received" });
     }
-    if (to.receivedAt) {
-      items.push({ label: "Received", date: to.receivedAt, active: true, completed: true });
+    if (to.receivedDate) {
+      items.push({ label: "Received", date: to.receivedDate, active: true, completed: true });
     }
   }
 
