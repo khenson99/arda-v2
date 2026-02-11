@@ -24,7 +24,7 @@ import {
 } from "@/components/ui";
 import { ArrowLeft, AlertCircle, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { parseApiError, updatePurchaseOrderStatus } from "@/lib/api-client";
+import { isUnauthorized, parseApiError, updatePurchaseOrderStatus } from "@/lib/api-client";
 
 /* ── Props ─────────────────────────────────────────────────── */
 
@@ -106,8 +106,9 @@ export function PODetailRoute({ session, onUnauthorized }: Props) {
         toast.success("Purchase order approved");
         refresh();
       } catch (err) {
-        if (parseApiError(err).includes("unauthorized")) {
+        if (isUnauthorized(err)) {
           onUnauthorized();
+          return;
         }
         throw err;
       }
@@ -125,8 +126,9 @@ export function PODetailRoute({ session, onUnauthorized }: Props) {
         toast.success("Purchase order rejected");
         refresh();
       } catch (err) {
-        if (parseApiError(err).includes("unauthorized")) {
+        if (isUnauthorized(err)) {
           onUnauthorized();
+          return;
         }
         throw err;
       }
