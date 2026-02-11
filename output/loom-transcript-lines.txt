@@ -1,0 +1,31 @@
+[0.011] Hey guys, I just wanted to roll through some feedback on the front end. So, a couple of things. So, I've noticed the quick actions here, it wraps, whereas the others don't.
+[10.947] So, for instance, image URL is cut off, or image, I guess, yeah, it's cut off there. But, quick actions here.
+[16.016] So, quick for some reason wraps. It would be great if they could all wrap, and you could always read the words that are being said.
+[20.997] Also, there's no real indication of a column shift, so it's really hard to adjust width. Some frequently end up just dragging them around.
+[30.889] And it's also hard because it's really not intuitive how long each one is, and also there's clearly some padding or buffer space between the text and the end, because skew's getting cut off here, but I don't, it doesn't feel like it should, based on where the mouse is.
+[44.241] And then additionally, these are the fields that should be visible, in this order. things like, created, should not be visible and take up a ton of space, like, right in kind of the prime real estate area.
+[55.03] So, yeah, hopefully, hopefully, getting this, this helps. additionally, inline editing is not obvious at all, and so, like, there's nothing that really tells me that I should be able to edit that, and then, for instance, like, that interaction with the sidebar coming out is pretty tough, and then it's
+[70.156] also impossible to edit any of the dropdowns because the sidebar comes out when you double-click, so you never actually get a chance to do that.
+[77.564] Oh, actually, that was the first time I succeeded. That's cool. and it's also separately a little bit confusing that they're all caps when they render here, but, lowercase here, would be great if they could just be kind of, like, lowercase, normal, human, readable, that would be, I think, a bit less 
+[90.392] confusing, and then one other thing that is definitely, vexed, I just, I got an email about this, which started the whole you me poking at the front end, is, item type, item subtype, these look like they should show up next time I type something, and they don't.
+[107.856] And so, regardless of, yeah, where I make the edits or, or anything, which item it's on, they, yeah, it just doesn't, does not show up.
+[125.521] So, that's, that's kind of a confusing interaction. love the density. The density is amazing. That really, really helps. yeah, for sure.
+[131.246] and then, further, some of these words are just confusing. So, I think order quantity, and order units, plural, would be a bit better.
+[137.898] And then if it's just minQuantity and minUnits, that would be better. and then, for, what was it, oh yeah, this, kind of cuts off here.
+[145.585] the, the grid lines, and I think there's a ticket for that, and then also the buttons don't really have, like, hover, or, like, focus states, and so, I actually, looked at the, mockups, and here they, they have this, it's kind of confusing, because there's two different, paradigms here, but, this turns
+[160.431] to a slightly different color when your mouse is over it, and this brings up a, a tool tip, both of which I think could be, could be great, and simple, they would also be great if there was feedback when you did click one of the buttons, so, like, you, I clicked print, very unclear if anything happened
+[174.267] , okay, so it did print, so, that would be, yeah, that'd be super useful, and then, wait, oops, so, for the cards, this has a card, it doesn't look like it does, so, for instance, this is showing up as zero cards, that the item has, I think, or it could just be zero in the cart.
+[197.386] Anyway, maybe that's what it is. And then, now I've added it to the cart. So if it has a card, it's very unclear why I can't add it to the cart.
+[209.186] Okay, so now that's one on the cart. Okay, so now I can add the second card to the cart. But that's still saying one, but it did get greyed out.
+[220.369] And then this doesn't have, a card, seemingly. but, it clearly does. And this one is waiting to be received, I guess, or waiting to be, I know, this is available.
+[233.448] Yeah, so I can't click this button, I guess, because it's available. Well, okay, that one I can't click, because it's in the card, so let me just It'd be great if I could just edit the item from here without having to click that dropdown.
+[281.506] That's strange. So it says email persisted, but it's still showing up here as online, and so I can't. Huh, that was odd.
+[289.978] okay, let me just receive these. Okay, great. Okay, so now, now these are working. Except this one's still not. So, I guess do I have to go through?
+[304.601] Okay, yeah, so I guess I had to go through it once in order for it to be addable. So, it would be good to get that sorted.
+[316.209] and then, lastly. The thing is this GL code. this does not, like, you can't get rid of it. And it shows up initially on the left, and takes up a lot of really good real estate, and, yeah, given that you can't get rid of it, it's pretty, pretty tough.
+[326.462] Also pretty tough that, these Thank much. don't readjust based on the, order that, the item, like, the fields are actually in.
+[334.393] I think we talked about that one. and, oh, and saving is really counterintuitive in a menu like this. Typically, you just want to have your name or selections persist with, like, when you click out of this.
+[345.734] so, like, I just click here for it to go away, like, it does, which is good. but, I would expect the changes that I made there to persist without clicking save.
+[354.251] And then, finally, I was doing a demo of the, onboarding tool, and I, I added, like, 2,000 items, I thought it was 200, and so, I had to go through and delete them all, and it's just, pretty much, it be tough to only be able to do 28 at a time, and have no, like, pagination, even if it does have to be
+[372.057] , like, no lazy load, where you, you know, you just scroll and, and then things load, it would be really great to be able to select, like, paid, like, you know, number of entries, 100, that would definitely save me a lot of time from doing this.
+[384.119] cool, but, awesome work, these updates are really huge, but, I think there's like, yeah, some confusion about what the default order should be, so I just wanted to clarify, some of that.

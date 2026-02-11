@@ -343,3 +343,89 @@ For warehouse/receiving persona on mobile devices, a bottom navigation bar repla
 | Cards | Cards | `/kanban/cards` |
 | Queue | Queue | `/orders/queue` |
 | More | More | Slide-up menu |
+
+---
+
+## 9. MVP Phase 1 Navigation (Current Implementation)
+
+> This section documents the simplified navigation state actually shipped in the MVP Phase 1 codebase.
+> It serves as a bridge between the full navigation model (sections 1-8) and the implementation reality.
+
+### 9.1 Simplified Sidebar
+
+The MVP ships a 7-item sidebar organized into 2 groups, reduced from the full spec's 6-group structure.
+
+| Group | Label | Route | Icon |
+|-------|-------|-------|------|
+| **Kanban** | Dashboard | `/` | `Activity` |
+| | Cards | `/cards` | `CreditCard` |
+| | Loops | `/loops` | `RefreshCw` |
+| **Operations** | Items | `/parts` | `Boxes` |
+| | Order Queue | `/queue` | `SquareKanban` |
+| | Order History | `/orders` | `Bell` |
+| | Receiving | `/receiving` | `PackageCheck` |
+
+**Source**: `apps/web/src/layouts/app-shell.tsx` (sidebar nav items array)
+
+### 9.2 Header Actions
+
+The header bar provides 6 global actions:
+
+| Position | Element | Action |
+|----------|---------|--------|
+| Left | Sidebar toggle | Collapse/expand sidebar |
+| Left | "Arda Kanban" wordmark | Navigate to `/` |
+| Center | Search icon | Open command palette (`Cmd+K`) |
+| Right | Scan button | Navigate to `/scan` |
+| Right | Bell icon | Open notifications drawer |
+| Right | User avatar | Open user menu (logout, theme toggle) |
+
+### 9.3 Implemented Routes
+
+`App.tsx` registers 11 routes inside the `AppShell` layout:
+
+| Route | Page Component | Notes |
+|-------|---------------|-------|
+| `/` | `DashboardRoute` | Landing page, renders `NextActionBanner` |
+| `/cards` | `CardsRoute` | Kanban card list |
+| `/cards/:cardId` | `CardDetailRoute` | Individual card detail |
+| `/loops` | `LoopsRoute` | Loop list |
+| `/loops/:loopId` | `LoopDetailRoute` | Individual loop detail/edit |
+| `/parts` | `PartsRoute` | Item catalog |
+| `/queue` | `QueueRoute` | Order queue (primary workflow page) |
+| `/orders` | `OrdersRoute` | Order history |
+| `/receiving` | `ReceivingRoute` | Goods receiving |
+| `/scan` | `ScanRoute` | QR code scanner |
+| `/scan/:cardId` | `ScanRoute` | Deep-link scan for specific card |
+
+**Legacy redirects** (also in `App.tsx`):
+- `/notifications` redirects to `/orders`
+- `/order-pulse` redirects to `/`
+
+### 9.4 Deferred from Full Spec
+
+The following navigation model features from sections 2-8 are **not yet implemented** and are deferred to later phases:
+
+| Feature | Spec Section | Status |
+|---------|-------------|--------|
+| URL prefix structure (`/kanban/*`, `/orders/*`, `/catalog/*`) | 3.2 | Flat routes used instead |
+| Reports section (`/reports/*`) | 2.2 | Not started |
+| eCommerce section (`/ecommerce/*`) | 2.2 | Not started |
+| Breadcrumb navigation | 6 | Not implemented (see UX-017) |
+| Mobile bottom navigation | 8 | Not implemented (see UX-016) |
+| Persona-based landing routes | 2.1 | All personas land on `/` |
+| Route-to-role access matrix | 5 | No role-based route guards |
+| Sidebar section expansion state | 3.1 | Flat list, no collapsible sections |
+
+### 9.5 Command Palette as Navigation Layer
+
+The command palette (`Cmd+K`) provides the primary keyboard navigation path. See `command-surface.md` for the full specification. Key gaps between current state and target are tracked in `ux-debt-backlog.md` as items UX-001 through UX-004 (all P0).
+
+### 9.6 Cross-References
+
+| Document | Relationship |
+|----------|-------------|
+| `docs/spec/ia/command-surface.md` | Defines the target command palette and keyboard shortcut system |
+| `docs/spec/ia/workflow-maps.md` | Click/time budgets that navigation must support |
+| `docs/spec/ia/ux-debt-backlog.md` | Prioritized list of navigation/UX gaps to close |
+| `docs/spec/screens/kanban-screens.md` | Screen-level specs for each route |

@@ -1,0 +1,129 @@
+{
+  "timestamp": "2026-02-11T03:46:26.518Z",
+  "baseUrl": "http://127.0.0.1:4173/parts",
+  "status": "passed",
+  "steps": [
+    "Build web app",
+    "Start web preview server",
+    "Wait for preview server",
+    "Open items page",
+    "Click quick action create-card button",
+    "Validate toast and request behavior"
+  ],
+  "itemCode": "PW-KANBAN-586518",
+  "toastText": "Created card #2 in Procurement loop.",
+  "state": {
+    "loopPagesRequested": [
+      1,
+      2
+    ],
+    "loopPatchCalls": 1,
+    "itemUpdateFallbackCalls": 0,
+    "apiRequests": [
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/auth/me",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/orders/queue/summary",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/orders/queue",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "POST",
+        "pathname": "/api/items/item/query",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/notifications",
+        "search": "?limit=20"
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/notifications/unread-count",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "POST",
+        "pathname": "/api/orders/order/query",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/kanban/loops",
+        "search": "?page=1&pageSize=100"
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/kanban/loops",
+        "search": "?page=2&pageSize=100"
+      },
+      {
+        "kind": "api",
+        "method": "PATCH",
+        "pathname": "/api/kanban/loops/loop-target/parameters",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/orders/queue/summary",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/orders/queue",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "POST",
+        "pathname": "/api/items/item/query",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/notifications",
+        "search": "?limit=20"
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/notifications/unread-count",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "POST",
+        "pathname": "/api/orders/order/query",
+        "search": ""
+      }
+    ]
+  },
+  "artifacts": {
+    "initial": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T03-46-26-516Z-kanban-btn-e2e-initial.png",
+    "afterClick": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T03-46-26-516Z-kanban-btn-e2e-after-click.png",
+    "failure": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T03-46-26-516Z-kanban-btn-e2e-failure.png",
+    "reportJson": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T03-46-26-516Z-kanban-btn-e2e-report.json",
+    "reportMd": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T03-46-26-516Z-kanban-btn-e2e-report.md"
+  },
+  "error": null
+}

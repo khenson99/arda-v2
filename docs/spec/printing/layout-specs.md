@@ -153,9 +153,27 @@ All print output uses **Open Sans** (loaded via `@font-face` or system fallback)
 
 ## 7. QR Code Specifications
 
-- **Content**: `https://{tenant-slug}.arda.cards/scan/{card-uuid}` (production) or `{APP_URL}/scan/{card-uuid}` (development)
+### Content (Payload Versions)
+
+| Version | URL Pattern | Example | Approx. Length |
+|---------|-------------|---------|----------------|
+| **v1** (current) | `https://{tenant}.arda.cards/scan/{uuid}` | `https://acme.arda.cards/scan/a0b1c2d3-e4f5-6789-abcd-ef0123456789` | ~65 chars |
+| **v2** (with checksum) | `https://{tenant}.arda.cards/scan/v2/{uuid}?c={checksum}` | `https://acme.arda.cards/scan/v2/a0b1c2d3-e4f5-6789-abcd-ef0123456789?c=k9Tm2x` | ~83 chars |
+
+Development URLs use `{APP_URL}` instead of the tenant domain.
+
+> Full v2 specification: [`docs/spec/pwa/qr-payload-v2.md`](../pwa/qr-payload-v2.md)
+
+### QR Capacity Validation
+
+- v1 (~65 chars) fits QR **Version 4** at ECC-H (50 alphanumeric capacity).
+- v2 (~83 chars) fits QR **Version 5** at ECC-H (106 alphanumeric capacity). No module-size increase needed at the current label dimensions.
+- All QR sizes in Section 1 (48px-120px) remain sufficient for both v1 and v2 payloads.
+
+### Other Properties
+
 - **UUID Immutability**: The card UUID encoded in the QR code is the card's primary key (`kanban_cards.id`). It NEVER changes across reprints.
-- **Error Correction**: M (standard), H (high — for printed cards subject to wear)
+- **Error Correction**: M (standard), H (high -- for printed cards subject to wear)
 - **Quiet Zone**: 2 module margin minimum
 
 ---

@@ -498,3 +498,81 @@ List all pending and recent ReLoWiSa (Reorder Level, Reorder Width, Safety Stock
     - "Reject" (outline button): Requires reason textarea (min 10 chars). Reason stored in `kanban_parameter_history`
   - POST `/api/kanban/relowisa/{id}/approve` or `/api/kanban/relowisa/{id}/reject`
   - On success: Card moves to Approved/Rejected tab, toast confirmation
+
+---
+
+## Implementation Status (MVP Phase 1)
+
+> Added Feb 2025. Maps each screen spec to its current implementation state and documents
+> new interaction patterns defined in `command-surface.md` and `workflow-maps.md`.
+
+### Screen Implementation Matrix
+
+| Screen | Spec Route | Implemented Route | Status | Notes |
+|--------|-----------|------------------|--------|-------|
+| Kanban Overview | `/kanban` | `/` (Dashboard) | Partial | Simplified as `DashboardRoute` with `NextActionBanner`; no charts or activity feed |
+| Loop List | `/kanban/loops` | `/loops` | Implemented | Flat route; filters via React state (not URL params) |
+| Create Loop | `/kanban/loops/new` | `/loops` (modal) | Implemented | Inline modal on loop list page, not separate route |
+| Loop Detail | `/kanban/loops/:loopId` | `/loops/:loopId` | Implemented | Edit and view combined |
+| Edit Loop | `/kanban/loops/:loopId/edit` | `/loops/:loopId` | Merged | Edit mode is inline on detail page |
+| Card List | `/kanban/cards` | `/cards` | Implemented | Basic list with search |
+| Card Detail | `/kanban/cards/:cardId` | `/cards/:cardId` | Implemented | Stage history, part info displayed |
+| Card Print | `/kanban/cards/:cardId/print` | -- | Not started | Deferred to Phase 2 |
+| Velocity Dashboard | `/kanban/velocity` | -- | Not started | Deferred to Phase 2 |
+| Loop Velocity Detail | `/kanban/velocity/:loopId` | -- | Not started | Deferred to Phase 2 |
+| ReLoWiSa Recommendations | `/kanban/relowisa` | -- | Not started | Deferred to Phase 2 |
+
+### New Interaction Patterns (from command-surface.md)
+
+The following interaction patterns are specified in `command-surface.md` and `ux-debt-backlog.md` but are **not yet implemented**. They apply to existing screens.
+
+#### Inline Card Actions (Queue Page -- UX-003)
+
+Each `QueueCardItem` row should show an inline icon button for the primary action without requiring card expansion:
+
+| Icon | Action | Current State | Target State |
+|------|--------|--------------|--------------|
+| ShoppingCart | Create order for this card | Inside `ExpandedCardPanel` only (4 clicks) | Inline on card row (2 clicks) |
+| ChevronDown | Expand card details | Implemented | No change |
+
+**Priority**: P0 | **Effort**: S (2-4h) | **Debt Item**: UX-003
+
+#### Bulk Actions Bar (Queue Page -- UX-006)
+
+When 1+ cards are selected via checkbox, a sticky bar appears at the viewport bottom:
+
+| Button | Action | API |
+|--------|--------|-----|
+| Create Orders | Bulk order creation | `createPurchaseOrderFromCards({ cardIds: selectedIds })` |
+| Print Labels | Bulk print job | `createPrintJob({ cardIds: selectedIds })` |
+| Clear Selection | Deselect all | Client-side state reset |
+
+**Prerequisites**: Per-card checkboxes, selection state management in `QueueRoute`.
+**Priority**: P1 | **Effort**: M (4-8h) | **Debt Item**: UX-006
+
+#### Keyboard Navigation (Queue Page -- UX-007)
+
+| Shortcut | Action |
+|----------|--------|
+| `j` | Move focus to next card in current loop column |
+| `k` | Move focus to previous card |
+| `x` | Toggle checkbox on focused card |
+| `Enter` | Expand/collapse focused card |
+| `Shift+Enter` | Create order for focused card |
+
+**Priority**: P1 | **Effort**: S (2-4h) | **Debt Item**: UX-007
+
+#### NextActionBanner Deep-Link (Dashboard + Queue -- UX-008)
+
+The `NextActionBanner` component should include an actionable "Review N aging cards" link that navigates to `/queue?aging=true`.
+
+**Priority**: P1 | **Effort**: XS (<2h) | **Debt Item**: UX-008
+
+### Cross-References
+
+| Document | Relationship |
+|----------|-------------|
+| `docs/spec/ia/command-surface.md` | Defines all keyboard shortcuts and contextual actions for these screens |
+| `docs/spec/ia/workflow-maps.md` | Click/time budgets each screen must support |
+| `docs/spec/ia/ux-debt-backlog.md` | Prioritized gaps between spec and implementation |
+| `docs/spec/ia/navigation-model.md` | Route definitions and MVP Phase 1 navigation state |

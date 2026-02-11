@@ -15,6 +15,7 @@ const listLoopsQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(200).default(25),
   loopType: z.enum(['procurement', 'production', 'transfer']).optional(),
   facilityId: z.string().uuid().optional(),
+  partId: z.string().uuid().optional(),
 });
 
 const patchLoopParamsSchema = z.object({
@@ -53,6 +54,9 @@ kanbanCompatRouter.get('/', async (req: AuthRequest, res, next) => {
     }
     if (query.facilityId) {
       conditions.push(eq(kanbanLoops.facilityId, query.facilityId));
+    }
+    if (query.partId) {
+      conditions.push(eq(kanbanLoops.partId, query.partId));
     }
     const whereClause = and(...conditions);
 

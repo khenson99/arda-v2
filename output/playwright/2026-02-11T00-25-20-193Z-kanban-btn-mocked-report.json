@@ -1,0 +1,148 @@
+{
+  "timestamp": "2026-02-11T00:25:20.194Z",
+  "baseUrl": "http://127.0.0.1:5173/parts",
+  "itemCode": "PW-KANBAN-520194",
+  "status": "failed",
+  "steps": [
+    "Open parts page with mocked authenticated session"
+  ],
+  "artifacts": {
+    "initial": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-25-20-193Z-kanban-btn-mocked-initial.png",
+    "afterClick": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-25-20-193Z-kanban-btn-mocked-after-click.png",
+    "failure": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-25-20-193Z-kanban-btn-mocked-failure.png",
+    "reportJson": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-25-20-193Z-kanban-btn-mocked-report.json",
+    "reportMd": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-25-20-193Z-kanban-btn-mocked-report.md"
+  },
+  "state": {
+    "loopPagesRequested": [],
+    "loopPatchCalls": 0,
+    "updateItemRecordCalls": 0,
+    "requests": [
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/auth/me",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/auth/me",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/orders/queue/summary",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/orders/queue",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "POST",
+        "pathname": "/api/items/item/query",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/notifications",
+        "search": "?limit=20"
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/notifications/unread-count",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "POST",
+        "pathname": "/api/orders/order/query",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/orders/queue/summary",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/orders/queue",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "POST",
+        "pathname": "/api/items/item/query",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/notifications",
+        "search": "?limit=20"
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/notifications/unread-count",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "POST",
+        "pathname": "/api/orders/order/query",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/orders/queue/summary",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/orders/queue",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "POST",
+        "pathname": "/api/items/item/query",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/notifications",
+        "search": "?limit=20"
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/notifications/unread-count",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "POST",
+        "pathname": "/api/orders/order/query",
+        "search": ""
+      }
+    ]
+  },
+  "toastText": null,
+  "error": {
+    "message": "page.waitForSelector: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('text=PW-KANBAN-520194') to be visible\u001b[22m\n",
+    "stack": "page.waitForSelector: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('text=PW-KANBAN-520194') to be visible\u001b[22m\n\n    at /private/tmp/test-create-kanban-button-mocked.js:221:16"
+  }
+}

@@ -3,7 +3,7 @@
 > **Epic**: MVP-05 — PWA Scan Module
 > **Ticket**: #47 (T1)
 > **Status**: Specification
-> **Last updated**: 2026-02-09
+> **Last updated**: 2026-02-10
 
 ---
 
@@ -37,27 +37,42 @@ Operators can initiate a scan through three distinct entry points:
 
 ### 2.1 URL Format
 
+**v1 (current)**:
 ```
 {APP_URL}/scan/{cardId}
 ```
 
+**v2 (with checksum)** — see [Section 2.7](#27-payload-v2-versioned-url-with-checksum):
+```
+{APP_URL}/scan/v2/{cardId}?c={checksum}
+```
+
 - `APP_URL` is the configured frontend base URL (e.g., `https://app.arda.io`).
 - `cardId` is the UUID v4 primary key of the kanban card (immutable; see `qr-payload.service.ts`).
+- `checksum` (v2 only) is a 6-character base62 integrity token.
 
 ### 2.2 QR Code Payload
 
-The QR code encodes the full deep-link URL. Example:
+The QR code encodes the full deep-link URL.
 
+**v1 example**:
 ```
 https://app.arda.io/scan/a0b1c2d3-e4f5-6789-abcd-ef0123456789
+```
+
+**v2 example** (new cards printed after v2 rollout):
+```
+https://app.arda.io/scan/v2/a0b1c2d3-e4f5-6789-abcd-ef0123456789?c=k9Tm2x
 ```
 
 ### 2.3 Backend Resolution
 
 | Endpoint | Method | Auth | Purpose |
 |---|---|---|---|
-| `GET /api/kanban/scan/:cardId` | GET | None (public) | Deep-link entry. Returns JSON for API clients or 302 redirect for browsers. |
-| `POST /api/kanban/scan/:cardId/trigger` | POST | JWT required | Triggers the card transition (created -> triggered). Used by PWA after authentication. |
+| `GET /api/kanban/scan/:cardId` | GET | None (public) | v1 deep-link entry. Returns JSON for API clients or 302 redirect for browsers. |
+| `POST /api/kanban/scan/:cardId/trigger` | POST | JWT required | v1 trigger. Transitions card (created -> triggered). |
+| `GET /api/kanban/scan/v2/:cardId` | GET | None (public) | v2 deep-link entry. Validates checksum from `?c=` query param. |
+| `POST /api/kanban/scan/v2/:cardId/trigger` | POST | JWT required | v2 trigger. Validates checksum, then transitions card. |
 
 ### 2.4 Trigger Request Body
 
@@ -89,6 +104,24 @@ Location is optional. The backend determines the scanned-by user from the JWT.
 - The backend uses an `idempotencyKey` stored in the transition metadata.
 - The PWA generates a deterministic key: `scan-{cardId}-{sessionId}-{timestamp}`.
 - If the same `idempotencyKey` is replayed, the backend returns the original transition result without creating a duplicate.
+
+### 2.7 Payload v2 (Versioned URL with Checksum)
+
+> Full specification: [`qr-payload-v2.md`](./qr-payload-v2.md)
+
+Starting with the v2 payload format, QR codes encode a versioned URL with an integrity checksum:
+
+```
+https://{tenant}.arda.cards/scan/v2/{cardId}?c={checksum}
+```
+
+- `v2` path segment enables server-side version negotiation via Express route ordering.
+- `checksum` is a 6-character base62-encoded truncated HMAC-SHA256 (integrity check, NOT a security boundary).
+- v1 URLs (without `/v2/` segment) remain permanently supported.
+- The PWA client parses both v1 and v2 formats using the `parseScanUrl()` utility.
+- Backend endpoints for v2: `GET /api/kanban/scan/v2/:cardId` and `POST /api/kanban/scan/v2/:cardId/trigger`.
+
+See [`qr-payload-v2.md`](./qr-payload-v2.md) for the full contract, checksum algorithm, error taxonomy, and migration plan.
 
 ---
 
@@ -143,6 +176,30 @@ Location is optional. The backend determines the scanned-by user from the JWT.
 - **Badge**: Sync status badge shows pending count (e.g., "2 pending").
 - **Action**: The scan event is persisted to IndexedDB and replayed when connectivity returns.
 
+### 3.9 Malformed Payload (v2)
+
+- **Trigger**: The backend returns 400 (`MALFORMED_PAYLOAD`). The URL does not match the expected v2 pattern.
+- **UI**: Error card with message "Invalid scan URL format."
+- **Action**: Scanner remains active for retry. Operator may use manual lookup.
+
+### 3.10 Unsupported Version
+
+- **Trigger**: The backend returns 400 (`UNSUPPORTED_VERSION`). The URL contains a payload version the server does not support (e.g., `/scan/v3/...`).
+- **UI**: Error card with message "This QR code uses an unsupported format. Please update your app."
+- **Action**: No retry. Operator should check for PWA updates.
+
+### 3.11 Checksum Missing (v2)
+
+- **Trigger**: The backend returns 400 (`CHECKSUM_MISSING`). A v2 URL was received without the `?c=` query parameter.
+- **UI**: Warning card with message "QR code integrity data is missing. The scan may still proceed if your administrator has configured fallback mode."
+- **Action**: Depends on tenant configuration. If `QR_CHECKSUM_MODE=enforce`, the scan is rejected. If `warn`, the scan proceeds with a warning.
+
+### 3.12 Checksum Mismatch (v2)
+
+- **Trigger**: The backend returns 400 (`CHECKSUM_MISMATCH`). The checksum in the URL does not match the server-computed value.
+- **UI**: Error card with message "QR code integrity check failed. This card may have been tampered with or printed incorrectly."
+- **Action**: No automatic retry. Operator should verify the physical card and contact admin. The card may need to be reprinted.
+
 ---
 
 ## 4. Operator Feedback for Queued/Offline Scans
@@ -195,12 +252,15 @@ When a queued scan replays and encounters a conflict (e.g., `CARD_ALREADY_TRIGGE
   [Device Camera / Native Scan / Manual Entry]
         |
         v
-  [PWA Frontend: /scan/:cardId]
+  [PWA Frontend: parseScanUrl() --> { version, cardId, checksum? }]
         |
-        +--[Online]--> POST /api/kanban/scan/:cardId/trigger
+        +--[v1]--> /scan/:cardId routes
+        +--[v2]--> /scan/v2/:cardId routes (checksum validated server-side)
+        |
+        +--[Online]--> POST /api/kanban/scan/[v2/]:cardId/trigger
         |                  |
         |                  +--> 200: Success UI
-        |                  +--> 400/403/404: Error UI
+        |                  +--> 400/403/404: Error UI (incl. CHECKSUM_MISMATCH)
         |
         +--[Offline]--> IndexedDB offline-queue
                             |
@@ -215,8 +275,9 @@ When a queued scan replays and encounters a conflict (e.g., `CARD_ALREADY_TRIGGE
 
 ## 6. Security Considerations
 
-- The `GET /scan/:cardId` endpoint is public (no auth) to support native camera scanning.
-- The `POST /scan/:cardId/trigger` endpoint requires JWT authentication.
-- QR codes do not contain any sensitive data -- only the card UUID.
+- The `GET /scan/:cardId` and `GET /scan/v2/:cardId` endpoints are public (no auth) to support native camera scanning.
+- The `POST /scan/:cardId/trigger` and `POST /scan/v2/:cardId/trigger` endpoints require JWT authentication.
+- QR codes do not contain any sensitive data -- only the card UUID (v1) or UUID + integrity checksum (v2).
+- The v2 checksum is an integrity check, NOT a security/authentication mechanism. See [`qr-payload-v2.md` Section 2.5](./qr-payload-v2.md#25-security-boundary) for details.
 - The PWA must verify the user is authenticated before dispatching the trigger call.
 - Offline-queued scans are stored only in the device's IndexedDB (client-side, no server persistence until sync).

@@ -1,0 +1,19 @@
+82	[MVP-21] Automate Order Queue actions end-to-end (email, URL handoff, PO, shopping list)	Product	4-Scale	P0	Wave 1	39	Todo	https://github.com/khenson99/arda-v2/issues/82
+83	[MVP-22] Harden QR scanning reliability across camera, deep-link, and offline sync	Product	4-Scale	P0	Wave 1	40	Todo	https://github.com/khenson99/arda-v2/issues/83
+84	[MVP-23] Streamline Kanban UI for intuitive workflows and high performance	Product	4-Scale	P1	Wave 1	41	Todo	https://github.com/khenson99/arda-v2/issues/84
+85	[MVP-21/T1] Define order queue automation policy, guardrails, and decision matrix	Product	4-Scale	P0	Wave 1	42	Todo	https://github.com/khenson99/arda-v2/issues/85
+86	[MVP-22/T1] Define QR payload v2 contract, compatibility, and error taxonomy	Product	4-Scale	P0	Wave 1	43	Todo	https://github.com/khenson99/arda-v2/issues/86
+87	[MVP-23/T1] Simplify Kanban IA and define command-centered workflow paths	Product	4-Scale	P1	Wave 1	44	Todo	https://github.com/khenson99/arda-v2/issues/87
+88	[MVP-20/T1] Run resilience and fault-injection matrix for scan-to-order workflows	Backend	4-Scale	P0	Wave 1	45	Todo	https://github.com/khenson99/arda-v2/issues/88
+89	[MVP-21/T2] Implement automation orchestrator with retries, idempotency, and replay	Backend	4-Scale	P0	Wave 2	46	Todo	https://github.com/khenson99/arda-v2/issues/89
+90	[MVP-22/T2] Harden scan ingestion for dedupe, offline replay, and conflict handling	Backend	4-Scale	P0	Wave 2	47	Todo	https://github.com/khenson99/arda-v2/issues/90
+91	[MVP-20/T2] Optimize queue and scan data paths to hit p95 latency/throughput targets	Data	4-Scale	P0	Wave 2	48	Todo	https://github.com/khenson99/arda-v2/issues/91
+92	[MVP-20/T3] Harden outbound automation security and tenant-safe execution boundaries	Backend	4-Scale	P0	Wave 2	49	Todo	https://github.com/khenson99/arda-v2/issues/92
+93	[MVP-21/T3] Build action adapters for email, URL handoff, PO creation, and shopping lists	Backend	4-Scale	P0	Wave 3	50	Todo	https://github.com/khenson99/arda-v2/issues/93
+94	[MVP-22/T3] Upgrade scan UX for camera/manual/deep-link with offline-first recovery	Product	4-Scale	P1	Wave 3	51	Todo	https://github.com/khenson99/arda-v2/issues/94
+95	[MVP-23/T2] Implement queue command-center UI with bulk and quick actions	Product	4-Scale	P1	Wave 3	52	Todo	https://github.com/khenson99/arda-v2/issues/95
+96	[MVP-23/T3] Optimize queue/board performance across API payloads, rendering, and queries	Data	4-Scale	P1	Wave 3	53	Todo	https://github.com/khenson99/arda-v2/issues/96
+97	[MVP-21/T4] Ship automation cockpit for approvals, replay, and manual override	Product	4-Scale	P1	Wave 4	54	Todo	https://github.com/khenson99/arda-v2/issues/97
+98	[MVP-22/T4] Add scan reliability dashboards, alerts, and CI regression gates	Data	4-Scale	P1	Wave 4	55	Todo	https://github.com/khenson99/arda-v2/issues/98
+99	[MVP-23/T4] Enforce UX/performance budgets with CI synthetic workflow gates	Infra	4-Scale	P1	Wave 4	56	Todo	https://github.com/khenson99/arda-v2/issues/99
+100	[MVP-20/T4] Execute DR rehearsal, rollback drill, and launch readiness sign-off	Infra	4-Scale	P0	Wave 4	57	Todo	https://github.com/khenson99/arda-v2/issues/100

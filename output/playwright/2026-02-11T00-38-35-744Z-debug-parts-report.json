@@ -1,0 +1,120 @@
+{
+  "stamp": "2026-02-11T00-38-35-744Z",
+  "baseUrl": "http://localhost:5173",
+  "email": "kanban-debug-1770770315745@example.com",
+  "status": "ok",
+  "apiResponses": [
+    {
+      "url": "http://127.0.0.1:3000/api/auth/register",
+      "status": 201,
+      "ok": true,
+      "method": "POST"
+    },
+    {
+      "url": "http://127.0.0.1:3000/api/notifications/unread-count",
+      "status": 200,
+      "ok": true,
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:3000/api/items/item/query",
+      "status": 200,
+      "ok": true,
+      "method": "POST"
+    },
+    {
+      "url": "http://127.0.0.1:3000/api/orders/queue",
+      "status": 200,
+      "ok": true,
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:3000/api/orders/queue/summary",
+      "status": 200,
+      "ok": true,
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:3000/api/notifications?limit=20",
+      "status": 200,
+      "ok": true,
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:3000/api/orders/order/query",
+      "status": 404,
+      "ok": false,
+      "method": "POST"
+    },
+    {
+      "url": "http://127.0.0.1:3000/api/auth/me",
+      "status": 200,
+      "ok": true,
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:3000/api/auth/me",
+      "status": 200,
+      "ok": true,
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:3000/api/items/item/query",
+      "status": 200,
+      "ok": true,
+      "method": "POST"
+    },
+    {
+      "url": "http://127.0.0.1:3000/api/notifications?limit=20",
+      "status": 200,
+      "ok": true,
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:3000/api/orders/queue/summary",
+      "status": 200,
+      "ok": true,
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:3000/api/notifications/unread-count",
+      "status": 200,
+      "ok": true,
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:3000/api/orders/queue",
+      "status": 200,
+      "ok": true,
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:3000/api/orders/order/query",
+      "status": 404,
+      "ok": false,
+      "method": "POST"
+    }
+  ],
+  "requestFailures": [],
+  "pageErrors": [],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)"
+  ],
+  "dom": {
+    "title": "Arda",
+    "url": "http://localhost:5173/parts",
+    "errorBannerText": null,
+    "hasAddItemButton": false,
+    "hasFloatingPlus": false,
+    "createCardButtons": 0,
+    "skeletonCount": 55,
+    "bodyText": "Arda\nA\n\nArda Test 6833\n\nDashboard\nCards\nLoops\nItems\nOrder Queue\nOrder History\nReceiving\n\nPlaywright Tester\n\ntenant admin\n\nSearch...\n⌘K\nScan\nSupport\nShop Floor Mode\nNotifications\nSign Out"
+  },
+  "artifacts": {
+    "initial": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-38-35-744Z-debug-initial.png",
+    "parts": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-38-35-744Z-debug-parts.png",
+    "report": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-38-35-744Z-debug-parts-report.json"
+  },
+  "error": null
+}

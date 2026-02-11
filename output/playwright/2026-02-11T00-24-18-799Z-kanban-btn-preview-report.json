@@ -1,0 +1,28 @@
+{
+  "timestamp": "2026-02-11T00:24:18.800Z",
+  "baseUrl": "http://127.0.0.1:4173/parts",
+  "itemCode": "PW-KANBAN-458800",
+  "status": "passed",
+  "steps": [
+    "Open parts page with mocked authenticated session",
+    "Click quick action Create card button",
+    "Verify success toast and pagination behavior"
+  ],
+  "artifacts": {
+    "initial": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-24-18-799Z-kanban-btn-preview-initial.png",
+    "afterClick": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-24-18-799Z-kanban-btn-preview-after-click.png",
+    "failure": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-24-18-799Z-kanban-btn-preview-failure.png",
+    "reportJson": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-24-18-799Z-kanban-btn-preview-report.json",
+    "reportMd": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-24-18-799Z-kanban-btn-preview-report.md"
+  },
+  "state": {
+    "loopPagesRequested": [
+      1,
+      2
+    ],
+    "loopPatchCalls": 1,
+    "updateItemRecordCalls": 0
+  },
+  "toastText": "Created card #2 in Procurement loop.",
+  "error": null
+}

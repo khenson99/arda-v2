@@ -1,0 +1,139 @@
+{
+  "startedAt": "2026-02-11T00:14:50.991Z",
+  "baseUrl": "https://arda-v2-peach.vercel.app",
+  "marker": "SMOKE-WYSIWYG-2026-02-11T00:14:50.991Z-vblfe5",
+  "pass": false,
+  "steps": [
+    {
+      "step": "Open bypass URL and establish cookie",
+      "status": "started"
+    },
+    {
+      "step": "Open bypass URL and establish cookie",
+      "status": "passed"
+    },
+    {
+      "step": "Login",
+      "status": "started"
+    },
+    {
+      "step": "Login",
+      "status": "passed"
+    },
+    {
+      "step": "Navigate to /parts and assert Items page",
+      "status": "started"
+    },
+    {
+      "step": "Navigate to /parts and assert Items page",
+      "status": "passed"
+    },
+    {
+      "step": "Open first item row detail panel",
+      "status": "started"
+    },
+    {
+      "step": "Open first item row detail panel",
+      "status": "passed"
+    },
+    {
+      "step": "Open Card Editor and verify Item Notes",
+      "status": "started"
+    },
+    {
+      "step": "Open Card Editor and verify Item Notes",
+      "status": "passed"
+    },
+    {
+      "step": "Verify WYSIWYG editor render (with one retry path)",
+      "status": "started"
+    },
+    {
+      "step": "Verify WYSIWYG editor render (with one retry path)",
+      "status": "passed"
+    },
+    {
+      "step": "Capture original notes state",
+      "status": "started"
+    },
+    {
+      "step": "Capture original notes state",
+      "status": "passed"
+    },
+    {
+      "step": "Insert marker and Save notes",
+      "status": "started"
+    }
+  ],
+  "artifacts": {
+    "editorPanel": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-14-50-991Z-editor-panel.png",
+    "failure": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-14-50-991Z-failure.png"
+  },
+  "console": {
+    "warnings": [],
+    "errors": [
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 404 ()",
+        "location": {
+          "url": "https://api-gateway-production-83fa.up.railway.app/api/orders/order/query",
+          "lineNumber": 0,
+          "columnNumber": 0
+        }
+      },
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 404 ()",
+        "location": {
+          "url": "https://api-gateway-production-83fa.up.railway.app/api/orders/order/query",
+          "lineNumber": 0,
+          "columnNumber": 0
+        }
+      },
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 500 ()",
+        "location": {
+          "url": "https://api-gateway-production-83fa.up.railway.app/api/items/item/8449820e-b474-4735-a6c9-583b5f91120a",
+          "lineNumber": 0,
+          "columnNumber": 0
+        }
+      },
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 404 ()",
+        "location": {
+          "url": "https://api-gateway-production-83fa.up.railway.app/api/orders/order/query",
+          "lineNumber": 0,
+          "columnNumber": 0
+        }
+      }
+    ],
+    "pageErrors": []
+  },
+  "data": {
+    "original": {
+      "html": "<p data-placeholder=\"Add notes about this item...\" class=\"is-empty is-editor-empty\"><br class=\"ProseMirror-trailingBreak\"></p>",
+      "text": ""
+    },
+    "afterSave": {
+      "html": null,
+      "text": null
+    },
+    "afterRollback": {
+      "html": null,
+      "text": null
+    }
+  },
+  "rollback": {
+    "attempted": false,
+    "success": false,
+    "exactHtmlMatch": false,
+    "textMatch": false
+  },
+  "error": {
+    "message": "locator.waitFor: Timeout 20000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByText('Notes saved.').first() to be visible\u001b[22m\n",
+    "stack": "locator.waitFor: Timeout 20000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByText('Notes saved.').first() to be visible\u001b[22m\n\n    at /private/tmp/wysiwyg_prod_smoke.js:168:50"
+  },
+  "finishedAt": "2026-02-11T00:15:14.519Z"
+}

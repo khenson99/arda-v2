@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta name="robots" content="noindex, noarchive, nofollow" />
+
+
+    <link rel="dns-prefetch" href="https://cdn.loom.com">
+<link rel="preconnect" href='https://cdn.loom.com' />
+<link rel="preconnect" href='https://cdn.loom.com' crossorigin="anonymous"/>
+<link rel="dns-prefetch" href="https://luna.loom.com">
+<link rel="preconnect" href="https://domain.com" />
+<link rel="preconnect" href="https://luna.loom.com" crossorigin="anonymous"/>
+<link rel="dns-prefetch" href="https://cdn.segment.com">
+<link rel="preconnect" href="https://cdn.segment.com" />
+<link rel="dns-prefetch" href='https://evs.sgmt.loom.com' />
+<link rel="dns-prefetch" href="https://accounts.google.com" />
+<link rel="dns-prefetch" href="https://www.google-analytics.com" />
+<link rel="dns-prefetch" href="https://www.googletagmanager.com" />
+<link rel="dns-prefetch" href='https://api.sgmt.loom.com'  />
+    <link rel="preload" href="https://cdn.loom.com/sessions/thumbnails/73e95326c1c64dee887b81a227a8ec3d-8afd9887841e064a.jpg" as="image" fetchpriority="high" />
+    <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, viewport-fit=cover">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Feedback on Front End Improvements and User Experience 🚀 | Loom</title>
+
+<link rel="alternate" type="application/json+oembed" href="https://www.loom.com/v1/oembed?url=https%3A%2F%2Fwww.loom.com%2Fshare%2F73e95326c1c64dee887b81a227a8ec3d&format=json">
+<link rel="alternate" type="text/xml+oembed" href="https://www.loom.com/v1/oembed?url=https%3A%2F%2Fwww.loom.com%2Fshare%2F73e95326c1c64dee887b81a227a8ec3d&format=xml">
+
+
+<meta name="slack-app-id" content="A9G1TH4S2">
+
+<!-- SEO -->
+<meta name="application-name" content="Loom" />
+  <meta name="description" content="Hey team, I wanted to share some feedback on the front end, focusing on issues like the wrapping of quick actions, unclear column shifts, and the visibility of certain fields that take up too much space. I also noticed that inline editing isn&#39;t obvious, and the interaction with the sidebar is confusing, especially when trying to edit dropdowns. Additionally, I think we need to improve the clarity of certain terms and the feedback provided when clicking buttons. Lastly, the inability to easily manage large numbers of items is a significant pain point, so I hope we can address these issues moving forward." />
+
+  <!-- open graph and twitter tags -->
+    <meta property="og:site_name" content="Loom">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://www.loom.com">
+  <meta property="og:title" content="Feedback on Front End Improvements and User Experience 🚀">
+      <meta property="og:description" content="Hey team, I wanted to share some feedback on the front end, focusing on issues like the wrapping of quick actions, unclear column shifts, and the visibility of certain fields that take up too much space. I also noticed that inline editing isn&#39;t obvious, and the interaction with the sidebar is confusing, especially when trying to edit dropdowns. Additionally, I think we need to improve the clarity of certain terms and the feedback provided when clicking buttons. Lastly, the inability to easily manage large numbers of items is a significant pain point, so I hope we can address these issues moving forward." />
+    <meta property="og:image" content="https://cdn.loom.com/assets/img/og/loom-banner.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="600">
+  <meta name="twitter:card" content="summary_large_image" />
+
+
+
+
+<!-- Web App Icons -->
+<meta name="application-name" content="Loom">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#ffffff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Loom">
+<meta name="msapplication-TileColor" content="#b91d47">
+<meta name="msapplication-TileImage" content="https://cdn.loom.com/assets/favicons-loom/mstile-150x150.png">
+
+<link rel="icon" href="https://cdn.loom.com/assets/favicons-loom/favicon.ico" sizes="any">
+<link rel="icon" href="https://cdn.loom.com/assets/favicons-loom/favicon.svg" type="image/svg+xml">
+<link rel="icon" type="image/png" sizes="32x32" href="https://cdn.loom.com/assets/favicons-loom/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="https://cdn.loom.com/assets/favicons-loom/android-chrome-192x192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="https://cdn.loom.com/assets/favicons-loom/apple-touch-icon-180x180.png">
+<link rel="mask-icon" color="#625df5" href="https://cdn.loom.com/assets/favicons-loom/safari-pinned-tab.svg">
+
+
+  <link rel="stylesheet" href="https://cdn.loom.com/assets/css/4414-9944d64161267c1d.css" />
+
+  <link rel="stylesheet" href="https://cdn.loom.com/assets/css/3266-0e7f16b31804a30f.css" />
+
+  <link rel="stylesheet" href="https://cdn.loom.com/assets/css/2661-1a9020f0d1af95d2.css" />
+
+  <link rel="stylesheet" href="https://cdn.loom.com/assets/css/1592-76d0bc1fcc3bc34c.css" />
+
+  <link rel="stylesheet" href="https://cdn.loom.com/assets/css/4837-8443f7a10200bf54.css" />
+
+  <link rel="stylesheet" href="https://cdn.loom.com/assets/css/9253-4e596b8599fa7947.css" />
+
+  <link rel="stylesheet" href="https://cdn.loom.com/assets/css/875-719e19cdc4358a46.css" />
+
+  <link rel="stylesheet" href="https://cdn.loom.com/assets/css/8871-a94932f322ab9f71.css" />
+
+  <link rel="stylesheet" href="https://cdn.loom.com/assets/css/3092-26f326a31fc6ffd3.css" />
+
+  <link rel="stylesheet" href="https://cdn.loom.com/assets/css/9909-cdf534146975b181.css" />
+
+  <link rel="stylesheet" href="https://cdn.loom.com/assets/css/share-video-b531d34714bc361e.css" />
+
+
+<script nonce="OWRcBEYumNq5A3J2fACCwl+T2ragry69blIoZ9s+laBXbYt9">
+  window._LOOM_ = "%7O%22NGYNFFVNA_SRNGHER_TNGRF_NCV_XRL%22%3N%229ro5168p-32r7-4nsp-n17q-pp4oppnr60np%22%2P%22OVYYVAT_ERPNCGPUN_FVGR_XRL%22%3N%226Yq-a7bHNNNNNWKXybyTXC7sCMus-WzaKnlg9CA5%22%2P%22PUEBZR_RKGRAFVBA_VQ%22%3N%22yvrpoqqzxvvvuarqbozyzvyyubqwxqzo%22%2P%22PYVRAG_YBT_YRIRYF%22%3N%22sngny%2Preebe%2Pjnea%2Pvasb%22%2P%22PYBHQSEBAG_HEV%22%3N%22pqa.ybbz.pbz%22%2P%22NIFREIRE_PYBHQSEBAG_HEV%22%3N%22yhan.ybbz.pbz%22%2P%22RYRIVB_NPPBHAG_VQ%22%3N%225p7qp041087r9%22%2P%22TBBTYR_NCV_PYVRAG_VQ%22%3N%22443240113960-6zw529e3e24tcc4p9h57a9aqet01v911.nccf.tbbtyrhfrepbagrag.pbz%22%2P%22YBBZ_QRFXGBC_CEBGBPBY%22%3N%22ybbzQrfxgbc%3N%2S%2S%22%2P%22ZHK_RAI_XRL%22%3N%229ntt7cyq771c850zs45zfatc3%22%2P%22CHFU_FREIRE_CHOYVP_XRL%22%3N%22OSMAlOrBig4yrVK8OhRu7u2-7lFWCL2bSfWdV5HyfTxa57ZKc924pqoufgdF69Uz-IYo1wXEEm4LnRu7qTeFKFZ%22%2P%22FGEVCR_CHOYVP_XRL%22%3N%22cx_yvir_ZT87GpsZRyPHEEBsexfSFZ8k%22%2P%22QNGNQBT_EHZ_NCCYVPNGVBA_VQ%22%3N%227ns92855-r997-4q9o-nn41-839r1p64r6s3%22%2P%22QNGNQBT_EHZ_PYVRAG_GBXRA%22%3N%22choo1955571qp736r541o72313p6942242s%22%2P%22QNGNQBT_EHZ_RANOYR%22%3N%22gehr%22%2P%22QNGNQBT_EHZ_FREIVPR%22%3N%22ybbz-cebq%22%2P%22QNGNQBT_EHZ_FRFFVBA_FNZCYR_ENGR%22%3N%2215%22%2P%22QNGNQBT_EHZ_FRFFVBA_ERCYNL_FNZCYR_ENGR%22%3N%2215%22%2P%22QNGNQBT_YBT_PYVRAG_GBXRA%22%3N%22cho6n5r653719oonqp7o8q28o628o09oq41%22%2P%22QNGNQBT_YBT_RANOYR%22%3N%22gehr%22%2P%22QNGNQBT_YBT_FNZCYR_ENGR%22%3N%2210%22%2P%22QNGNQBT_YBT_FREIVPR%22%3N%22jroncc%22%2P%22YBBZ_FQX_NCV_XRL%22%3N%22677no500-qo70-4087-91ns-6rsqo06sss68%22%2P%22CNPXNTRF_PYBHQSEBAG_HEV%22%3N%22cnpxntrf.ybbz.pbz%22%2P%22FRAGEL_ERCYNLF_BA_REEBE_FNZCYR_ENGR%22%3N%220.001%22%2P%22SO_NCC_VQ%22%3N%221591221991190878%22%2P%22NQZVA_UHO_HEV%22%3N%22nqzva.ngynffvna.pbz%22%2P%22NABA_PBBXVR_QBZNVA%22%3N%22ybbz.pbz%22%2P%22NGYNFFVNA_TBIREANGBE_HEV%22%3N%22uggcf%3N%2S%2Stbireangbe-hv.cebq-rnfg.sebagraq.choyvp.ngy-cnnf.arg%22%2P%22NGYNFFVNA_BVQP_VAVGVNGVBA_EBHGR%22%3N%22uggcf%3N%2S%2Svq.ngynffvna.pbz%22%2P%22NGYNFFVNA_CEBSVYR_ZNANTRZRAG_HEV%22%3N%22uggcf%3N%2S%2Svq.ngynffvna.pbz%2Sznantr-cebsvyr%2Scebsvyr-naq-ivfvovyvgl%22%2P%22NGYNFFVNA_FABBCE_HEV%22%3N%22uggcf%3N%2S%2Sfabbce.cebq.ngy-cnnf.arg%2Spf%22%2P%22YBBZ_ONER_HEV%22%3N%22ybbz.pbz%22%2P%22YBBZ_ERPBEQ_JF_HEV%22%3N%22erpbeq.ybbz.pbz%22%2P%22YBBZ_FFE_HFRE_FUNQBJ_GRFG_RANOYR%22%3N%22gehr%22%2P%22YBBZ_FFE_HFRE_FUNQBJ_GRFG_VTABER_CNGUF%22%3N%22%5O%5Q%22%2P%22YBBZ_HEV%22%3N%22jjj.ybbz.pbz%22%2P%22YBBZ_IREFVBA%22%3N%222s84835%22%2P%22YBBZ_IREFVBA_AHZREVP%22%3N69778%2P%22ABQR_RAI%22%3N%22cebqhpgvba%22%7Q";
+
+
+
+  window.__APOLLO_STATE__ = {"ROOT_QUERY":{"__typename":"Query","getCurrentUser":{"__typename":"UserNotLoggedIn"},"getVideo({\"id\":\"73e95326c1c64dee887b81a227a8ec3d\",\"password\":null})":{"__ref":"RegularUserVideo:73e95326c1c64dee887b81a227a8ec3d"},"fetchVideoTranscript({\"captionsLanguageSelection\":null,\"password\":null,\"videoId\":\"73e95326c1c64dee887b81a227a8ec3d\"})":{"__ref":"VideoTranscriptDetails:566669397"}},"Avatar:{\"thumb\":\"avatars/28142048_07da844824d04ce4bf9dbdfff210650c_192.jpg\"}":{"__typename":"Avatar","name":"07da844824d04ce4bf9dbdfff210650c","large":"avatars/28142048_07da844824d04ce4bf9dbdfff210650c_1024.jpg","thumb":"avatars/28142048_07da844824d04ce4bf9dbdfff210650c_192.jpg","iosLarge":"avatars/28142048_07da844824d04ce4bf9dbdfff210650c_1024.jpg","iosThumb":"avatars/28142048_07da844824d04ce4bf9dbdfff210650c_192.jpg","isAtlassianMastered":null},"RegularUser:28142048":{"__typename":"RegularUser","id":"28142048","first_name":"Kyle","display_name":"Kyle Henson","avatars":[{"__ref":"Avatar:{\"thumb\":\"avatars/28142048_07da844824d04ce4bf9dbdfff210650c_192.jpg\"}"}],"status":"verified","profile":null},"RegularUserVideo:73e95326c1c64dee887b81a227a8ec3d":{"__typename":"RegularUserVideo","id":"73e95326c1c64dee887b81a227a8ec3d","defaultThumbnails":{"__typename":"VideoDefaultThumbnailsSources","default":"https://cdn.loom.com/sessions/thumbnails/73e95326c1c64dee887b81a227a8ec3d-8afd9887841e064a.gif","static":"https://cdn.loom.com/sessions/thumbnails/73e95326c1c64dee887b81a227a8ec3d-8afd9887841e064a.jpg"},"signedThumbnails":{"__typename":"VideoThumbnailsSources","animatedPreview":"https://cdn.loom.com/sessions/thumbnails/73e95326c1c64dee887b81a227a8ec3d-8afd9887841e064a.mp4","default":"https://cdn.loom.com/sessions/thumbnails/73e95326c1c64dee887b81a227a8ec3d-8afd9887841e064a.jpg","default4X3":"https://cdn.loom.com/sessions/thumbnails/73e95326c1c64dee887b81a227a8ec3d-8afd9887841e064a-4x3.jpg","defaultPlay":"https://cdn.loom.com/sessions/thumbnails/73e95326c1c64dee887b81a227a8ec3d-8afd9887841e064a-full-play.jpg","ogFull":null,"full":null,"fullPlay":null,"defaultGif":"https://cdn.loom.com/sessions/thumbnails/73e95326c1c64dee887b81a227a8ec3d-8afd9887841e064a.gif","defaultGifPlay":"https://cdn.loom.com/sessions/thumbnails/73e95326c1c64dee887b81a227a8ec3d-8afd9887841e064a-full-play.gif"},"nullableRawCdnUrl({\"acceptableMimes\":[\"DASH\"],\"password\":null})":null,"nullableRawCdnUrl({\"acceptableMimes\":[\"M3U8\"],\"password\":null})":{"__typename":"CloudfrontSignedUrlPayload","url":"https://luna.loom.com/id/73e95326c1c64dee887b81a227a8ec3d/rev/80b87a9b976da42ec882cdec3f34f83533a6d5ae88110f52e8df7800c7bc76a15/resource/hls/playlist-multibitrate.m3u8?Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9sdW5hLmxvb20uY29tL2lkLzczZTk1MzI2YzFjNjRkZWU4ODdiODFhMjI3YThlYzNkL3Jldi84MGI4N2E5Yjk3NmRhNDJlYzg4MmNkZWMzZjM0ZjgzNTMzYTZkNWFlODgxMTBmNTJlOGRmNzgwMGM3YmM3NmExNS9yZXNvdXJjZS8qIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJBV1M6RXBvY2hUaW1lIjoxNzcwNzg1NzIxfX19XX0_&Signature=V9TyLy8VFKZdRWoVunnPHjkDmhM6yuzqXBBv5SfeLI0MbHsSkGBP8TBHsYRkZLh-gc2yNPBZuO0lcm5Dz9dMrFesLDzUfSo07lyOHmsw2t4%7ENwwruDPSB-ixPDcelsTWpUMTDlktHBB3Rzyy8bZilUbycZ6IfZTMkYR8X1FIyBx382d6dIVgZ7j8j8QwOM11c36j5vWpWxijxSuGFwEEQRjHGDx4AhU-2pz4gxTWLJHaZUKYmorQJWcyqUklKXbll3dBezlvTRiCAmz7TINvHab3U5m11EZqpvaDIJSK8g4jpl5CfFT4gUlq04lN7OBgT3dfIAqL2s1upNE9EvAmUg__&Key-Pair-Id=APKAJQIC5BGSW7XXK7FQ","credentials":{"__typename":"CloudfrontSignedCredentialsPayload","Policy":"eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9sdW5hLmxvb20uY29tL2lkLzczZTk1MzI2YzFjNjRkZWU4ODdiODFhMjI3YThlYzNkL3Jldi84MGI4N2E5Yjk3NmRhNDJlYzg4MmNkZWMzZjM0ZjgzNTMzYTZkNWFlODgxMTBmNTJlOGRmNzgwMGM3YmM3NmExNS9yZXNvdXJjZS8qIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJBV1M6RXBvY2hUaW1lIjoxNzcwNzg1NzIxfX19XX0_","Signature":"V9TyLy8VFKZdRWoVunnPHjkDmhM6yuzqXBBv5SfeLI0MbHsSkGBP8TBHsYRkZLh-gc2yNPBZuO0lcm5Dz9dMrFesLDzUfSo07lyOHmsw2t4~NwwruDPSB-ixPDcelsTWpUMTDlktHBB3Rzyy8bZilUbycZ6IfZTMkYR8X1FIyBx382d6dIVgZ7j8j8QwOM11c36j5vWpWxijxSuGFwEEQRjHGDx4AhU-2pz4gxTWLJHaZUKYmorQJWcyqUklKXbll3dBezlvTRiCAmz7TINvHab3U5m11EZqpvaDIJSK8g4jpl5CfFT4gUlq04lN7OBgT3dfIAqL2s1upNE9EvAmUg__","KeyPairId":"APKAJQIC5BGSW7XXK7FQ"}},"active_video_transcript_id":"566669397","archived":false,"chapters":"00:00 Frontend Feedback Overview\n02:11 Inline Editing Confusion\n05:18 GL Code Visibility Problem","comments_enabled":true,"comments_email_enabled":true,"complete":true,"createdAt":"2026-02-06T06:16:59.636Z","cta":{"__typename":"CTA","enabled":false,"url":null,"text":null,"mods":null,"is_auto":null,"approved_at":null},"currentUserCanEdit":false,"currentUserHasWatched":null,"current_user_is_owner":false,"description":"Hey team, I wanted to share some feedback on the front end, focusing on issues like the wrapping of quick actions, unclear column shifts, and the visibility of certain fields that take up too much space. I also noticed that inline editing isn't obvious, and the interaction with the sidebar is confusing, especially when trying to edit dropdowns. Additionally, I think we need to improve the clarity of certain terms and the feedback provided when clicking buttons. Lastly, the inability to easily manage large numbers of items is a significant pain point, so I hope we can address these issues moving forward.","download_enabled":true,"downloadable":true,"downloadableBy":"anyone","email_gate_video_type":"NONE","stylizedCaptions":false,"viewerCaptionsOn":false,"folder_id":"044fdb4909504c26b997ce9fead90f61","folder":null,"hasBackground":false,"hasOverlay":false,"isCommunityLoom":false,"isOnWatchLaterList":false,"isParentOfPersonalizedCopies":false,"personalizationType":null,"isMeetingRecording":false,"calendarMeetingGuid":null,"is_protected":false,"isTeamShared":false,"loom_branded_player":true,"name":"Feedback on Front End Improvements and User Experience 🚀","needs_password":false,"organization_idv2":"28601957","organization":null,"owner_id":28142048,"owner":{"__ref":"RegularUser:28142048"},"privacy":"public","processing_information":{"__typename":"ProcessingInformation","instant_editing_enabled":true,"noise_cancellation_type":false,"replacements":null,"trim_id":1770359126033,"trim_ranges":[{"__typename":"VideoTrimRange","from":48021,"to":49055},{"__typename":"VideoTrimRange","from":50100,"to":54449},{"__typename":"VideoTrimRange","from":54918,"to":55366},{"__typename":"VideoTrimRange","from":61335,"to":62497},{"__typename":"VideoTrimRange","from":63318,"to":63616},{"__typename":"VideoTrimRange","from":63925,"to":64011},{"__typename":"VideoTrimRange","from":65087,"to":65407},{"__typename":"VideoTrimRange","from":65887,"to":66473},{"__typename":"VideoTrimRange","from":69394,"to":70236},{"__typename":"VideoTrimRange","from":74308,"to":75299},{"__typename":"VideoTrimRange","from":90254,"to":91171},{"__typename":"VideoTrimRange","from":95872,"to":95904},{"__typename":"VideoTrimRange","from":96917,"to":98111},{"__typename":"VideoTrimRange","from":101010,"to":102247},{"__typename":"VideoTrimRange","from":104357,"to":105711},{"__typename":"VideoTrimRange","from":107939,"to":109314},{"__typename":"VideoTrimRange","from":112021,"to":112927},{"__typename":"VideoTrimRange","from":114121,"to":115006},{"__typename":"VideoTrimRange","from":116370,"to":117159},{"__typename":"VideoTrimRange","from":124303,"to":125653},{"__typename":"VideoTrimRange","from":138478,"to":140280},{"__typename":"VideoTrimRange","from":143019,"to":144011},{"__typename":"VideoTrimRange","from":145279,"to":146441},{"__typename":"VideoTrimRange","from":147752,"to":148189},{"__typename":"VideoTrimRange","from":149569,"to":153861},{"__typename":"VideoTrimRange","from":154425,"to":154425},{"__typename":"VideoTrimRange","from":156003,"to":156589},{"__typename":"VideoTrimRange","from":160021,"to":162878},{"__typename":"VideoTrimRange","from":163518,"to":164168},{"__typename":"VideoTrimRange","from":164658,"to":167483},{"__typename":"VideoTrimRange","from":168048,"to":168890},{"__typename":"VideoTrimRange","from":171203,"to":171949},{"__typename":"VideoTrimRange","from":173069,"to":173559},{"__typename":"VideoTrimRange","from":175073,"to":175350},{"__typename":"VideoTrimRange","from":178100,"to":179198},{"__typename":"VideoTrimRange","from":180424,"to":180903},{"__typename":"VideoTrimRange","from":181362,"to":183899},{"__typename":"VideoTrimRange","from":184538,"to":188493},{"__typename":"VideoTrimRange","from":189506,"to":189761},{"__typename":"VideoTrimRange","from":192011,"to":192362},{"__typename":"VideoTrimRange","from":193716,"to":193961},{"__typename":"VideoTrimRange","from":195177,"to":195464},{"__typename":"VideoTrimRange","from":197532,"to":198364},{"__typename":"VideoTrimRange","from":198790,"to":199398},{"__typename":"VideoTrimRange","from":201562,"to":201849},{"__typename":"VideoTrimRange","from":202244,"to":202724},{"__typename":"VideoTrimRange","from":204067,"to":204930},{"__typename":"VideoTrimRange","from":205538,"to":206433},{"__typename":"VideoTrimRange","from":209290,"to":210025},{"__typename":"VideoTrimRange","from":210899,"to":211134},{"__typename":"VideoTrimRange","from":215760,"to":216890},{"__typename":"VideoTrimRange","from":217551,"to":217988},{"__typename":"VideoTrimRange","from":220152,"to":220578},{"__typename":"VideoTrimRange","from":221143,"to":221399},{"__typename":"VideoTrimRange","from":224565,"to":225130},{"__typename":"VideoTrimRange","from":230257,"to":231078},{"__typename":"VideoTrimRange","from":232229,"to":232624},{"__typename":"VideoTrimRange","from":233700,"to":236045},{"__typename":"VideoTrimRange","from":260278,"to":261102},{"__typename":"VideoTrimRange","from":268140,"to":271511},{"__typename":"VideoTrimRange","from":279699,"to":281175},{"__typename":"VideoTrimRange","from":289929,"to":290580},{"__typename":"VideoTrimRange","from":293083,"to":294931},{"__typename":"VideoTrimRange","from":332301,"to":336011},{"__typename":"VideoTrimRange","from":357596,"to":358566},{"__typename":"VideoTrimRange","from":359996,"to":363511},{"__typename":"VideoTrimRange","from":364962,"to":365708},{"__typename":"VideoTrimRange","from":379842,"to":383511},{"__typename":"VideoTrimRange","from":392741,"to":393018},{"__typename":"VideoTrimRange","from":395885,"to":397964},{"__typename":"VideoTrimRange","from":398582,"to":399734},{"__typename":"VideoTrimRange","from":401098,"to":402079},{"__typename":"VideoTrimRange","from":406406,"to":406556},{"__typename":"VideoTrimRange","from":408112,"to":409199},{"__typename":"VideoTrimRange","from":409508,"to":409871},{"__typename":"VideoTrimRange","from":411470,"to":413420},{"__typename":"VideoTrimRange","from":415115,"to":415584},{"__typename":"VideoTrimRange","from":418526,"to":418782},{"__typename":"VideoTrimRange","from":420264,"to":421138},{"__typename":"VideoTrimRange","from":423430,"to":423941},{"__typename":"VideoTrimRange","from":424954,"to":425423},{"__typename":"VideoTrimRange","from":434494,"to":435017},{"__typename":"VideoTrimRange","from":436274,"to":436914},{"__typename":"VideoTrimRange","from":439707,"to":440421},{"__typename":"VideoTrimRange","from":446156,"to":448011},{"__typename":"VideoTrimRange","from":449897,"to":450345},{"__typename":"VideoTrimRange","from":452999,"to":454268},{"__typename":"VideoTrimRange","from":455099,"to":455877},{"__typename":"VideoTrimRange","from":459715,"to":460546},{"__typename":"VideoTrimRange","from":470907,"to":471931},{"__typename":"VideoTrimRange","from":473967,"to":474713},{"__typename":"VideoTrimRange","from":477698,"to":478092},{"__typename":"VideoTrimRange","from":479510,"to":480011},{"__typename":"VideoTrimRange","from":483859,"to":485255},{"__typename":"VideoTrimRange","from":486300,"to":487035},{"__typename":"VideoTrimRange","from":488623,"to":489039},{"__typename":"VideoTrimRange","from":493484,"to":493836}],"videoUploadMessage":null,"videoUploadValid":null,"trim_progress":100,"split_segment_ttl":null},"record_reply_enabled":true,"s3_id":"73e95326c1c64dee887b81a227a8ec3d","salesforce_engagement_tracking":false,"show_analytics_to_viewer":true,"show_transcript_to_viewer":true,"spaces":null,"suggested_playback_rate":"none","use_emojis":true,"use_gif":true,"video_properties":{"__typename":"VideoProperties","avgBitRate":null,"client":null,"camera_enabled":null,"client_version":null,"countdown":null,"duration":495,"durationMs":495169,"externalUpload":null,"format":"hls","height":1080,"ingestion_type":null,"liveRewindTrimmedSections":null,"mediaMetadataRotation":null,"microphone_enabled":true,"os":null,"os_version":null,"recordingClient":"extension","recording_type":"screen_cam","recording_version":"v6","screen_type":"desktop","sdkPartnerIdv2":null,"tab_audio":null,"trim_duration":392.595,"width":1920},"playable_duration":392.595,"signedDefaultThumbnails":{"__typename":"VideoDefaultThumbnailsSources","default":"https://cdn.loom.com/sessions/thumbnails/73e95326c1c64dee887b81a227a8ec3d-8afd9887841e064a.gif","static":"https://cdn.loom.com/sessions/thumbnails/73e95326c1c64dee887b81a227a8ec3d-8afd9887841e064a.jpg"},"source_duration":495.169,"thumbnails":{"__typename":"VideoThumbnailsSources","default":"https://cdn.loom.com/sessions/thumbnails/73e95326c1c64dee887b81a227a8ec3d-8afd9887841e064a.jpg","default4X3":"https://cdn.loom.com/sessions/thumbnails/73e95326c1c64dee887b81a227a8ec3d-8afd9887841e064a-4x3.jpg","defaultPlay":"https://cdn.loom.com/sessions/thumbnails/73e95326c1c64dee887b81a227a8ec3d-8afd9887841e064a-full-play.jpg","ogFull":null,"full":null,"fullPlay":null,"defaultGif":"https://cdn.loom.com/sessions/thumbnails/73e95326c1c64dee887b81a227a8ec3d-8afd9887841e064a.gif","defaultGifPlay":"https://cdn.loom.com/sessions/thumbnails/73e95326c1c64dee887b81a227a8ec3d-8afd9887841e064a-full-play.gif","animatedPreview":"https://cdn.loom.com/sessions/thumbnails/73e95326c1c64dee887b81a227a8ec3d-8afd9887841e064a.mp4"},"videoWorkspaceInfo":{"__typename":"VideoWorkspaceInfo","plan":"business","planIncludesAi":true,"siteId":null},"viewerNeedsPermission":false,"viewers_can_weave":true,"views":{"__typename":"RegularUserVideoViewCounts","total":1,"distinct":1,"named":null},"visibility":"owner","waveform_generation":"success","white_label_player":false,"storage":"S3"},"VideoTranscriptDetails:566669397":{"__typename":"VideoTranscriptDetails","idv2":"566669397","video_id":"73e95326c1c64dee887b81a227a8ec3d","s3_id":"73e95326c1c64dee887b81a227a8ec3d","version":3,"transcript_url":"mediametadata/transcription/73e95326c1c64dee887b81a227a8ec3d-3.json","captions_url":"mediametadata/captions/73e95326c1c64dee887b81a227a8ec3d-3.vtt","processing_service":"instant_whisper","transcription_status":"success","processing_start_time":"2026-02-06T06:16:59.683Z","processing_end_time":"2026-02-06T06:25:25.342Z","createdAt":"2026-02-06T06:16:59.681Z","updatedAt":"2026-02-06T06:25:26.375Z","source_url":"https://cdn.loom.com/mediametadata/transcription/73e95326c1c64dee887b81a227a8ec3d-3.json?Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9jZG4ubG9vbS5jb20vbWVkaWFtZXRhZGF0YS90cmFuc2NyaXB0aW9uLzczZTk1MzI2YzFjNjRkZWU4ODdiODFhMjI3YThlYzNkLTMuanNvbiIsIkNvbmRpdGlvbiI6eyJEYXRlTGVzc1RoYW4iOnsiQVdTOkVwb2NoVGltZSI6MTc3MDY5OTkyMX19fV19&Key-Pair-Id=APKAJQIC5BGSW7XXK7FQ&Signature=Q0-sJKaC-V4hxYyycHqOHgrnhPQ-E95Ce4JCyfXRhPoWriwzT4UoA0UljCpgBfPwRQ6QlAy6vTsiNEqN4RbBlfR2KNY0MPrZzseZlFnFzfZj33ZRyB%7E4s9XYbGNzBg2S5u8ul-YzaTwIFl2Ipwfx6Lurb%7EZuTdR7xaZ4HQBHQM33bzGxwc8kovAxWw24wN9MXSAoZLHSfMrBin4n7ECit4aj6RZQ90bs0lqmAiZth-1DddJxabUG%7EGiII2AJNVPHW3dljcwHqA%7ESRjYAL1-kU3ajTangJJLY-ykTrgJZUIeMd%7EOhZ-gmXAoTiWBXJSMb3awluwgicH72lVSyqaGslg__","captions_source_url":"https://cdn.loom.com/mediametadata/captions/73e95326c1c64dee887b81a227a8ec3d-3.vtt?Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9jZG4ubG9vbS5jb20vbWVkaWFtZXRhZGF0YS9jYXB0aW9ucy83M2U5NTMyNmMxYzY0ZGVlODg3YjgxYTIyN2E4ZWMzZC0zLnZ0dCIsIkNvbmRpdGlvbiI6eyJEYXRlTGVzc1RoYW4iOnsiQVdTOkVwb2NoVGltZSI6MTc3MDY5OTkyMX19fV19&Key-Pair-Id=APKAJQIC5BGSW7XXK7FQ&Signature=tWaAloKw1psM5uBi54ARA36QhzVAt9hi1exnM-eCecC-5Ia5dEpnOHvKgXuHHz5wlyfohYIZCgIbEcuF1rK-5wpAIKNP2UPNqXfJATNv5hn-iA0n7wj%7Ed-e9AqeHedJG2SJK-dt0GroaGsG6vcrDQ%7EvbG7sbUfGhKkBlZtM80jEY%7ETL22v8xH1AP3oo8IXyPItKtuvb7T4bwSQp4bt2HIOOLcLTDBSui2oSvae-ApbWsYEXHoAkzz1593OcGBZeFodIHunGwvE7O3HEOrxRXppQlhOrtScZcUX45Swbta%7E4GLSkUNGDebEdnSox3HXswR0h0JqiPoX5yqTXkkYTeAA__","captionsTranslatedLanguage":"en","captionsInOriginalLanguage":true,"captionsTranslationInProgress":false,"captionTranslationErrorFallback":true,"filler_words":{"ranges":[],"numFillerWordsInVideoVersion":0},"silences":{"numSilencesInVideoVersion":0},"language":"en"}};
+
+</script>
+
+
+<link
+  rel="stylesheet"
+  href="https://ds-cdn.prod-east.frontend.public.atl-paas.net/assets/font-rules/v5/atlassian-fonts.css"
+  as="style"
+/>
+
+<link rel="preconnect" href="https://ds-cdn.prod-east.frontend.public.atl-paas.net" />
+<link
+  rel="preload"
+  href="https://ds-cdn.prod-east.frontend.public.atl-paas.net/assets/fonts/atlassian-sans/v3/AtlassianSans-latin.woff2"
+  as="font"
+  type="font/woff2"
+  crossorigin
+/>
+<link
+  rel="preload stylesheet"
+  href="https://ds-cdn.prod-east.frontend.public.atl-paas.net/assets/font-rules/v5/atlassian-fonts.css"
+  as="style"
+/>
+
+    
+    <!-- Google Tag Manager -->
+<script nonce="OWRcBEYumNq5A3J2fACCwl+T2ragry69blIoZ9s+laBXbYt9"
+  
+      type="text/javascript"
+  >(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;var n=d.querySelector('[nonce]');
+  n&&j.setAttribute('nonce',n.nonce||n.getAttribute('nonce'));f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer','GTM-PNDSL7P');</script>
+<!-- End Google Tag Manager -->
+
+    <script nonce="OWRcBEYumNq5A3J2fACCwl+T2ragry69blIoZ9s+laBXbYt9" src="https://accounts.google.com/gsi/client" async defer></script>    
+      <script nonce="OWRcBEYumNq5A3J2fACCwl+T2ragry69blIoZ9s+laBXbYt9" type="application/ld+json">
+ {
+    "@context": "https://schema.org",
+    "@type": "videoObject",
+    "name":  "Feedback on Front End Improvements and User Experience 🚀",
+    "description": "Hey team, I wanted to share some feedback on the front end, focusing on issues like the wrapping of quick actions, unclear column shifts, and the visibility of certain fields that take up too much space. I also noticed that inline editing isn&#39;t obvious, and the interaction with the sidebar is confusing, especially when trying to edit dropdowns. Additionally, I think we need to improve the clarity of certain terms and the feedback provided when clicking buttons. Lastly, the inability to easily manage large numbers of items is a significant pain point, so I hope we can address these issues moving forward.",
+    "uploadDate": "2026-02-06T06:16:59.636Z",
+    "duration": "PT392.595S",
+    "embedUrl": "https://www.loom.com/v1/oembed?url=https%3A%2F%2Fwww.loom.com%2Fshare%2F73e95326c1c64dee887b81a227a8ec3d",
+    "thumbnailUrl": "https://cdn.loom.com/sessions/thumbnails/73e95326c1c64dee887b81a227a8ec3d-8afd9887841e064a.jpg",
+    "interactionStatistic": {
+        "@type": "InteractionCounter",
+        "interactionType": { "@type": "WatchAction" },
+        "userInteractionCount": 1
+      }
+  }
+  </script>
+    
+    <script nonce="OWRcBEYumNq5A3J2fACCwl+T2ragry69blIoZ9s+laBXbYt9">
+      
+   </script>
+    <style>
+      .delayed-loading-error {
+        font-family: "Atlassian Sans", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Ubuntu, system-ui, "Helvetica Neue", sans-serif;
+        width: 100%;
+        padding-top: 100px;
+        font-size: 20px;
+        text-align: center;
+        animation: reveal-slow-load 8s forwards;
+      }
+
+      .delayed-loading-error h1 {
+        display: block;
+        font-size: 32px;
+        line-height: 38.4px;
+        font-weight: 700;
+      }
+
+      .delayed-loading-error p {
+        font-size: 18px;
+      }
+
+      .delayed-loading-error a {
+        text-decoration: none;
+        color: hsla(242, 88.4%, 66.3%, 1);
+        box-shadow: 0 1px 0 currentColor;
+        padding: 0 0 1px 0;
+        cursor: pointer;
+        font-size: 14px
+      }
+
+      .delayed-loading-error div {
+        padding-bottom: 16px;
+      }
+
+      @keyframes reveal-slow-load {
+        0% {
+          opacity: 0;
+        }
+
+        99.99% {
+          opacity: 0;
+        }
+
+        100% {
+          opacity: 1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main id="container">
+      <div class="delayed-loading-error" aria-hidden="true">
+        <h1 font-weight="bold">Loom is running a bit slower than usual.</h1>
+        <p>Contact support if this issue persists.</p>
+        <div><a href="/" target="_blank" rel="noopener noreferrer">Go to Homepage</a></div>
+        <div><a href="https://www.loomstatus.com" target="_blank" rel="noopener noreferrer">Check System Status</a></div>
+      </div>
+    </main>
+    <script nonce="OWRcBEYumNq5A3J2fACCwl+T2ragry69blIoZ9s+laBXbYt9"
+  
+      type="text/javascript"
+  >
+    !function(){var analytics=window.analytics=window.analytics||[];if(!analytics.initialize)if(analytics.invoked)window.console&&console.error&&console.error("Segment snippet included twice.");else{analytics.invoked=!0;analytics.methods=["trackSubmit","trackClick","trackLink","trackForm","pageview","identify","reset","group","track","ready","alias","debug","page","once","off","on","addSourceMiddleware","addIntegrationMiddleware","setAnonymousId","addDestinationMiddleware"];analytics.factory=function(e){return function(){var t=Array.prototype.slice.call(arguments);t.unshift(e);analytics.push(t);return analytics}};for(var e=0;e<analytics.methods.length;e++){var key=analytics.methods[e];analytics[key]=analytics.factory(key)}analytics.load=function(key,e){var t=document.createElement("script");t.type="text/javascript";t.async=!0;t.src="https://evs.sgmt.loom.com/yhPeelcEJD/eejxbDiFfK.min.js";var n=document.getElementsByTagName("script")[0];n.parentNode.insertBefore(t,n);analytics._loadOptions=e};analytics.SNIPPET_VERSION="4.13.1";
+  analytics.load("rggRFsCK29LOKVGyTLpt9xoXVhNNXaP6", { "integrations": {"Google Analytics":true} });
+
+  
+  }}();
+</script>
+    
+  <script nonce="OWRcBEYumNq5A3J2fACCwl+T2ragry69blIoZ9s+laBXbYt9" src="https://cdn.loom.com/assets/js/0runtime-0e780a4db8efb36d.js"></script>
+  
+  <script nonce="OWRcBEYumNq5A3J2fACCwl+T2ragry69blIoZ9s+laBXbYt9" src="https://cdn.loom.com/assets/js/react-vendor-2c7f67fa1dc1fd28.js"></script>
+  
+  <script nonce="OWRcBEYumNq5A3J2fACCwl+T2ragry69blIoZ9s+laBXbYt9" src="https://cdn.loom.com/assets/js/6535-1113d3c32eee9dca.js"></script>
+  
+  <script nonce="OWRcBEYumNq5A3J2fACCwl+T2ragry69blIoZ9s+laBXbYt9" src="https://cdn.loom.com/assets/js/4414-49302d5fb6a8aef4.js"></script>
+  
+  <script nonce="OWRcBEYumNq5A3J2fACCwl+T2ragry69blIoZ9s+laBXbYt9" src="https://cdn.loom.com/assets/js/546-3efc6ede5d032b5c.js"></script>
+  
+  <script nonce="OWRcBEYumNq5A3J2fACCwl+T2ragry69blIoZ9s+laBXbYt9" src="https://cdn.loom.com/assets/js/7292-054f848de8a0db9a.js"></script>
+  
+  <script nonce="OWRcBEYumNq5A3J2fACCwl+T2ragry69blIoZ9s+laBXbYt9" src="https://cdn.loom.com/assets/js/3847-15856811cc235f5f.js"></script>
+  
+  <script nonce="OWRcBEYumNq5A3J2fACCwl+T2ragry69blIoZ9s+laBXbYt9" src="https://cdn.loom.com/assets/js/8555-9badf744a5cb6dc9.js"></script>
+  
+  <script nonce="OWRcBEYumNq5A3J2fACCwl+T2ragry69blIoZ9s+laBXbYt9" src="https://cdn.loom.com/assets/js/2661-7ed9b9c74bdf71b1.js"></script>
+  
+  <script nonce="OWRcBEYumNq5A3J2fACCwl+T2ragry69blIoZ9s+laBXbYt9" src="https://cdn.loom.com/assets/js/1592-7d598bd46cbde75a.js"></script>
+  
+  <script nonce="OWRcBEYumNq5A3J2fACCwl+T2ragry69blIoZ9s+laBXbYt9" src="https://cdn.loom.com/assets/js/380-39c6b268c342c96b.js"></script>
+  
+  <script nonce="OWRcBEYumNq5A3J2fACCwl+T2ragry69blIoZ9s+laBXbYt9" src="https://cdn.loom.com/assets/js/4837-e65b2724dd280909.js"></script>
+  
+  <script nonce="OWRcBEYumNq5A3J2fACCwl+T2ragry69blIoZ9s+laBXbYt9" src="https://cdn.loom.com/assets/js/9253-5db57ab105b495a9.js"></script>
+  
+  <script nonce="OWRcBEYumNq5A3J2fACCwl+T2ragry69blIoZ9s+laBXbYt9" src="https://cdn.loom.com/assets/js/1762-904e6002f4e92cd0.js"></script>
+  
+  <script nonce="OWRcBEYumNq5A3J2fACCwl+T2ragry69blIoZ9s+laBXbYt9" src="https://cdn.loom.com/assets/js/875-2047c66f1f11944b.js"></script>
+  
+  <script nonce="OWRcBEYumNq5A3J2fACCwl+T2ragry69blIoZ9s+laBXbYt9" src="https://cdn.loom.com/assets/js/8871-5cea46bad198da9e.js"></script>
+  
+  <script nonce="OWRcBEYumNq5A3J2fACCwl+T2ragry69blIoZ9s+laBXbYt9" src="https://cdn.loom.com/assets/js/3092-a19d08a9e44b3c96.js"></script>
+  
+  <script nonce="OWRcBEYumNq5A3J2fACCwl+T2ragry69blIoZ9s+laBXbYt9" src="https://cdn.loom.com/assets/js/share-video-806c3320c93d0d92.js"></script>
+    </body>
+</html>

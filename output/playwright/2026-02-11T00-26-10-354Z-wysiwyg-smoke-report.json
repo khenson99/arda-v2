@@ -1,0 +1,161 @@
+{
+  "startedAt": "2026-02-11T00:26:10.355Z",
+  "baseUrl": "https://arda-v2-peach.vercel.app",
+  "marker": "SMOKE-WYSIWYG-2026-02-11T00:26:10.354Z-0pz3p5",
+  "pass": true,
+  "steps": [
+    {
+      "step": "Open bypass URL and establish cookie",
+      "status": "started"
+    },
+    {
+      "step": "Open bypass URL and establish cookie",
+      "status": "passed"
+    },
+    {
+      "step": "Login",
+      "status": "started"
+    },
+    {
+      "step": "Login",
+      "status": "passed"
+    },
+    {
+      "step": "Navigate to /parts and assert Items page",
+      "status": "started"
+    },
+    {
+      "step": "Navigate to /parts and assert Items page",
+      "status": "passed"
+    },
+    {
+      "step": "Open first item row detail panel",
+      "status": "started"
+    },
+    {
+      "step": "Open first item row detail panel",
+      "status": "passed"
+    },
+    {
+      "step": "Open Card Editor and verify Item Notes",
+      "status": "started"
+    },
+    {
+      "step": "Open Card Editor and verify Item Notes",
+      "status": "passed"
+    },
+    {
+      "step": "Verify WYSIWYG editor render (with one retry path)",
+      "status": "started"
+    },
+    {
+      "step": "Verify WYSIWYG editor render (with one retry path)",
+      "status": "passed"
+    },
+    {
+      "step": "Capture original notes state",
+      "status": "started"
+    },
+    {
+      "step": "Capture original notes state",
+      "status": "passed"
+    },
+    {
+      "step": "Insert marker and Save notes",
+      "status": "started"
+    },
+    {
+      "step": "Insert marker and Save notes",
+      "status": "passed"
+    },
+    {
+      "step": "Reopen and verify marker persistence",
+      "status": "started"
+    },
+    {
+      "step": "Marker persistence check after reopen",
+      "status": "passed"
+    },
+    {
+      "step": "Reopen and verify marker persistence",
+      "status": "passed"
+    },
+    {
+      "step": "Rollback original content and verify restoration",
+      "status": "started"
+    },
+    {
+      "step": "Rollback original content and verify restoration",
+      "status": "passed"
+    }
+  ],
+  "artifacts": {
+    "editorPanel": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-26-10-354Z-editor-panel.png",
+    "afterSaveToast": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-26-10-354Z-after-save-toast.png",
+    "afterRollback": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-26-10-354Z-after-rollback.png"
+  },
+  "console": {
+    "warnings": [],
+    "errors": [
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 404 ()",
+        "location": {
+          "url": "https://api-gateway-production-83fa.up.railway.app/api/orders/order/query",
+          "lineNumber": 0,
+          "columnNumber": 0
+        }
+      },
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 404 ()",
+        "location": {
+          "url": "https://api-gateway-production-83fa.up.railway.app/api/orders/order/query",
+          "lineNumber": 0,
+          "columnNumber": 0
+        }
+      },
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 404 ()",
+        "location": {
+          "url": "https://api-gateway-production-83fa.up.railway.app/api/orders/order/query",
+          "lineNumber": 0,
+          "columnNumber": 0
+        }
+      },
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 404 ()",
+        "location": {
+          "url": "https://api-gateway-production-83fa.up.railway.app/api/orders/order/query",
+          "lineNumber": 0,
+          "columnNumber": 0
+        }
+      }
+    ],
+    "pageErrors": []
+  },
+  "data": {
+    "original": {
+      "html": "<p data-placeholder=\"Add notes about this item...\" class=\"is-empty is-editor-empty\"><br class=\"ProseMirror-trailingBreak\"></p>",
+      "text": ""
+    },
+    "afterSave": {
+      "html": "<p>SMOKE-WYSIWYG-2026-02-11T00:26:10.354Z-0pz3p5</p>",
+      "text": "SMOKE-WYSIWYG-2026-02-11T00:26:10.354Z-0pz3p5"
+    },
+    "afterRollback": {
+      "html": "<p data-placeholder=\"Add notes about this item...\" class=\"is-empty is-editor-empty\"><br class=\"ProseMirror-trailingBreak\"></p>",
+      "text": ""
+    }
+  },
+  "rollback": {
+    "attempted": true,
+    "success": true,
+    "exactHtmlMatch": true,
+    "textMatch": true
+  },
+  "markerPersisted": true,
+  "finishedAt": "2026-02-11T00:26:39.451Z"
+}

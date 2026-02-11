@@ -150,6 +150,10 @@ Partial receipt tracking happens at the **order line level**, not the card level
 | `in_transit` | REJECTED: Card already in cycle | 400 | `CARD_ALREADY_TRIGGERED` |
 | `received` | REJECTED: Card already in cycle | 400 | `CARD_ALREADY_TRIGGERED` |
 | `restocked` | REJECTED: Card about to reset | 400 | `CARD_ALREADY_TRIGGERED` |
+| (any — v2 URL malformed) | REJECTED: URL does not match v2 pattern | 400 | `MALFORMED_PAYLOAD` |
+| (any — unsupported version) | REJECTED: Unknown payload version (e.g., v3) | 400 | `UNSUPPORTED_VERSION` |
+| (any — v2, no checksum) | REJECTED or WARN: Missing `?c=` param | 400 | `CHECKSUM_MISSING` |
+| (any — v2, bad checksum) | REJECTED: Checksum does not match | 400 | `CHECKSUM_MISMATCH` |
 
 #### User-Facing Message
 
@@ -191,6 +195,41 @@ Duplicate scans are **not** idempotent. Each scan attempt that fails returns an 
 1. **Reactivate loop**: Set `kanban_loops.isActive = true`. All cards resume normal behavior.
 2. **Reactivate card**: Set `kanban_cards.isActive = true`. Card resumes from its current stage.
 3. **Stuck cards after reactivation**: If a card is in `restocked` and the loop was deactivated, reactivating the loop allows the cycle reset to proceed.
+
+---
+
+### 1.6 QR Payload v2 — Checksum and Version Failures
+
+> Full specification: [`docs/spec/pwa/qr-payload-v2.md`](../pwa/qr-payload-v2.md)
+
+**Definition**: A v2 scan URL fails validation before card lookup occurs. These are pre-transition errors that reject the request before any card state is evaluated.
+
+#### Failure Scenarios
+
+| Scenario | Error Code | HTTP | Retryable? | Recovery |
+|----------|-----------|------|-----------|----------|
+| URL path does not match v1 or v2 pattern | `MALFORMED_PAYLOAD` | 400 | No | Operator should re-scan or use manual lookup. Card may need reprinting. |
+| URL contains unrecognized version segment (e.g., `/scan/v3/...`) | `UNSUPPORTED_VERSION` | 400 | No | Operator should update PWA. Admin should verify QR generation version. |
+| v2 URL missing `?c=` query parameter | `CHECKSUM_MISSING` | 400 | No | Behavior depends on `QR_CHECKSUM_MODE` env var: `enforce` rejects, `warn` logs and proceeds, `skip` ignores. |
+| v2 URL checksum does not match server-computed HMAC | `CHECKSUM_MISMATCH` | 400 | No | Card may have been tampered with or printed with a rotated HMAC secret. Admin should verify card and potentially reprint. |
+
+#### HMAC Secret Rotation Handling
+
+When the HMAC signing secret is rotated, there is a transition window where cards printed with the old secret will produce checksum mismatches. The backend supports a dual-key validation window:
+
+1. Checksum is validated against the current secret (`QR_HMAC_SECRET`).
+2. If mismatch, validated against the previous secret (`QR_HMAC_SECRET_PREVIOUS`).
+3. If both fail, `CHECKSUM_MISMATCH` is returned.
+
+This ensures zero-downtime secret rotation without mass card reprinting.
+
+#### Checksum Mode Configuration
+
+| `QR_CHECKSUM_MODE` | Behavior on Missing/Invalid Checksum |
+|--------------------|--------------------------------------|
+| `enforce` (default) | Reject with 400 error |
+| `warn` | Log warning, proceed with scan (checksum status = `skipped` or `mismatch`) |
+| `skip` | Ignore checksum entirely (useful during migration) |
 
 ---
 
@@ -448,6 +487,10 @@ All queue-to-order operations are fully atomic:
 | 15 | Redis failure | Event publish catch block | Log error; DB state is source of truth | Automated (graceful degradation) |
 | 16 | Concurrent transition | DB transaction validation | Second attempt fails cleanly; UI refreshes | Automated (rejection) |
 | 17 | Stale queue data | Order creation validation | Transaction rolls back; UI refreshes | Automated (rejection) |
+| 18 | Malformed QR payload (v2) | Scan endpoint URL parsing | Return `MALFORMED_PAYLOAD`; operator re-scans or uses manual lookup | Automated (rejection) |
+| 19 | Unsupported payload version | Scan endpoint URL parsing | Return `UNSUPPORTED_VERSION`; operator updates PWA | Automated (rejection) |
+| 20 | Checksum missing (v2) | Scan endpoint validation | Depends on `QR_CHECKSUM_MODE`: reject, warn, or skip | Configurable |
+| 21 | Checksum mismatch (v2) | Scan endpoint HMAC validation | Return `CHECKSUM_MISMATCH`; admin verifies card; reprint if needed | Automated (rejection) |
 
 ### 4.2 Exception Transition Map
 

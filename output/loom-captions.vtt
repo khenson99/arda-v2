@@ -1,0 +1,469 @@
+WEBVTT
+
+1
+00:00:00.011 --> 00:00:04.542
+<v 0>Hey guys, I just wanted to roll through some feedback on the front end.</v>
+
+2
+00:00:04.999 --> 00:00:08.454
+So, a couple of things. So, I've noticed the quick actions here,
+
+3
+00:00:08.911 --> 00:00:10.947
+it wraps, whereas the others don't.
+
+4
+00:00:10.947 --> 00:00:13.607
+So, for instance, image URL is cut off, or image,
+
+5
+00:00:13.607 --> 00:00:16.016
+I guess, yeah, it's cut off there. But, quick actions here.
+
+6
+00:00:16.016 --> 00:00:17.711
+So, quick for some reason wraps. It would be great if they could all
+
+7
+00:00:17.711 --> 00:00:20.692
+wrap, and you could always read the words that are being said.
+
+8
+00:00:20.997 --> 00:00:24.032
+Also, there's no real indication of a column shift,
+
+9
+00:00:24.032 --> 00:00:26.544
+so it's really hard to adjust width.
+
+10
+00:00:28.256 --> 00:00:31.750
+Some frequently end up just dragging them around. And it's also hard because it's
+
+11
+00:00:32.011 --> 00:00:34.297
+really not intuitive how long each one is,
+
+12
+00:00:34.297 --> 00:00:37.991
+and also there's clearly some padding or buffer space between the text and the
+
+13
+00:00:37.991 --> 00:00:40.213
+end, because skew's getting cut off here,
+
+14
+00:00:40.213 --> 00:00:43.054
+but I don't, it doesn't feel like it should, based on where the mouse
+
+15
+00:00:43.054 --> 00:00:46.663
+is. And then additionally, these are the fields that should be visible,
+
+16
+00:00:46.757 --> 00:00:49.066
+in this order. things like,
+
+17
+00:00:49.077 --> 00:00:51.784
+created, should not be visible and take up a ton of space,
+
+18
+00:00:51.784 --> 00:00:55.030
+like, right in kind of the prime real estate area.
+
+19
+00:00:55.030 --> 00:00:57.710
+So, yeah, hopefully, hopefully, getting this,
+
+20
+00:00:57.721 --> 00:01:01.111
+this helps. additionally, inline editing is not obvious at all,
+
+21
+00:01:01.122 --> 00:01:04.239
+and so, like, there's nothing that really tells me that I should be able
+
+22
+00:01:04.239 --> 00:01:06.398
+to edit that, and then, for instance,
+
+23
+00:01:06.398 --> 00:01:09.719
+like, that interaction with the sidebar coming out is pretty tough,
+
+24
+00:01:09.719 --> 00:01:14.025
+and then it's also impossible to edit any of the dropdowns because the sidebar
+
+25
+00:01:14.025 --> 00:01:17.266
+comes out when you double-click, so you never actually get a chance to do
+
+26
+00:01:17.266 --> 00:01:19.276
+that. Oh, actually, that was the first time I succeeded.
+
+27
+00:01:19.626 --> 00:01:23.640
+That's cool. and it's also separately a little bit confusing that they're all caps
+
+28
+00:01:23.640 --> 00:01:25.852
+when they render here, but, lowercase here,
+
+29
+00:01:25.862 --> 00:01:28.010
+would be great if they could just be kind of, like, lowercase, normal,
+
+30
+00:01:28.010 --> 00:01:30.861
+human, readable, that would be, I think, a bit less confusing,
+
+31
+00:01:30.872 --> 00:01:33.089
+and then one other thing that is definitely,
+
+32
+00:01:33.099 --> 00:01:35.695
+vexed, I just, I got an email about this, which started the whole you
+
+33
+00:01:35.807 --> 00:01:38.354
+me poking at the front end, is, item type, item subtype,
+
+34
+00:01:38.365 --> 00:01:43.540
+these look like they should show up next time
+
+35
+00:01:43.540 --> 00:01:47.856
+I type something, and they don't.
+
+36
+00:01:47.856 --> 00:01:52.453
+And
+
+37
+00:01:52.453 --> 00:01:57.049
+so,
+
+38
+00:01:57.049 --> 00:02:00.045
+regardless of, yeah, where I make the edits or,
+
+39
+00:02:00.065 --> 00:02:02.330
+or anything, which item it's on,
+
+40
+00:02:02.341 --> 00:02:04.521
+they, yeah, it just doesn't, does not show up.
+
+41
+00:02:05.521 --> 00:02:08.053
+So, that's, that's kind of a confusing interaction. love the density.
+
+42
+00:02:08.053 --> 00:02:10.595
+The density is amazing. That really, really helps.
+
+43
+00:02:10.606 --> 00:02:13.914
+yeah, for sure. and then, further, some of these words are just confusing.
+
+44
+00:02:14.077 --> 00:02:16.682
+So, I think order quantity, and order units,
+
+45
+00:02:16.682 --> 00:02:19.987
+plural, would be a bit better. And then if it's just minQuantity and minUnits,
+
+46
+00:02:19.998 --> 00:02:22.311
+that would be better. and then, for,
+
+47
+00:02:22.322 --> 00:02:25.574
+what was it, oh yeah, this, kind of cuts off here.
+
+48
+00:02:25.585 --> 00:02:28.144
+the, the grid lines, and I think there's a ticket for that,
+
+49
+00:02:28.155 --> 00:02:30.212
+and then also the buttons don't really have, like,
+
+50
+00:02:30.222 --> 00:02:32.802
+hover, or, like, focus states, and so,
+
+51
+00:02:32.813 --> 00:02:35.148
+I actually, looked at the, mockups,
+
+52
+00:02:35.159 --> 00:02:38.005
+and here they, they have this, it's kind of confusing, because there's two different,
+
+53
+00:02:38.016 --> 00:02:42.045
+paradigms here, but, this turns to a slightly different color when your mouse is
+
+54
+00:02:42.045 --> 00:02:44.166
+over it, and this brings up a, a tool tip,
+
+55
+00:02:44.177 --> 00:02:46.330
+both of which I think could be, could be great,
+
+56
+00:02:46.341 --> 00:02:48.824
+and simple, they would also be great if there was feedback when you did
+
+57
+00:02:48.824 --> 00:02:50.930
+click one of the buttons, so, like, you,
+
+58
+00:02:50.930 --> 00:02:54.041
+I clicked print, very unclear if anything happened,
+
+59
+00:02:54.267 --> 00:02:56.339
+okay, so it did print, so, that would be,
+
+60
+00:02:56.349 --> 00:02:58.689
+yeah, that'd be super useful, and then, wait,
+
+61
+00:02:58.689 --> 00:03:06.325
+oops, so,
+
+62
+00:03:06.325 --> 00:03:09.558
+for the cards, this has a card, it doesn't look like it does,
+
+63
+00:03:10.376 --> 00:03:13.363
+so, for instance, this is showing up as zero cards,
+
+64
+00:03:14.224 --> 00:03:16.560
+that the item has, I think, or it could just be zero in the
+
+65
+00:03:16.560 --> 00:03:19.086
+cart. Anyway,
+
+66
+00:03:19.086 --> 00:03:21.148
+maybe that's what it is. And then,
+
+67
+00:03:22.148 --> 00:03:25.015
+now I've added it to the cart. So if it has a card,
+
+68
+00:03:25.794 --> 00:03:28.186
+it's very unclear why I can't add it to the cart.
+
+69
+00:03:29.186 --> 00:03:32.117
+Okay,
+
+70
+00:03:32.117 --> 00:03:35.182
+so now that's one on the cart. Okay, so now I can add the
+
+71
+00:03:35.182 --> 00:03:38.518
+second card to the cart. But that's still saying one,
+
+72
+00:03:38.518 --> 00:03:43.710
+but it did get greyed out. And then this doesn't have,
+
+73
+00:03:43.710 --> 00:03:46.053
+a card, seemingly. but,
+
+74
+00:03:46.556 --> 00:03:50.868
+it clearly does. And this one is waiting to be received,
+
+75
+00:03:50.868 --> 00:03:53.064
+I guess, or waiting to be, I know,
+
+76
+00:03:53.064 --> 00:03:55.493
+this is available. Yeah, so I can't click this button,
+
+77
+00:03:55.538 --> 00:03:58.079
+I guess, because it's available. Well, okay, that one I can't click,
+
+78
+00:03:58.079 --> 00:04:08.159
+because it's in the card, so let me just It'd
+
+79
+00:04:08.159 --> 00:04:22.590
+be great
+
+80
+00:04:22.590 --> 00:04:24.968
+if I could just edit the item from here without having to click that
+
+81
+00:04:24.968 --> 00:04:25.501
+dropdown.
+
+82
+00:04:41.506 --> 00:04:45.402
+That's strange. So it says email persisted,
+
+83
+00:04:45.402 --> 00:04:48.016
+but it's still showing up here as online, and so I can't.
+
+84
+00:04:49.016 --> 00:04:52.270
+Huh, that was odd. okay, let me just receive these.
+
+85
+00:04:52.270 --> 00:04:55.174
+Okay,
+
+86
+00:04:55.174 --> 00:04:58.007
+great. Okay, so now, now these are working.
+
+87
+00:04:58.588 --> 00:05:01.685
+Except this one's still not. So,
+
+88
+00:05:02.063 --> 00:05:09.627
+I guess do I have to go through? Okay,
+
+89
+00:05:09.627 --> 00:05:11.567
+yeah, so I guess I had to go through it once in order for
+
+90
+00:05:11.567 --> 00:05:16.198
+it to be addable. So, it would be good to get that sorted.
+
+91
+00:05:16.209 --> 00:05:19.030
+and then, lastly. The thing is this GL code. this does not,
+
+92
+00:05:19.739 --> 00:05:22.182
+like, you can't get rid of it. And it shows up initially on the
+
+93
+00:05:22.182 --> 00:05:24.372
+left, and takes up a lot of really good real estate, and,
+
+94
+00:05:24.382 --> 00:05:26.462
+yeah, given that you can't get rid of it, it's pretty, pretty tough.
+
+95
+00:05:26.462 --> 00:05:30.608
+Also pretty tough that, these Thank much. don't readjust based on the,
+
+96
+00:05:30.619 --> 00:05:32.708
+order that, the item,
+
+97
+00:05:32.708 --> 00:05:35.395
+like, the fields are actually in. I think we talked about that one.
+
+98
+00:05:35.406 --> 00:05:39.931
+and, oh, and saving is really counterintuitive in a menu like this.
+
+99
+00:05:39.931 --> 00:05:44.466
+Typically, you just want to have your name or selections persist with,
+
+100
+00:05:44.476 --> 00:05:46.826
+like, when you click out of this. so, like, I just click here for
+
+101
+00:05:46.826 --> 00:05:48.885
+it to go away, like, it does, which is good. but,
+
+102
+00:05:50.205 --> 00:05:54.251
+I would expect the changes that I made there to persist without clicking save.
+
+103
+00:05:54.251 --> 00:05:56.547
+And then, finally,
+
+104
+00:05:56.547 --> 00:05:58.791
+I was doing a demo of the,
+
+105
+00:05:58.801 --> 00:06:01.360
+onboarding tool, and I,
+
+106
+00:06:01.360 --> 00:06:03.460
+I added, like, 2,000 items, I thought it was 200,
+
+107
+00:06:03.471 --> 00:06:06.141
+and so, I had to go through and delete them all, and it's just,
+
+108
+00:06:06.141 --> 00:06:09.206
+pretty much, it be tough to only be able to do 28 at a
+
+109
+00:06:09.206 --> 00:06:12.057
+time, and have no, like, pagination, even if it does have to be,
+
+110
+00:06:12.057 --> 00:06:14.071
+like, no lazy load, where you, you know,
+
+111
+00:06:14.071 --> 00:06:17.083
+you just scroll and, and then things load, it would be really great to
+
+112
+00:06:17.083 --> 00:06:19.764
+be able to select, like, paid, like, you know, number of entries,
+
+113
+00:06:19.764 --> 00:06:24.108
+100, that would definitely save me a lot of time from doing this.
+
+114
+00:06:24.119 --> 00:06:26.480
+cool, but, awesome work, these updates are really huge,
+
+115
+00:06:26.480 --> 00:06:29.054
+but, I think there's like, yeah, some confusion about what the default order should
+
+116
+00:06:29.054 --> 00:06:31.186
+be, so I just wanted to clarify,
+
+117
+00:06:31.196 --> 00:06:31.537
+some of that.

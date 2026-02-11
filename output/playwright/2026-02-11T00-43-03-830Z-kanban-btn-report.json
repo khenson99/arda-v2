@@ -1,0 +1,29 @@
+{
+  "timestamp": "2026-02-11T00:43:03.831Z",
+  "baseUrl": "http://127.0.0.1:4173",
+  "email": "kanban-btn-1770770583831@example.com",
+  "itemCode": "PW-KANBAN-583831",
+  "status": "failed",
+  "steps": [
+    "Open app",
+    "Register account",
+    "Wait for authenticated app shell",
+    "Navigate to parts page",
+    "Create test item",
+    "Click quick action: Create card",
+    "Verify success feedback"
+  ],
+  "artifacts": {
+    "initial": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-43-03-830Z-kanban-btn-initial.png",
+    "afterCreateItem": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-43-03-830Z-kanban-btn-after-create-item.png",
+    "afterCreateCard": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-43-03-830Z-kanban-btn-after-create-card.png",
+    "failure": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-43-03-830Z-kanban-btn-failure.png",
+    "reportJson": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-43-03-830Z-kanban-btn-report.json",
+    "reportMd": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-43-03-830Z-kanban-btn-report.md"
+  },
+  "error": {
+    "message": "Unexpected success toast text: Item created with an initial card.",
+    "stack": "Error: Unexpected success toast text: Item created with an initial card.\n    at /Users/kylehenson/arda-v2/output/playwright/test-create-kanban-button.live-preview4173-ipv4.js:84:13"
+  },
+  "toastText": "Item created with an initial card."
+}

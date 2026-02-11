@@ -1,0 +1,125 @@
+{
+  "timestamp": "2026-02-11T03:44:57.002Z",
+  "baseUrl": "http://127.0.0.1:4173/parts",
+  "status": "failed",
+  "steps": [
+    "Build web app",
+    "Start web preview server",
+    "Wait for preview server",
+    "Open items page",
+    "Click quick action create-card button",
+    "Validate toast and request behavior"
+  ],
+  "itemCode": "PW-KANBAN-497002",
+  "toastText": "Created default loop and first card for this item.",
+  "state": {
+    "loopPagesRequested": [
+      1
+    ],
+    "loopPatchCalls": 0,
+    "itemUpdateFallbackCalls": 1,
+    "apiRequests": [
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/auth/me",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/orders/queue/summary",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/orders/queue",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "POST",
+        "pathname": "/api/items/item/query",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/notifications",
+        "search": "?limit=20"
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/notifications/unread-count",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "POST",
+        "pathname": "/api/orders/order/query",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/kanban/loops",
+        "search": "?page=1&pageSize=200"
+      },
+      {
+        "kind": "api",
+        "method": "PUT",
+        "pathname": "/api/items/item/item-1",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/orders/queue/summary",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "POST",
+        "pathname": "/api/items/item/query",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/orders/queue",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/notifications",
+        "search": "?limit=20"
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/notifications/unread-count",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "POST",
+        "pathname": "/api/orders/order/query",
+        "search": ""
+      }
+    ]
+  },
+  "artifacts": {
+    "initial": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T03-44-57-001Z-kanban-btn-e2e-initial.png",
+    "afterClick": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T03-44-57-001Z-kanban-btn-e2e-after-click.png",
+    "failure": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T03-44-57-001Z-kanban-btn-e2e-failure.png",
+    "reportJson": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T03-44-57-001Z-kanban-btn-e2e-report.json",
+    "reportMd": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T03-44-57-001Z-kanban-btn-e2e-report.md"
+  },
+  "error": {
+    "message": "Expected paged loop lookup [1,2], got [1]",
+    "stack": "Error: Expected paged loop lookup [1,2], got [1]\n    at main (/Users/kylehenson/arda-v2/scripts/e2e/test-create-kanban-card-button.cjs:368:15)\n    at runNextTicks (node:internal/process/task_queues:60:5)\n    at process.processImmediate (node:internal/timers:454:9)\n    at process.callbackTrampoline (node:internal/async_hooks:130:17)"
+  }
+}

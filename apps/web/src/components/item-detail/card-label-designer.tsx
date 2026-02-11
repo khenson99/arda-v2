@@ -20,6 +20,38 @@ interface CardLabelDesignerProps {
   part: PartRecord;
   token: string;
   onUnauthorized: () => void;
+  onOpenLoopsTab?: () => void;
+}
+
+const MAX_CARD_PAGES_PER_LOOP = 10;
+const CARD_PREVIEW_LOAD_TIMEOUT_MS = 20_000;
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
+async function fetchCardsForLoop(token: string, loopId: string): Promise<KanbanCard[]> {
+  const cards: KanbanCard[] = [];
+  let page = 1;
+  let totalPages = 1;
+
+  while (page <= totalPages && page <= MAX_CARD_PAGES_PER_LOOP) {
+    const result = await fetchCards(token, { loopId, page, pageSize: 100 });
+    cards.push(...result.data);
+    totalPages = Math.max(1, result.pagination.totalPages || 1);
+    page += 1;
+  }
+
+  return cards;
 }
 
 export function resolveLoopLabel(loopType?: string | null): string | null {
@@ -31,6 +63,7 @@ export function CardLabelDesigner({
   part,
   token,
   onUnauthorized,
+  onOpenLoopsTab,
 }: CardLabelDesignerProps) {
   const [cards, setCards] = React.useState<KanbanCard[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
@@ -49,7 +82,11 @@ export function CardLabelDesigner({
       setIsLoading(true);
       setLoadError(null);
       try {
-        const loops = await fetchLoopsForPart(token, part);
+        const loops = await withTimeout(
+          fetchLoopsForPart(token, part),
+          CARD_PREVIEW_LOAD_TIMEOUT_MS,
+          "Loading card loops timed out.",
+        );
         if (cancelled) return;
 
         if (loops.length === 0) {
@@ -58,20 +95,14 @@ export function CardLabelDesigner({
           return;
         }
 
-        const partCards: KanbanCard[] = [];
-        for (const loop of loops) {
-          let page = 1;
-          let totalPages = 1;
-          while (page <= totalPages) {
-            const result = await fetchCards(token, { loopId: loop.id, page, pageSize: 100 });
-            if (cancelled) return;
-            partCards.push(...result.data);
-            totalPages = Math.max(1, result.pagination.totalPages || 1);
-            page += 1;
-          }
-        }
-
+        const cardsByLoop = await withTimeout(
+          Promise.all(loops.map((loop) => fetchCardsForLoop(token, loop.id))),
+          CARD_PREVIEW_LOAD_TIMEOUT_MS,
+          "Loading cards timed out.",
+        );
         if (cancelled) return;
+        const partCards = cardsByLoop.flat();
+
         setCards(partCards);
         setSelectedCard((current) => {
           if (partCards.length === 0) return null;
@@ -154,9 +185,21 @@ export function CardLabelDesigner({
   if (loadError) {
     return (
       <div className="space-y-3">
-        <h3 className="text-sm font-semibold">Card Label Preview</h3>
-        <div className="rounded-md border border-border p-6 text-center text-xs text-muted-foreground">
-          Unable to load card preview: {loadError}
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold">Card Label Preview</h3>
+          {onOpenLoopsTab && (
+            <Button size="sm" variant="outline" onClick={onOpenLoopsTab}>
+              Open Loops &amp; Cards
+            </Button>
+          )}
+        </div>
+        <div className="space-y-3 rounded-md border border-border p-6 text-center text-xs text-muted-foreground">
+          <p>Unable to load card preview: {loadError}</p>
+          {onOpenLoopsTab && (
+            <Button size="sm" variant="outline" onClick={onOpenLoopsTab}>
+              Go to Loops &amp; Cards
+            </Button>
+          )}
         </div>
       </div>
     );
@@ -165,9 +208,21 @@ export function CardLabelDesigner({
   if (cards.length === 0) {
     return (
       <div className="space-y-3">
-        <h3 className="text-sm font-semibold">Card Label Preview</h3>
-        <div className="rounded-md border border-border p-6 text-center text-xs text-muted-foreground">
-          No cards exist for this item yet. Create a loop first.
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold">Card Label Preview</h3>
+          {onOpenLoopsTab && (
+            <Button size="sm" variant="outline" onClick={onOpenLoopsTab}>
+              Open Loops &amp; Cards
+            </Button>
+          )}
+        </div>
+        <div className="space-y-3 rounded-md border border-border p-6 text-center text-xs text-muted-foreground">
+          <p>No cards exist for this item yet. Use Loops &amp; Cards to provision and add cards.</p>
+          {onOpenLoopsTab && (
+            <Button size="sm" variant="outline" onClick={onOpenLoopsTab}>
+              Go to Loops &amp; Cards
+            </Button>
+          )}
         </div>
       </div>
     );
@@ -182,25 +237,32 @@ export function CardLabelDesigner({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">Card Label Preview</h3>
-        {cards.length > 1 && (
-          <select
-            className="rounded-md border border-border bg-background px-2 py-1 text-xs"
-            value={selectedCard?.id || ""}
-            onChange={(e) => {
-              const card = cards.find((c) => c.id === e.target.value);
-              setSelectedCard(card || null);
-            }}
-          >
-            {cards.map((card) => (
-              <option key={card.id} value={card.id}>
-                Card #{card.cardNumber}
-                {card.loopType
-                  ? ` — ${resolveLoopLabel(card.loopType)}`
-                  : ""}
-              </option>
-            ))}
-          </select>
-        )}
+        <div className="flex items-center gap-2">
+          {cards.length > 1 && (
+            <select
+              className="rounded-md border border-border bg-background px-2 py-1 text-xs"
+              value={selectedCard?.id || ""}
+              onChange={(e) => {
+                const card = cards.find((c) => c.id === e.target.value);
+                setSelectedCard(card || null);
+              }}
+            >
+              {cards.map((card) => (
+                <option key={card.id} value={card.id}>
+                  Card #{card.cardNumber}
+                  {card.loopType
+                    ? ` — ${resolveLoopLabel(card.loopType)}`
+                    : ""}
+                </option>
+              ))}
+            </select>
+          )}
+          {onOpenLoopsTab && (
+            <Button size="sm" variant="outline" onClick={onOpenLoopsTab}>
+              Loops &amp; Cards
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Label preview — simulates a physical kanban card */}

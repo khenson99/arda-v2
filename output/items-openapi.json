@@ -1,0 +1,4487 @@
+{
+  "openapi" : "3.1.0",
+  "info" : {
+    "title" : "QR Lookup Component",
+    "description" : "This component is responsible for looking up QR codes and returning the associated data. It temporarily includes the Item Data Authority Module",
+    "termsOfService" : "https://arda.cards/terms-of-service",
+    "contact" : {
+      "name" : "Arda Cards",
+      "url" : "https://arda.cards",
+      "email" : "systems@arda.cards"
+    },
+    "license" : {
+      "name" : "Arda License",
+      "url" : "https://arda.cards/terms-of-service",
+      "identifier" : "Arda Proprietary"
+    },
+    "version" : "v1"
+  },
+  "externalDocs" : {
+    "description" : "Documentation for Arda Cards Integration Developers",
+    "url" : "https://arda.cards/developers"
+  },
+  "servers" : [ {
+    "url" : "https://",
+    "description" : " Server for QR Lookup Component with version v1"
+  } ],
+  "tags" : [ ],
+  "paths" : {
+    "/v1/items/item/{entity-id}" : {
+      "get" : {
+        "tags" : [ "v1" ],
+        "summary" : "Get all the details of one item retrieved by its Id",
+        "description" : "Given an id for item, return the latest record previous to the given effective time",
+        "operationId" : "get-item",
+        "parameters" : [ {
+          "name" : "X-Request-ID",
+          "in" : "header",
+          "description" : "A unique identifier for the request, the server will generate one if not provided",
+          "required" : false,
+          "deprecated" : false,
+          "explode" : false,
+          "schema" : {
+            "type" : "string",
+            "title" : "String"
+          }
+        }, {
+          "name" : "entity-id",
+          "in" : "path",
+          "description" : "The encoded reference of the item to retrieve",
+          "required" : true,
+          "deprecated" : false,
+          "explode" : false,
+          "schema" : {
+            "type" : "string",
+            "title" : "String"
+          }
+        }, {
+          "name" : "effectiveasof",
+          "in" : "query",
+          "description" : "The effective date of the item to retrieve",
+          "required" : false,
+          "deprecated" : false,
+          "explode" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64",
+            "title" : "Long"
+          }
+        }, {
+          "name" : "recordedasof",
+          "in" : "query",
+          "description" : "The recorded date of the item to retrieve",
+          "required" : false,
+          "deprecated" : false,
+          "explode" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64",
+            "title" : "Long"
+          }
+        } ],
+        "responses" : {
+          "400" : {
+            "description" : "Bad Request",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "402" : {
+            "description" : "Payment Required",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "405" : {
+            "description" : "Method Not Allowed",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "406" : {
+            "description" : "Not Acceptable",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "407" : {
+            "description" : "Proxy Authentication Required",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "408" : {
+            "description" : "Request Timeout",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "410" : {
+            "description" : "Gone",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "411" : {
+            "description" : "Length Required",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "412" : {
+            "description" : "Precondition Failed",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "413" : {
+            "description" : "Payload Too Large",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "414" : {
+            "description" : "Request-URI Too Long",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "415" : {
+            "description" : "Unsupported Media Type",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "416" : {
+            "description" : "Requested Range Not Satisfiable",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "417" : {
+            "description" : "Expectation Failed",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "418" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "421" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Unprocessable Entity",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "423" : {
+            "description" : "Locked",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "424" : {
+            "description" : "Failed Dependency",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "425" : {
+            "description" : "Too Early",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "426" : {
+            "description" : "Upgrade Required",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "428" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too Many Requests",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "431" : {
+            "description" : "Request Header Fields Too Large",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "451" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "501" : {
+            "description" : "Not Implemented",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "502" : {
+            "description" : "Bad Gateway",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "503" : {
+            "description" : "Service Unavailable",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "504" : {
+            "description" : "Gateway Timeout",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "505" : {
+            "description" : "HTTP Version Not Supported",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "506" : {
+            "description" : "Variant Also Negotiates",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "507" : {
+            "description" : "Insufficient Storage",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "508" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "510" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "511" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "200" : {
+            "description" : "The Record matching the requested entity at the defined time",
+            "headers" : {
+              "X-Request-ID" : {
+                "description" : "The Unique identifier for the corresponding request",
+                "required" : true,
+                "deprecated" : false,
+                "schema" : {
+                  "type" : "string",
+                  "title" : "String"
+                }
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.module.dataauthority.EntityRecord"
+                }
+              }
+            }
+          }
+        },
+        "deprecated" : false
+      },
+      "put" : {
+        "tags" : [ "v1" ],
+        "summary" : "Update a item in the Data Authority",
+        "description" : "Update an entity in the data authority given its id and an effective time.\nIt will fail if the effective time is earlier than the latest record of the entity",
+        "operationId" : "put-item",
+        "parameters" : [ {
+          "name" : "X-Request-ID",
+          "in" : "header",
+          "description" : "A unique identifier for the request, the server will generate one if not provided",
+          "required" : false,
+          "deprecated" : false,
+          "explode" : false,
+          "schema" : {
+            "type" : "string",
+            "title" : "String"
+          }
+        }, {
+          "name" : "entity-id",
+          "in" : "path",
+          "description" : "The encoded reference of the item to retrieve",
+          "required" : true,
+          "deprecated" : false,
+          "explode" : false,
+          "schema" : {
+            "type" : "string",
+            "title" : "String"
+          }
+        } ],
+        "requestBody" : {
+          "description" : "Request to update an entity to its data authority",
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.server.dataauthority.RequestCreate"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "400" : {
+            "description" : "Bad Request",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "402" : {
+            "description" : "Payment Required",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "405" : {
+            "description" : "Method Not Allowed",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "406" : {
+            "description" : "Not Acceptable",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "407" : {
+            "description" : "Proxy Authentication Required",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "408" : {
+            "description" : "Request Timeout",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "410" : {
+            "description" : "Gone",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "411" : {
+            "description" : "Length Required",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "412" : {
+            "description" : "Precondition Failed",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "413" : {
+            "description" : "Payload Too Large",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "414" : {
+            "description" : "Request-URI Too Long",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "415" : {
+            "description" : "Unsupported Media Type",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "416" : {
+            "description" : "Requested Range Not Satisfiable",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "417" : {
+            "description" : "Expectation Failed",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "418" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "421" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Unprocessable Entity",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "423" : {
+            "description" : "Locked",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "424" : {
+            "description" : "Failed Dependency",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "425" : {
+            "description" : "Too Early",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "426" : {
+            "description" : "Upgrade Required",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "428" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too Many Requests",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "431" : {
+            "description" : "Request Header Fields Too Large",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "451" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "501" : {
+            "description" : "Not Implemented",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "502" : {
+            "description" : "Bad Gateway",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "503" : {
+            "description" : "Service Unavailable",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "504" : {
+            "description" : "Gateway Timeout",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "505" : {
+            "description" : "HTTP Version Not Supported",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "506" : {
+            "description" : "Variant Also Negotiates",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "507" : {
+            "description" : "Insufficient Storage",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "508" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "510" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "511" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "200" : {
+            "description" : "Success, returns the created record for the Item",
+            "headers" : {
+              "X-Request-ID" : {
+                "description" : "The Unique identifier for the corresponding request",
+                "required" : true,
+                "deprecated" : false,
+                "schema" : {
+                  "type" : "string",
+                  "title" : "String"
+                }
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.module.dataauthority.EntityRecord"
+                }
+              }
+            }
+          }
+        },
+        "deprecated" : false
+      },
+      "delete" : {
+        "tags" : [ "v1" ],
+        "summary" : "Delete a item in the Data Authority",
+        "description" : "Delete an entity in the data authority given its id and an effective time.\nIt will fail if the effective time is earlier than the latest record of the entity",
+        "operationId" : "delete-item",
+        "parameters" : [ {
+          "name" : "X-Request-ID",
+          "in" : "header",
+          "description" : "A unique identifier for the request, the server will generate one if not provided",
+          "required" : false,
+          "deprecated" : false,
+          "explode" : false,
+          "schema" : {
+            "type" : "string",
+            "title" : "String"
+          }
+        }, {
+          "name" : "entity-id",
+          "in" : "path",
+          "description" : "The encoded reference of the item to retrieve",
+          "required" : true,
+          "deprecated" : false,
+          "explode" : false,
+          "schema" : {
+            "type" : "string",
+            "title" : "String"
+          }
+        }, {
+          "name" : "effectiveasof",
+          "in" : "query",
+          "description" : "The effective date of the item to retrieve",
+          "required" : false,
+          "deprecated" : false,
+          "explode" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64",
+            "title" : "Long"
+          }
+        } ],
+        "responses" : {
+          "400" : {
+            "description" : "Bad Request",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "402" : {
+            "description" : "Payment Required",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "405" : {
+            "description" : "Method Not Allowed",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "406" : {
+            "description" : "Not Acceptable",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "407" : {
+            "description" : "Proxy Authentication Required",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "408" : {
+            "description" : "Request Timeout",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "410" : {
+            "description" : "Gone",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "411" : {
+            "description" : "Length Required",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "412" : {
+            "description" : "Precondition Failed",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "413" : {
+            "description" : "Payload Too Large",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "414" : {
+            "description" : "Request-URI Too Long",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "415" : {
+            "description" : "Unsupported Media Type",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "416" : {
+            "description" : "Requested Range Not Satisfiable",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "417" : {
+            "description" : "Expectation Failed",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "418" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "421" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Unprocessable Entity",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "423" : {
+            "description" : "Locked",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "424" : {
+            "description" : "Failed Dependency",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "425" : {
+            "description" : "Too Early",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "426" : {
+            "description" : "Upgrade Required",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "428" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too Many Requests",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "431" : {
+            "description" : "Request Header Fields Too Large",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "451" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "501" : {
+            "description" : "Not Implemented",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "502" : {
+            "description" : "Bad Gateway",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "503" : {
+            "description" : "Service Unavailable",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "504" : {
+            "description" : "Gateway Timeout",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "505" : {
+            "description" : "HTTP Version Not Supported",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "506" : {
+            "description" : "Variant Also Negotiates",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "507" : {
+            "description" : "Insufficient Storage",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "508" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "510" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "511" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "200" : {
+            "description" : "Success, returns the deleted record for the Entity",
+            "headers" : {
+              "X-Request-ID" : {
+                "description" : "The Unique identifier for the corresponding request",
+                "required" : true,
+                "deprecated" : false,
+                "schema" : {
+                  "type" : "string",
+                  "title" : "String"
+                }
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.module.dataauthority.EntityRecord"
+                }
+              }
+            }
+          }
+        },
+        "deprecated" : false
+      }
+    },
+    "/v1/items/item" : {
+      "post" : {
+        "tags" : [ "v1" ],
+        "summary" : "Create a new item in the Data Authority",
+        "description" : "Create a new entity in the Data Authority",
+        "operationId" : "post-item",
+        "parameters" : [ {
+          "name" : "X-Request-ID",
+          "in" : "header",
+          "description" : "A unique identifier for the request, the server will generate one if not provided",
+          "required" : false,
+          "deprecated" : false,
+          "explode" : false,
+          "schema" : {
+            "type" : "string",
+            "title" : "String"
+          }
+        } ],
+        "requestBody" : {
+          "description" : "Request to create a new entity in the Data Authority",
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.server.dataauthority.RequestCreate"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "400" : {
+            "description" : "Bad Request",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "402" : {
+            "description" : "Payment Required",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "405" : {
+            "description" : "Method Not Allowed",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "406" : {
+            "description" : "Not Acceptable",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "407" : {
+            "description" : "Proxy Authentication Required",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "408" : {
+            "description" : "Request Timeout",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "410" : {
+            "description" : "Gone",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "411" : {
+            "description" : "Length Required",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "412" : {
+            "description" : "Precondition Failed",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "413" : {
+            "description" : "Payload Too Large",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "414" : {
+            "description" : "Request-URI Too Long",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "415" : {
+            "description" : "Unsupported Media Type",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "416" : {
+            "description" : "Requested Range Not Satisfiable",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "417" : {
+            "description" : "Expectation Failed",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "418" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "421" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Unprocessable Entity",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "423" : {
+            "description" : "Locked",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "424" : {
+            "description" : "Failed Dependency",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "425" : {
+            "description" : "Too Early",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "426" : {
+            "description" : "Upgrade Required",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "428" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too Many Requests",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "431" : {
+            "description" : "Request Header Fields Too Large",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "451" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "501" : {
+            "description" : "Not Implemented",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "502" : {
+            "description" : "Bad Gateway",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "503" : {
+            "description" : "Service Unavailable",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "504" : {
+            "description" : "Gateway Timeout",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "505" : {
+            "description" : "HTTP Version Not Supported",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "506" : {
+            "description" : "Variant Also Negotiates",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "507" : {
+            "description" : "Insufficient Storage",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "508" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "510" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "511" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "200" : {
+            "description" : "Success, returns the created record for the entity",
+            "headers" : {
+              "X-Request-ID" : {
+                "description" : "The Unique identifier for the corresponding request",
+                "required" : true,
+                "deprecated" : false,
+                "schema" : {
+                  "type" : "string",
+                  "title" : "String"
+                }
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.module.dataauthority.EntityRecord"
+                }
+              }
+            }
+          }
+        },
+        "deprecated" : false
+      }
+    },
+    "/v1/items/item/query" : {
+      "post" : {
+        "tags" : [ "v1" ],
+        "summary" : "Query item entities in the Data Authority",
+        "description" : "Query item entities based on a Query object.",
+        "operationId" : "query-item",
+        "parameters" : [ {
+          "name" : "X-Request-ID",
+          "in" : "header",
+          "description" : "A unique identifier for the request, the server will generate one if not provided",
+          "required" : false,
+          "deprecated" : false,
+          "explode" : false,
+          "schema" : {
+            "type" : "string",
+            "title" : "String"
+          }
+        }, {
+          "name" : "effectiveasof",
+          "in" : "query",
+          "description" : "The effective date of the item to retrieve",
+          "required" : false,
+          "deprecated" : false,
+          "explode" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64",
+            "title" : "Long"
+          }
+        }, {
+          "name" : "recordedasof",
+          "in" : "query",
+          "description" : "The recorded date of the item to retrieve",
+          "required" : false,
+          "deprecated" : false,
+          "explode" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64",
+            "title" : "Long"
+          }
+        } ],
+        "requestBody" : {
+          "description" : "Query object to filter item entities",
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/cards.arda.common.lib.lang.query.Query"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "400" : {
+            "description" : "Bad Request",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "402" : {
+            "description" : "Payment Required",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "405" : {
+            "description" : "Method Not Allowed",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "406" : {
+            "description" : "Not Acceptable",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "407" : {
+            "description" : "Proxy Authentication Required",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "408" : {
+            "description" : "Request Timeout",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "410" : {
+            "description" : "Gone",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "411" : {
+            "description" : "Length Required",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "412" : {
+            "description" : "Precondition Failed",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "413" : {
+            "description" : "Payload Too Large",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "414" : {
+            "description" : "Request-URI Too Long",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "415" : {
+            "description" : "Unsupported Media Type",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "416" : {
+            "description" : "Requested Range Not Satisfiable",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "417" : {
+            "description" : "Expectation Failed",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "418" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "421" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Unprocessable Entity",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "423" : {
+            "description" : "Locked",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "424" : {
+            "description" : "Failed Dependency",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "425" : {
+            "description" : "Too Early",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "426" : {
+            "description" : "Upgrade Required",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "428" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too Many Requests",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "431" : {
+            "description" : "Request Header Fields Too Large",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "451" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "501" : {
+            "description" : "Not Implemented",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "502" : {
+            "description" : "Bad Gateway",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "503" : {
+            "description" : "Service Unavailable",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "504" : {
+            "description" : "Gateway Timeout",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "505" : {
+            "description" : "HTTP Version Not Supported",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "506" : {
+            "description" : "Variant Also Negotiates",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "507" : {
+            "description" : "Insufficient Storage",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "508" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "510" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "511" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "200" : {
+            "description" : "Success, returns a page of item entities matching the query",
+            "headers" : {
+              "X-Request-ID" : {
+                "description" : "The Unique identifier for the corresponding request",
+                "required" : true,
+                "deprecated" : false,
+                "schema" : {
+                  "type" : "string",
+                  "title" : "String"
+                }
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.module.dataauthority.PageResult"
+                }
+              }
+            }
+          }
+        },
+        "deprecated" : false
+      }
+    },
+    "/v1/items/item/query/{page}" : {
+      "get" : {
+        "tags" : [ "v1" ],
+        "summary" : "Query item entities by page identifier in the Data Authority",
+        "description" : "Query item entities using a page identifier obtained from a previous query.",
+        "operationId" : "query-page-item",
+        "parameters" : [ {
+          "name" : "X-Request-ID",
+          "in" : "header",
+          "description" : "A unique identifier for the request, the server will generate one if not provided",
+          "required" : false,
+          "deprecated" : false,
+          "explode" : false,
+          "schema" : {
+            "type" : "string",
+            "title" : "String"
+          }
+        }, {
+          "name" : "page",
+          "in" : "path",
+          "description" : "The page identifier for retrieving a specific page of item entities",
+          "required" : true,
+          "deprecated" : false,
+          "explode" : false,
+          "schema" : {
+            "type" : "string",
+            "title" : "String"
+          }
+        }, {
+          "name" : "effectiveasof",
+          "in" : "query",
+          "description" : "The effective date of the item to retrieve",
+          "required" : false,
+          "deprecated" : false,
+          "explode" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64",
+            "title" : "Long"
+          }
+        }, {
+          "name" : "recordedasof",
+          "in" : "query",
+          "description" : "The recorded date of the item to retrieve",
+          "required" : false,
+          "deprecated" : false,
+          "explode" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64",
+            "title" : "Long"
+          }
+        } ],
+        "responses" : {
+          "400" : {
+            "description" : "Bad Request",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "402" : {
+            "description" : "Payment Required",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "405" : {
+            "description" : "Method Not Allowed",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "406" : {
+            "description" : "Not Acceptable",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "407" : {
+            "description" : "Proxy Authentication Required",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "408" : {
+            "description" : "Request Timeout",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "410" : {
+            "description" : "Gone",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "411" : {
+            "description" : "Length Required",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "412" : {
+            "description" : "Precondition Failed",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "413" : {
+            "description" : "Payload Too Large",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "414" : {
+            "description" : "Request-URI Too Long",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "415" : {
+            "description" : "Unsupported Media Type",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "416" : {
+            "description" : "Requested Range Not Satisfiable",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "417" : {
+            "description" : "Expectation Failed",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "418" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "421" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Unprocessable Entity",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "423" : {
+            "description" : "Locked",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "424" : {
+            "description" : "Failed Dependency",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "425" : {
+            "description" : "Too Early",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "426" : {
+            "description" : "Upgrade Required",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "428" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too Many Requests",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "431" : {
+            "description" : "Request Header Fields Too Large",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "451" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "501" : {
+            "description" : "Not Implemented",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "502" : {
+            "description" : "Bad Gateway",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "503" : {
+            "description" : "Service Unavailable",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "504" : {
+            "description" : "Gateway Timeout",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "505" : {
+            "description" : "HTTP Version Not Supported",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "506" : {
+            "description" : "Variant Also Negotiates",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "507" : {
+            "description" : "Insufficient Storage",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "508" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "510" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "511" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "200" : {
+            "description" : "Success, returns a page of item entities",
+            "headers" : {
+              "X-Request-ID" : {
+                "description" : "The Unique identifier for the corresponding request",
+                "required" : true,
+                "deprecated" : false,
+                "schema" : {
+                  "type" : "string",
+                  "title" : "String"
+                }
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.module.dataauthority.PageResult"
+                }
+              }
+            }
+          }
+        },
+        "deprecated" : false
+      }
+    },
+    "/v1/items/item/{entity-id}/history" : {
+      "post" : {
+        "tags" : [ "v1" ],
+        "summary" : "Query item entity history",
+        "description" : "Query the history of a item entity instance",
+        "operationId" : "history-item",
+        "parameters" : [ {
+          "name" : "X-Request-ID",
+          "in" : "header",
+          "description" : "A unique identifier for the request, the server will generate one if not provided",
+          "required" : false,
+          "deprecated" : false,
+          "explode" : false,
+          "schema" : {
+            "type" : "string",
+            "title" : "String"
+          }
+        }, {
+          "name" : "entity-id",
+          "in" : "path",
+          "description" : "The encoded reference of the item to retrieve",
+          "required" : true,
+          "deprecated" : false,
+          "explode" : false,
+          "schema" : {
+            "type" : "string",
+            "title" : "String"
+          }
+        } ],
+        "requestBody" : {
+          "description" : "Entity Id, Bitemporal boundaries and page of the history records to retrieve",
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.server.dataauthority.DataAuthorityEndpointSpec.HistoryRequestBody"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "400" : {
+            "description" : "Bad Request",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "402" : {
+            "description" : "Payment Required",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "405" : {
+            "description" : "Method Not Allowed",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "406" : {
+            "description" : "Not Acceptable",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "407" : {
+            "description" : "Proxy Authentication Required",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "408" : {
+            "description" : "Request Timeout",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "410" : {
+            "description" : "Gone",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "411" : {
+            "description" : "Length Required",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "412" : {
+            "description" : "Precondition Failed",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "413" : {
+            "description" : "Payload Too Large",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "414" : {
+            "description" : "Request-URI Too Long",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "415" : {
+            "description" : "Unsupported Media Type",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "416" : {
+            "description" : "Requested Range Not Satisfiable",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "417" : {
+            "description" : "Expectation Failed",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "418" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "421" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Unprocessable Entity",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "423" : {
+            "description" : "Locked",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "424" : {
+            "description" : "Failed Dependency",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "425" : {
+            "description" : "Too Early",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "426" : {
+            "description" : "Upgrade Required",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "428" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too Many Requests",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "431" : {
+            "description" : "Request Header Fields Too Large",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "451" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "501" : {
+            "description" : "Not Implemented",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "502" : {
+            "description" : "Bad Gateway",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "503" : {
+            "description" : "Service Unavailable",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "504" : {
+            "description" : "Gateway Timeout",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "505" : {
+            "description" : "HTTP Version Not Supported",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "506" : {
+            "description" : "Variant Also Negotiates",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "507" : {
+            "description" : "Insufficient Storage",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "508" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "510" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "511" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "200" : {
+            "description" : "Success, returns a page of item records matching the history request",
+            "headers" : {
+              "X-Request-ID" : {
+                "description" : "The Unique identifier for the corresponding request",
+                "required" : true,
+                "deprecated" : false,
+                "schema" : {
+                  "type" : "string",
+                  "title" : "String"
+                }
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.module.dataauthority.PageResult"
+                }
+              }
+            }
+          }
+        },
+        "deprecated" : false
+      }
+    },
+    "/v1/items/item/{entity-id}/history/{page}" : {
+      "get" : {
+        "tags" : [ "v1" ],
+        "summary" : "Get a page of historical records for the given item entity instance",
+        "description" : "Return a page of historical records. The page identifier must be originated from the history-item",
+        "operationId" : "history-page-item",
+        "parameters" : [ {
+          "name" : "X-Request-ID",
+          "in" : "header",
+          "description" : "A unique identifier for the request, the server will generate one if not provided",
+          "required" : false,
+          "deprecated" : false,
+          "explode" : false,
+          "schema" : {
+            "type" : "string",
+            "title" : "String"
+          }
+        }, {
+          "name" : "page",
+          "in" : "path",
+          "description" : "The page identifier for retrieving a specific page of item entities",
+          "required" : true,
+          "deprecated" : false,
+          "explode" : false,
+          "schema" : {
+            "type" : "string",
+            "title" : "String"
+          }
+        }, {
+          "name" : "effectiveasof",
+          "in" : "query",
+          "description" : "The effective date of the item to retrieve",
+          "required" : false,
+          "deprecated" : false,
+          "explode" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64",
+            "title" : "Long"
+          }
+        }, {
+          "name" : "recordedasof",
+          "in" : "query",
+          "description" : "The recorded date of the item to retrieve",
+          "required" : false,
+          "deprecated" : false,
+          "explode" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64",
+            "title" : "Long"
+          }
+        } ],
+        "responses" : {
+          "400" : {
+            "description" : "Bad Request",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "402" : {
+            "description" : "Payment Required",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "405" : {
+            "description" : "Method Not Allowed",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "406" : {
+            "description" : "Not Acceptable",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "407" : {
+            "description" : "Proxy Authentication Required",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "408" : {
+            "description" : "Request Timeout",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "410" : {
+            "description" : "Gone",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "411" : {
+            "description" : "Length Required",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "412" : {
+            "description" : "Precondition Failed",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "413" : {
+            "description" : "Payload Too Large",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "414" : {
+            "description" : "Request-URI Too Long",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "415" : {
+            "description" : "Unsupported Media Type",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "416" : {
+            "description" : "Requested Range Not Satisfiable",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "417" : {
+            "description" : "Expectation Failed",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "418" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "421" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Unprocessable Entity",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "423" : {
+            "description" : "Locked",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "424" : {
+            "description" : "Failed Dependency",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "425" : {
+            "description" : "Too Early",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "426" : {
+            "description" : "Upgrade Required",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "428" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too Many Requests",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "431" : {
+            "description" : "Request Header Fields Too Large",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "451" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "501" : {
+            "description" : "Not Implemented",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "502" : {
+            "description" : "Bad Gateway",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "503" : {
+            "description" : "Service Unavailable",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "504" : {
+            "description" : "Gateway Timeout",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "505" : {
+            "description" : "HTTP Version Not Supported",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "506" : {
+            "description" : "Variant Also Negotiates",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "507" : {
+            "description" : "Insufficient Storage",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "508" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "510" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "511" : {
+            "description" : "Unknown Status Code",
+            "headers" : { },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.api.rest.types.ErrorResponse"
+                }
+              }
+            }
+          },
+          "200" : {
+            "description" : "Success, returns a page of item entities",
+            "headers" : {
+              "X-Request-ID" : {
+                "description" : "The Unique identifier for the corresponding request",
+                "required" : true,
+                "deprecated" : false,
+                "schema" : {
+                  "type" : "string",
+                  "title" : "String"
+                }
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/cards.arda.common.lib.module.dataauthority.PageResult"
+                }
+              }
+            }
+          }
+        },
+        "deprecated" : false
+      }
+    }
+  },
+  "components" : {
+    "schemas" : {
+      "string" : {
+        "type" : "string",
+        "title" : "String"
+      },
+      "kotlinx.serialization.json.JsonElement" : {
+        "type" : "object",
+        "properties" : { },
+        "title" : "JsonElement"
+      },
+      "cards.arda.common.lib.api.rest.types.ErrorResponse" : {
+        "type" : "object",
+        "properties" : {
+          "responseMessage" : {
+            "type" : "string",
+            "title" : "String"
+          },
+          "code" : {
+            "type" : "integer",
+            "format" : "int32",
+            "title" : "Int"
+          },
+          "details" : {
+            "oneOf" : [ {
+              "type" : "null"
+            }, {
+              "$ref" : "#/components/schemas/kotlinx.serialization.json.JsonElement"
+            } ]
+          }
+        },
+        "required" : [ "code", "responseMessage" ],
+        "title" : "ErrorResponse"
+      },
+      "UUID" : {
+        "type" : "object",
+        "properties" : { },
+        "title" : "UUID"
+      },
+      "cards.arda.common.lib.persistence.bitemporal.TimeCoordinates" : {
+        "type" : "object",
+        "properties" : {
+          "effective" : {
+            "type" : "integer",
+            "format" : "int64",
+            "title" : "Long"
+          },
+          "recorded" : {
+            "type" : "integer",
+            "format" : "int64",
+            "title" : "Long"
+          }
+        },
+        "required" : [ "effective", "recorded" ],
+        "title" : "TimeCoordinates"
+      },
+      "cards.arda.qrLookup.itemda.business.Item" : {
+        "type" : "object",
+        "properties" : {
+          "eId" : {
+            "$ref" : "#/components/schemas/UUID"
+          },
+          "externalGuid" : {
+            "type" : "string",
+            "title" : "String"
+          },
+          "name" : {
+            "type" : "string",
+            "title" : "String"
+          },
+          "orderMechanism" : {
+            "type" : "string",
+            "title" : "String"
+          },
+          "location" : {
+            "type" : [ "null", "string" ],
+            "title" : "String"
+          },
+          "minQty" : {
+            "type" : "integer",
+            "format" : "int32",
+            "title" : "Int"
+          },
+          "minQtyUnit" : {
+            "type" : "string",
+            "title" : "String"
+          },
+          "orderQty" : {
+            "type" : [ "null", "integer" ],
+            "format" : "int32",
+            "title" : "Int"
+          },
+          "orderQtyUnit" : {
+            "type" : [ "null", "string" ],
+            "title" : "String"
+          },
+          "primarySupplier" : {
+            "type" : "string",
+            "title" : "String"
+          },
+          "primarySupplierLink" : {
+            "type" : [ "null", "string" ],
+            "title" : "String"
+          },
+          "imageUrl" : {
+            "type" : [ "null", "string" ],
+            "title" : "String"
+          }
+        },
+        "required" : [ "eId", "externalGuid", "minQty", "minQtyUnit", "name", "orderMechanism", "primarySupplier" ],
+        "title" : "Item"
+      },
+      "cards.arda.qrLookup.itemda.business.ItemMetadata" : {
+        "type" : "object",
+        "properties" : {
+          "tenantId" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        },
+        "required" : [ "tenantId" ],
+        "title" : "ItemMetadata"
+      },
+      "cards.arda.common.lib.module.dataauthority.EntityRecord" : {
+        "type" : "object",
+        "properties" : {
+          "rId" : {
+            "$ref" : "#/components/schemas/UUID"
+          },
+          "asOf" : {
+            "$ref" : "#/components/schemas/cards.arda.common.lib.persistence.bitemporal.TimeCoordinates"
+          },
+          "payload" : {
+            "$ref" : "#/components/schemas/cards.arda.qrLookup.itemda.business.Item"
+          },
+          "metadata" : {
+            "$ref" : "#/components/schemas/cards.arda.qrLookup.itemda.business.ItemMetadata"
+          },
+          "previous" : {
+            "oneOf" : [ {
+              "type" : "null"
+            }, {
+              "$ref" : "#/components/schemas/UUID"
+            } ]
+          },
+          "retired" : {
+            "type" : "boolean",
+            "title" : "Boolean"
+          }
+        },
+        "required" : [ "asOf", "metadata", "payload", "rId", "retired" ],
+        "title" : "EntityRecord"
+      },
+      "cards.arda.qrLookup.itemda.api.ItemInput" : {
+        "type" : "object",
+        "properties" : {
+          "externalGuid" : {
+            "type" : "string",
+            "title" : "String"
+          },
+          "name" : {
+            "type" : "string",
+            "title" : "String"
+          },
+          "orderMechanism" : {
+            "type" : "string",
+            "title" : "String"
+          },
+          "location" : {
+            "type" : [ "null", "string" ],
+            "title" : "String"
+          },
+          "minQty" : {
+            "type" : "integer",
+            "format" : "int32",
+            "title" : "Int"
+          },
+          "minQtyUnit" : {
+            "type" : "string",
+            "title" : "String"
+          },
+          "orderQty" : {
+            "type" : [ "null", "integer" ],
+            "format" : "int32",
+            "title" : "Int"
+          },
+          "orderQtyUnit" : {
+            "type" : [ "null", "string" ],
+            "title" : "String"
+          },
+          "primarySupplier" : {
+            "type" : "string",
+            "title" : "String"
+          },
+          "primarySupplierLink" : {
+            "type" : [ "null", "string" ],
+            "title" : "String"
+          },
+          "imageUrl" : {
+            "type" : [ "null", "string" ],
+            "title" : "String"
+          }
+        },
+        "required" : [ "externalGuid", "minQty", "minQtyUnit", "name", "orderMechanism", "primarySupplier" ],
+        "title" : "ItemInput"
+      },
+      "cards.arda.qrLookup.itemda.api.ItemInputMetadata" : {
+        "type" : "object",
+        "properties" : {
+          "tenantId" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        },
+        "required" : [ "tenantId" ],
+        "title" : "ItemInputMetadata"
+      },
+      "cards.arda.common.lib.api.rest.server.dataauthority.RequestCreate" : {
+        "type" : "object",
+        "properties" : {
+          "payload" : {
+            "$ref" : "#/components/schemas/cards.arda.qrLookup.itemda.api.ItemInput"
+          },
+          "metadata" : {
+            "$ref" : "#/components/schemas/cards.arda.qrLookup.itemda.api.ItemInputMetadata"
+          },
+          "effectiveAt" : {
+            "type" : "integer",
+            "format" : "int64",
+            "title" : "Long"
+          },
+          "author" : {
+            "type" : "string",
+            "title" : "String"
+          }
+        },
+        "required" : [ "author", "effectiveAt", "metadata", "payload" ],
+        "title" : "RequestCreate"
+      },
+      "Filter" : {
+        "type" : "object",
+        "properties" : { },
+        "title" : "Filter"
+      },
+      "cards.arda.common.lib.lang.query.Sort" : {
+        "type" : "object",
+        "properties" : {
+          "entries" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/cards.arda.common.lib.lang.query.SortEntry"
+            },
+            "title" : "ArrayList<SortEntry>"
+          }
+        },
+        "required" : [ "entries" ],
+        "title" : "Sort"
+      },
+      "cards.arda.common.lib.lang.query.SortEntry" : {
+        "type" : "object",
+        "properties" : {
+          "key" : {
+            "type" : "string",
+            "title" : "String"
+          },
+          "direction" : {
+            "$ref" : "#/components/schemas/cards.arda.common.lib.lang.query.SortDirection"
+          }
+        },
+        "required" : [ "direction", "key" ],
+        "title" : "SortEntry"
+      },
+      "cards.arda.common.lib.lang.query.SortDirection" : {
+        "type" : "string",
+        "enum" : [ "ASC", "DESC" ],
+        "title" : "SortDirection"
+      },
+      "cards.arda.common.lib.lang.query.Pagination" : {
+        "type" : "object",
+        "properties" : {
+          "index" : {
+            "type" : "integer",
+            "format" : "int32",
+            "title" : "Int"
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32",
+            "title" : "Int"
+          }
+        },
+        "required" : [ "index", "size" ],
+        "title" : "Pagination"
+      },
+      "cards.arda.common.lib.lang.query.Query" : {
+        "type" : "object",
+        "properties" : {
+          "filter" : {
+            "$ref" : "#/components/schemas/Filter"
+          },
+          "sort" : {
+            "$ref" : "#/components/schemas/cards.arda.common.lib.lang.query.Sort"
+          },
+          "paginate" : {
+            "$ref" : "#/components/schemas/cards.arda.common.lib.lang.query.Pagination"
+          }
+        },
+        "required" : [ "filter", "paginate", "sort" ],
+        "title" : "Query"
+      },
+      "cards.arda.common.lib.module.dataauthority.PageResult" : {
+        "type" : "object",
+        "properties" : {
+          "thisPage" : {
+            "type" : "string",
+            "title" : "String"
+          },
+          "nextPage" : {
+            "type" : "string",
+            "title" : "String"
+          },
+          "previousPage" : {
+            "type" : [ "null", "string" ],
+            "title" : "String"
+          },
+          "results" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/cards.arda.common.lib.module.dataauthority.EntityRecord"
+            },
+            "title" : "ArrayList<EntityRecord>"
+          },
+          "totalCount" : {
+            "type" : [ "null", "integer" ],
+            "format" : "int64",
+            "title" : "Long"
+          }
+        },
+        "required" : [ "nextPage", "results", "thisPage" ],
+        "title" : "PageResult"
+      },
+      "cards.arda.common.lib.api.rest.server.dataauthority.DataAuthorityEndpointSpec.HistoryRequestBody" : {
+        "type" : "object",
+        "properties" : {
+          "since" : {
+            "$ref" : "#/components/schemas/cards.arda.common.lib.persistence.bitemporal.TimeCoordinates"
+          },
+          "until" : {
+            "$ref" : "#/components/schemas/cards.arda.common.lib.persistence.bitemporal.TimeCoordinates"
+          },
+          "page" : {
+            "oneOf" : [ {
+              "type" : "null"
+            }, {
+              "$ref" : "#/components/schemas/cards.arda.common.lib.lang.query.Pagination"
+            } ]
+          }
+        },
+        "required" : [ "since", "until" ],
+        "title" : "HistoryRequestBody"
+      }
+    },
+    "examples" : { },
+    "securitySchemes" : {
+      "bearer-token-arda-auth" : {
+        "type" : "apiKey",
+        "name" : "bearer-token-arda-auth",
+        "scheme" : "bearer",
+        "bearerFormat" : "String, provided by Arda Systems"
+      }
+    }
+  },
+  "webhooks" : { }
+}

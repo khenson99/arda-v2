@@ -1,0 +1,22 @@
+{
+  "timestamp": "2026-02-11T00:35:20.657Z",
+  "baseUrl": "http://127.0.0.1:5173",
+  "email": "kanban-btn-1770770120657@example.com",
+  "itemCode": "PW-KANBAN-120657",
+  "status": "failed",
+  "steps": [
+    "Open app"
+  ],
+  "artifacts": {
+    "initial": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-35-20-656Z-kanban-btn-initial.png",
+    "afterCreateItem": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-35-20-656Z-kanban-btn-after-create-item.png",
+    "afterCreateCard": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-35-20-656Z-kanban-btn-after-create-card.png",
+    "failure": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-35-20-656Z-kanban-btn-failure.png",
+    "reportJson": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-35-20-656Z-kanban-btn-report.json",
+    "reportMd": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-35-20-656Z-kanban-btn-report.md"
+  },
+  "error": {
+    "message": "page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:5173/\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:5173/\", waiting until \"domcontentloaded\"\u001b[22m\n",
+    "stack": "page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:5173/\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:5173/\", waiting until \"domcontentloaded\"\u001b[22m\n\n    at /Users/kylehenson/arda-v2/output/playwright/test-create-kanban-button.live.js:41:16"
+  }
+}

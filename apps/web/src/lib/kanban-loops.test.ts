@@ -10,10 +10,15 @@ vi.mock("@/lib/api-client", () => ({
 describe("fetchLoopsForPart", () => {
   const fetchLoopsMock = vi.mocked(fetchLoops);
   const token = "token-123";
-  const part = {
+  const nonUuidPart = {
     id: "PART-1",
     eId: "legacy-1",
     externalGuid: "ext-1",
+  } as PartRecord;
+  const uuidPart = {
+    id: "28f8cb2f-1a21-4147-9fd0-7a9f40d9d881",
+    eId: "28f8cb2f-1a21-4147-9fd0-7a9f40d9d881",
+    externalGuid: "PART-UUID",
   } as PartRecord;
 
   const makeLoop = (id: string, partId: string) =>
@@ -23,7 +28,7 @@ describe("fetchLoopsForPart", () => {
     fetchLoopsMock.mockReset();
   });
 
-  it("walks all pages and returns loops linked to the part", async () => {
+  it("walks all pages and returns loops linked to the part for non-uuid link ids", async () => {
     fetchLoopsMock
       .mockResolvedValueOnce({
         data: [makeLoop("loop-a", "other")],
@@ -38,7 +43,7 @@ describe("fetchLoopsForPart", () => {
         pagination: { page: 3, pageSize: 100, total: 3, totalPages: 3 },
       });
 
-    const result = await fetchLoopsForPart(token, part);
+    const result = await fetchLoopsForPart(token, nonUuidPart);
 
     expect(fetchLoopsMock).toHaveBeenCalledTimes(3);
     expect(fetchLoopsMock).toHaveBeenNthCalledWith(1, token, { page: 1, pageSize: 100 });
@@ -53,9 +58,26 @@ describe("fetchLoopsForPart", () => {
       pagination: { page: 1, pageSize: 100, total: 1, totalPages: 1 },
     });
 
-    const result = await fetchLoopsForPart(token, part);
+    const result = await fetchLoopsForPart(token, nonUuidPart);
 
     expect(fetchLoopsMock).toHaveBeenCalledTimes(1);
     expect(result).toEqual([]);
+  });
+
+  it("uses partId filtering when the part link id is a uuid", async () => {
+    fetchLoopsMock.mockResolvedValueOnce({
+      data: [makeLoop("loop-uuid", "28f8cb2f-1a21-4147-9fd0-7a9f40d9d881")],
+      pagination: { page: 1, pageSize: 100, total: 1, totalPages: 1 },
+    });
+
+    const result = await fetchLoopsForPart(token, uuidPart);
+
+    expect(fetchLoopsMock).toHaveBeenCalledTimes(1);
+    expect(fetchLoopsMock).toHaveBeenCalledWith(token, {
+      partId: "28f8cb2f-1a21-4147-9fd0-7a9f40d9d881",
+      page: 1,
+      pageSize: 100,
+    });
+    expect(result).toEqual([makeLoop("loop-uuid", "28f8cb2f-1a21-4147-9fd0-7a9f40d9d881")]);
   });
 });

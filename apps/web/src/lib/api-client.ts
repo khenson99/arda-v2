@@ -1074,10 +1074,12 @@ function normalizeParameterHistory(
 
 export async function fetchLoops(
   token: string,
-  params?: { loopType?: LoopType; page?: number; pageSize?: number },
+  params?: { loopType?: LoopType; facilityId?: string; partId?: string; page?: number; pageSize?: number },
 ): Promise<{ data: KanbanLoop[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }> {
   const qs = new URLSearchParams();
   if (params?.loopType) qs.set("loopType", params.loopType);
+  if (params?.facilityId) qs.set("facilityId", params.facilityId);
+  if (params?.partId) qs.set("partId", params.partId);
   if (params?.page) qs.set("page", String(params.page));
   if (params?.pageSize) qs.set("pageSize", String(params.pageSize));
   const suffix = qs.toString() ? `?${qs.toString()}` : "";

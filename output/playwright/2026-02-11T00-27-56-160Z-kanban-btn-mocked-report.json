@@ -1,0 +1,126 @@
+{
+  "timestamp": "2026-02-11T00:27:56.161Z",
+  "baseUrl": "http://127.0.0.1:4173/parts",
+  "itemCode": "PW-KANBAN-676161",
+  "status": "passed",
+  "steps": [
+    "Open parts page with mocked authenticated session",
+    "Click quick action Create card button",
+    "Verify success toast and pagination behavior"
+  ],
+  "artifacts": {
+    "initial": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-27-56-160Z-kanban-btn-mocked-initial.png",
+    "afterClick": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-27-56-160Z-kanban-btn-mocked-after-click.png",
+    "failure": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-27-56-160Z-kanban-btn-mocked-failure.png",
+    "reportJson": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-27-56-160Z-kanban-btn-mocked-report.json",
+    "reportMd": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-27-56-160Z-kanban-btn-mocked-report.md"
+  },
+  "state": {
+    "loopPagesRequested": [
+      1,
+      2
+    ],
+    "loopPatchCalls": 1,
+    "updateItemRecordCalls": 0,
+    "requests": [
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/auth/me",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/orders/queue/summary",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/orders/queue",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "POST",
+        "pathname": "/api/items/item/query",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/notifications",
+        "search": "?limit=20"
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/notifications/unread-count",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "POST",
+        "pathname": "/api/orders/order/query",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/kanban/loops",
+        "search": "?page=1&pageSize=100"
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/kanban/loops",
+        "search": "?page=2&pageSize=100"
+      },
+      {
+        "kind": "api",
+        "method": "PATCH",
+        "pathname": "/api/kanban/loops/loop-target/parameters",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/orders/queue/summary",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/orders/queue",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "POST",
+        "pathname": "/api/items/item/query",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/notifications",
+        "search": "?limit=20"
+      },
+      {
+        "kind": "api",
+        "method": "GET",
+        "pathname": "/api/notifications/unread-count",
+        "search": ""
+      },
+      {
+        "kind": "api",
+        "method": "POST",
+        "pathname": "/api/orders/order/query",
+        "search": ""
+      }
+    ]
+  },
+  "toastText": "Created card #2 in Procurement loop.",
+  "error": null
+}

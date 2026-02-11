@@ -1,0 +1,26 @@
+{
+  "timestamp": "2026-02-11T00:41:35.751Z",
+  "baseUrl": "http://127.0.0.1:4173",
+  "email": "kanban-btn-1770770495751@example.com",
+  "itemCode": "PW-KANBAN-495751",
+  "status": "failed",
+  "steps": [
+    "Open app",
+    "Register account",
+    "Wait for authenticated app shell",
+    "Navigate to parts page",
+    "Create test item"
+  ],
+  "artifacts": {
+    "initial": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-41-35-750Z-kanban-btn-initial.png",
+    "afterCreateItem": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-41-35-750Z-kanban-btn-after-create-item.png",
+    "afterCreateCard": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-41-35-750Z-kanban-btn-after-create-card.png",
+    "failure": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-41-35-750Z-kanban-btn-failure.png",
+    "reportJson": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-41-35-750Z-kanban-btn-report.json",
+    "reportMd": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-41-35-750Z-kanban-btn-report.md"
+  },
+  "error": {
+    "message": "locator.fill: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByLabel('Item code')\u001b[22m\n",
+    "stack": "locator.fill: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByLabel('Item code')\u001b[22m\n\n    at /Users/kylehenson/arda-v2/output/playwright/test-create-kanban-button.live-preview4173-ipv4.js:62:40"
+  }
+}

@@ -1,0 +1,121 @@
+{
+  "startedAt": "2026-02-11T00:17:27.013Z",
+  "baseUrl": "https://arda-v2-peach.vercel.app",
+  "marker": "SMOKE-WYSIWYG-2026-02-11T00:17:27.013Z-6rnpo7",
+  "pass": false,
+  "steps": [
+    {
+      "step": "Open bypass URL and establish cookie",
+      "status": "started"
+    },
+    {
+      "step": "Open bypass URL and establish cookie",
+      "status": "passed"
+    },
+    {
+      "step": "Login",
+      "status": "started"
+    },
+    {
+      "step": "Login",
+      "status": "passed"
+    },
+    {
+      "step": "Navigate to /parts and assert Items page",
+      "status": "started"
+    },
+    {
+      "step": "Navigate to /parts and assert Items page",
+      "status": "passed"
+    },
+    {
+      "step": "Open first item row detail panel",
+      "status": "started"
+    },
+    {
+      "step": "Open first item row detail panel",
+      "status": "passed"
+    },
+    {
+      "step": "Open Card Editor and verify Item Notes",
+      "status": "started"
+    },
+    {
+      "step": "Open Card Editor and verify Item Notes",
+      "status": "passed"
+    },
+    {
+      "step": "Verify WYSIWYG editor render (with one retry path)",
+      "status": "started"
+    },
+    {
+      "step": "Verify WYSIWYG editor render (with one retry path)",
+      "status": "passed"
+    },
+    {
+      "step": "Capture original notes state",
+      "status": "started"
+    },
+    {
+      "step": "Capture original notes state",
+      "status": "passed"
+    },
+    {
+      "step": "Insert marker and Save notes",
+      "status": "started"
+    }
+  ],
+  "artifacts": {
+    "editorPanel": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-17-27-012Z-editor-panel.png",
+    "failure": "/Users/kylehenson/arda-v2/output/playwright/2026-02-11T00-17-27-012Z-failure.png"
+  },
+  "console": {
+    "warnings": [],
+    "errors": [
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 404 ()",
+        "location": {
+          "url": "https://api-gateway-production-83fa.up.railway.app/api/orders/order/query",
+          "lineNumber": 0,
+          "columnNumber": 0
+        }
+      },
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 404 ()",
+        "location": {
+          "url": "https://api-gateway-production-83fa.up.railway.app/api/orders/order/query",
+          "lineNumber": 0,
+          "columnNumber": 0
+        }
+      }
+    ],
+    "pageErrors": []
+  },
+  "data": {
+    "original": {
+      "html": "<p>SMOKE-WYSIWYG-2026-02-11T00:14:50.991Z-vblfe5</p>",
+      "text": "SMOKE-WYSIWYG-2026-02-11T00:14:50.991Z-vblfe5"
+    },
+    "afterSave": {
+      "html": null,
+      "text": null
+    },
+    "afterRollback": {
+      "html": null,
+      "text": null
+    }
+  },
+  "rollback": {
+    "attempted": false,
+    "success": false,
+    "exactHtmlMatch": false,
+    "textMatch": false
+  },
+  "error": {
+    "message": "Unable to set editor content via automation input paths",
+    "stack": "Error: Unable to set editor content via automation input paths\n    at setEditorPlainText (/private/tmp/wysiwyg_prod_smoke.js:102:11)\n    at async /private/tmp/wysiwyg_prod_smoke.js:166:5"
+  },
+  "finishedAt": "2026-02-11T00:17:32.120Z"
+}

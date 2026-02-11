@@ -98,6 +98,7 @@ export function ItemDetailPanel({
               part={part}
               token={session.tokens.accessToken}
               onUnauthorized={onUnauthorized}
+              onOpenLoopsTab={() => setActiveTab("loops")}
             />
           </div>
         </div>
