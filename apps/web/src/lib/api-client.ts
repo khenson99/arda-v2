@@ -33,6 +33,9 @@ import type {
   PurchaseOrder,
   POStatus,
   WorkOrder,
+  WorkOrderDetail,
+  WOStatus,
+  RoutingStepStatus,
   TransferOrder,
   TOStatus,
   SourceRecommendation,
@@ -1444,13 +1447,86 @@ export async function sendPurchaseOrderEmailDraft(
 
 export async function fetchWorkOrders(
   token: string,
-  params?: { page?: number; pageSize?: number },
+  params?: { page?: number; pageSize?: number; status?: WOStatus; partId?: string; facilityId?: string; kanbanCardId?: string },
 ): Promise<{ data: WorkOrder[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }> {
   const qs = new URLSearchParams();
   if (params?.page) qs.set("page", String(params.page));
   if (params?.pageSize) qs.set("pageSize", String(params.pageSize));
+  if (params?.status) qs.set("status", params.status);
+  if (params?.partId) qs.set("partId", params.partId);
+  if (params?.facilityId) qs.set("facilityId", params.facilityId);
+  if (params?.kanbanCardId) qs.set("kanbanCardId", params.kanbanCardId);
   const suffix = qs.toString() ? `?${qs.toString()}` : "";
   return apiRequest(`/api/orders/work-orders${suffix}`, { token });
+}
+
+export async function fetchWorkOrder(
+  token: string,
+  id: string,
+): Promise<WorkOrderDetail> {
+  return apiRequest(`/api/orders/work-orders/${encodeURIComponent(id)}`, { token });
+}
+
+export async function createWorkOrder(
+  token: string,
+  input: {
+    partId: string;
+    facilityId: string;
+    quantityToProduce: number;
+    scheduledStartDate?: string;
+    scheduledEndDate?: string;
+    priority?: number;
+    notes?: string;
+    kanbanCardId?: string;
+    routingSteps: Array<{
+      workCenterId: string;
+      stepNumber: number;
+      operationName: string;
+      estimatedMinutes?: number;
+    }>;
+  },
+): Promise<WorkOrderDetail> {
+  return apiRequest("/api/orders/work-orders", {
+    method: "POST",
+    token,
+    body: input,
+  });
+}
+
+export async function updateWorkOrderStatus(
+  token: string,
+  id: string,
+  input: { status: WOStatus; holdReason?: string; holdNotes?: string; cancelReason?: string; notes?: string },
+): Promise<WorkOrderDetail> {
+  return apiRequest(`/api/orders/work-orders/${encodeURIComponent(id)}/status`, {
+    method: "PATCH",
+    token,
+    body: input,
+  });
+}
+
+export async function updateWorkOrderRoutingStep(
+  token: string,
+  woId: string,
+  routingId: string,
+  input: { status?: RoutingStepStatus; actualMinutes?: number; notes?: string },
+): Promise<WorkOrderDetail> {
+  return apiRequest(
+    `/api/orders/work-orders/${encodeURIComponent(woId)}/routings/${encodeURIComponent(routingId)}`,
+    { method: "PATCH", token, body: input },
+  );
+}
+
+export async function reportWorkOrderProduction(
+  token: string,
+  id: string,
+  input: { quantityProduced: number; quantityRejected?: number },
+): Promise<WorkOrderDetail> {
+  return apiRequest(`/api/orders/work-orders/${encodeURIComponent(id)}/production`, {
+    method: "PATCH",
+    token,
+    body: input,
+  });
 }
 
 /* ── Transfer Orders ──────────────────────────────────────────── */

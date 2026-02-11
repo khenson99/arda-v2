@@ -534,7 +534,26 @@ export interface PurchaseOrderLine {
 
 /* ── Work Order ──────────────────────────────────────────────── */
 
-export type WOStatus = "draft" | "scheduled" | "in_progress" | "completed" | "cancelled";
+export type WOStatus = "draft" | "scheduled" | "in_progress" | "on_hold" | "completed" | "cancelled";
+
+export type RoutingStepStatus = "pending" | "in_progress" | "complete" | "on_hold" | "skipped";
+
+export interface WorkOrderRoutingStep {
+  id: string;
+  tenantId: string;
+  workOrderId: string;
+  workCenterId: string;
+  stepNumber: number;
+  operationName: string;
+  status: RoutingStepStatus;
+  estimatedMinutes: number | null;
+  actualMinutes: number | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface WorkOrder {
   id: string;
@@ -544,13 +563,31 @@ export interface WorkOrder {
   facilityId: string;
   partId: string;
   partName?: string;
-  quantityOrdered: number;
-  quantityCompleted: number;
-  scheduledDate: string | null;
-  completedAt: string | null;
+  quantityToProduce: number;
+  quantityProduced: number;
+  quantityRejected: number;
+  quantityScrapped: number;
+  scheduledStartDate: string | null;
+  scheduledEndDate: string | null;
+  actualStartDate: string | null;
+  actualEndDate: string | null;
+  priority: number;
+  isExpedited: boolean;
+  isRework: boolean;
+  parentWorkOrderId: string | null;
+  holdReason: string | null;
+  holdNotes: string | null;
+  cancelReason: string | null;
+  routingTemplateId: string | null;
   notes: string | null;
+  kanbanCardId: string | null;
+  createdByUserId: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface WorkOrderDetail extends WorkOrder {
+  routingSteps: WorkOrderRoutingStep[];
 }
 
 /* ── Transfer Order ──────────────────────────────────────────── */

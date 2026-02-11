@@ -17,6 +17,7 @@ import { LoopsRoute } from "@/pages/loops";
 import { OrderHistoryRoute } from "@/pages/order-history";
 import { ReceivingRoute } from "@/pages/receiving";
 import { PODetailRoute } from "@/pages/orders/po-detail";
+import { WODetailRoute } from "@/pages/orders/wo-detail";
 import type { AuthResponse, AuthSession } from "@/types";
 
 function detectGuestMobileImportLink(): boolean {
@@ -133,6 +134,7 @@ function App() {
           <Route path="queue" element={<ErrorBoundary><QueueRoute session={session} onUnauthorized={clearSession} /></ErrorBoundary>} />
           <Route path="orders" element={<ErrorBoundary><OrderHistoryRoute session={session} onUnauthorized={clearSession} /></ErrorBoundary>} />
           <Route path="orders/po/:id" element={<ErrorBoundary><PODetailRoute session={session} onUnauthorized={clearSession} /></ErrorBoundary>} />
+          <Route path="orders/wo/:id" element={<ErrorBoundary><WODetailRoute session={session} onUnauthorized={clearSession} /></ErrorBoundary>} />
           <Route path="receiving" element={<ErrorBoundary><ReceivingRoute session={session} onUnauthorized={clearSession} /></ErrorBoundary>} />
           <Route path="scan" element={<ErrorBoundary><ScanRoute session={session} onUnauthorized={clearSession} /></ErrorBoundary>} />
           <Route path="scan/:cardId" element={<ErrorBoundary><ScanRoute session={session} onUnauthorized={clearSession} /></ErrorBoundary>} />

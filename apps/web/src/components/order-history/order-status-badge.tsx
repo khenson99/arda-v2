@@ -9,6 +9,7 @@ const WO_STATUS_META: Record<WOStatus, { label: string; colorClass: string }> = 
   draft: { label: "Draft", colorClass: "bg-muted text-muted-foreground border-border" },
   scheduled: { label: "Scheduled", colorClass: "bg-accent/10 text-[hsl(var(--accent))] border-accent/20" },
   in_progress: { label: "In Progress", colorClass: "bg-accent/10 text-[hsl(var(--accent))] border-accent/20" },
+  on_hold: { label: "On Hold", colorClass: "bg-destructive/10 text-destructive border-destructive/20" },
   completed: { label: "Completed", colorClass: "bg-[hsl(var(--arda-success-light))] text-[hsl(var(--arda-success))] border-[hsl(var(--arda-success))]/20" },
   cancelled: { label: "Cancelled", colorClass: "bg-destructive/10 text-destructive border-destructive/20" },
 };
