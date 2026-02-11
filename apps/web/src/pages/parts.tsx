@@ -2,7 +2,6 @@ import * as React from "react";
 import { useOutletContext } from "react-router-dom";
 import {
   Check,
-  CircleHelp,
   Loader2,
   Plus,
   Printer,
@@ -246,17 +245,11 @@ export function PartsRoute({
   const partsHeaderActions = React.useMemo(
     () => (
       <>
-        <ColumnConfig visibleColumns={visibleColumns} onColumnsChange={setVisibleColumns} />
-        <Button variant="outline" className="h-9" asChild>
-          <a href="mailto:support@arda.app?subject=Arda%20Support%20Request">
-            <CircleHelp className="h-4 w-4" />
-            Support
-          </a>
-        </Button>
         <Button className="h-9" onClick={openCreateItemDialog}>
           <Plus className="h-4 w-4" />
           Add item
         </Button>
+        <ColumnConfig visibleColumns={visibleColumns} onColumnsChange={setVisibleColumns} />
       </>
     ),
     [openCreateItemDialog, visibleColumns],

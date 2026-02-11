@@ -156,6 +156,9 @@ export function AppShell({ session, onSignOut }: AppShellProps) {
               )}
 
               <div className="ml-auto flex items-center gap-2">
+                {!queueHeaderControls && pageHeaderActions && (
+                  <div className="hidden items-center gap-1.5 md:flex">{pageHeaderActions}</div>
+                )}
                 <Button asChild variant="outline" size="sm">
                   <Link to="/scan">
                     <QrCode className="h-4 w-4" />
@@ -249,12 +252,6 @@ export function AppShell({ session, onSignOut }: AppShellProps) {
                   )}
                   Refresh
                 </Button>
-              </div>
-            )}
-
-            {!queueHeaderControls && pageHeaderActions && (
-              <div className="mt-2 flex flex-wrap items-center justify-end gap-1.5">
-                {pageHeaderActions}
               </div>
             )}
 
