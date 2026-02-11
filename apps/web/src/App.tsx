@@ -18,6 +18,7 @@ import { OrderHistoryRoute } from "@/pages/order-history";
 import { ReceivingRoute } from "@/pages/receiving";
 import { PODetailRoute } from "@/pages/orders/po-detail";
 import { WODetailRoute } from "@/pages/orders/wo-detail";
+import { TODetailRoute } from "@/pages/orders/to-detail";
 import { ProfilePage } from "@/pages/profile";
 import { NotificationsRoute } from "@/pages/notifications";
 import type { AuthResponse, AuthSession } from "@/types";
@@ -137,6 +138,7 @@ function App() {
           <Route path="orders" element={<ErrorBoundary><OrderHistoryRoute session={session} onUnauthorized={clearSession} /></ErrorBoundary>} />
           <Route path="orders/po/:id" element={<ErrorBoundary><PODetailRoute session={session} onUnauthorized={clearSession} /></ErrorBoundary>} />
           <Route path="orders/wo/:id" element={<ErrorBoundary><WODetailRoute session={session} onUnauthorized={clearSession} /></ErrorBoundary>} />
+          <Route path="orders/to/:id" element={<ErrorBoundary><TODetailRoute session={session} onUnauthorized={clearSession} /></ErrorBoundary>} />
           <Route path="receiving" element={<ErrorBoundary><ReceivingRoute session={session} onUnauthorized={clearSession} /></ErrorBoundary>} />
           <Route path="scan" element={<ErrorBoundary><ScanRoute session={session} onUnauthorized={clearSession} /></ErrorBoundary>} />
           <Route path="scan/:cardId" element={<ErrorBoundary><ScanRoute session={session} onUnauthorized={clearSession} /></ErrorBoundary>} />
