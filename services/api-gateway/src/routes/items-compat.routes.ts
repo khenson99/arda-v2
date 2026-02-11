@@ -46,9 +46,14 @@ type CatalogPart = {
   type: string;
   uom: string;
   isActive: boolean;
+  description?: string | null;
+  specifications?: Record<string, string> | null;
+  imageUrl?: string | null;
   updatedAt?: string;
   createdAt?: string;
 };
+
+const ITEM_NOTES_SPEC_KEY = '__ardaItemNotesHtml';
 
 function requireTenantId(req: AuthRequest): string {
   const tenantId = req.user?.tenantId?.trim();
@@ -63,6 +68,36 @@ function requireTenantId(req: AuthRequest): string {
 function normalizeOptionalString(input?: string | null): string | null {
   const normalized = input?.trim();
   return normalized ? normalized : null;
+}
+
+function sanitizeSpecifications(input?: Record<string, string> | null): Record<string, string> {
+  if (!input || typeof input !== 'object') return {};
+  const next: Record<string, string> = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (typeof value === 'string') {
+      next[key] = value;
+    }
+  }
+  return next;
+}
+
+function mergeNotesIntoSpecifications(
+  existing: Record<string, string> | null | undefined,
+  notes: string | null | undefined
+): Record<string, string> {
+  const next = sanitizeSpecifications(existing);
+  const normalizedNotes = normalizeOptionalString(notes);
+  if (normalizedNotes) {
+    next[ITEM_NOTES_SPEC_KEY] = normalizedNotes;
+  } else {
+    delete next[ITEM_NOTES_SPEC_KEY];
+  }
+  return next;
+}
+
+function resolveItemNotes(part: CatalogPart): string | null {
+  const specs = sanitizeSpecifications(part.specifications);
+  return normalizeOptionalString(specs[ITEM_NOTES_SPEC_KEY]) ?? normalizeOptionalString(part.description);
 }
 
 function toPositiveInt(input?: number | null, fallback = 1): number {
@@ -152,6 +187,8 @@ async function createCatalogPart(input: {
   type: string;
   uom: string;
   imageUrl?: string | null;
+  description?: string | null;
+  specifications?: Record<string, string>;
 }): Promise<CatalogPart> {
   const response = await fetch(`${serviceUrls.catalog}/parts`, {
     method: 'POST',
@@ -165,6 +202,8 @@ async function createCatalogPart(input: {
       type: input.type,
       uom: input.uom,
       imageUrl: input.imageUrl || undefined,
+      description: input.description || undefined,
+      specifications: input.specifications ?? undefined,
       isSellable: false,
     }),
   });
@@ -185,6 +224,8 @@ async function updateCatalogPart(input: {
   type: string;
   uom: string;
   imageUrl?: string | null;
+  description?: string | null;
+  specifications?: Record<string, string>;
 }): Promise<CatalogPart> {
   const response = await fetch(`${serviceUrls.catalog}/parts/${encodeURIComponent(input.id)}`, {
     method: 'PATCH',
@@ -197,6 +238,8 @@ async function updateCatalogPart(input: {
       type: input.type,
       uom: input.uom,
       imageUrl: input.imageUrl || undefined,
+      description: input.description || undefined,
+      specifications: input.specifications ?? undefined,
     }),
   });
 
@@ -369,6 +412,10 @@ itemsCompatRouter.put('/item/:entityId', async (req: AuthRequest, res, next) => 
 
     const type = toCatalogType(input.payload.orderMechanism);
     const uom = toCatalogUom(input.payload.minQtyUnit, input.payload.orderQtyUnit);
+    const hasNotesPatch = Object.prototype.hasOwnProperty.call(input.payload, 'notes');
+    const specifications = hasNotesPatch
+      ? mergeNotesIntoSpecifications(existing?.specifications, input.payload.notes)
+      : sanitizeSpecifications(existing?.specifications);
 
     const part = existing
       ? await updateCatalogPart({
@@ -378,6 +425,8 @@ itemsCompatRouter.put('/item/:entityId', async (req: AuthRequest, res, next) => 
           type,
           uom,
           imageUrl: input.payload.imageUrl,
+          description: existing.description ?? null,
+          specifications,
         })
       : await createCatalogPart({
           token,
@@ -386,16 +435,28 @@ itemsCompatRouter.put('/item/:entityId', async (req: AuthRequest, res, next) => 
           type,
           uom,
           imageUrl: input.payload.imageUrl,
+          description: null,
+          specifications,
         });
 
-    const cardEnsured = await ensureDefaultLoopWithCard({
-      token,
-      tenantId,
-      partId: part.id,
-      minQty: input.payload.minQty,
-      orderQty: input.payload.orderQty,
-      preferredSupplierName: input.payload.primarySupplier,
-    });
+    let cardEnsured = false;
+    try {
+      cardEnsured = await ensureDefaultLoopWithCard({
+        token,
+        tenantId,
+        partId: part.id,
+        minQty: input.payload.minQty,
+        orderQty: input.payload.orderQty,
+        preferredSupplierName: input.payload.primarySupplier,
+      });
+    } catch (loopError) {
+      // Notes/item updates should not fail just because auto-loop provisioning failed.
+      console.warn('Failed to auto-provision default loop/card during item upsert', {
+        entityId,
+        partId: part.id,
+        error: loopError instanceof Error ? loopError.message : String(loopError),
+      });
+    }
 
     res.json({
       accepted: true,
@@ -466,8 +527,8 @@ itemsCompatRouter.post('/item/query', async (req: AuthRequest, res, next) => {
           orderQtyUnit: part.uom || 'each',
           primarySupplier: null,
           primarySupplierLink: null,
-          imageUrl: null,
-          notes: null,
+          imageUrl: part.imageUrl ?? null,
+          notes: resolveItemNotes(part),
           glCode: null,
           itemSubtype: null,
         },
