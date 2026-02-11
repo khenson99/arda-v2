@@ -114,7 +114,7 @@ describe('IdempotencyManager — Resilience / Fault Injection', () => {
     });
 
     it('propagates error when DEL throws during failed-record cleanup', async () => {
-      mockRedisGet.mockResolvedValueOnce(buildRecord('failed', { error: 'prev error' }));
+      mockRedisGet.mockResolvedValueOnce(buildRecord('failed', { result: { error: 'prev error' } }));
       mockRedisDel.mockRejectedValueOnce(new Error('Redis DEL broken'));
 
       await expect(
@@ -267,7 +267,7 @@ describe('IdempotencyManager — Resilience / Fault Injection', () => {
 
   describe('failed-then-retry', () => {
     it('clears failed key and re-executes action on retry', async () => {
-      mockRedisGet.mockResolvedValueOnce(buildRecord('failed', { error: 'timeout' }));
+      mockRedisGet.mockResolvedValueOnce(buildRecord('failed', { result: { error: 'timeout' } }));
       mockRedisDel.mockResolvedValueOnce(1);
 
       // After DEL, the retry claim flow: GET (null) → SET NX (OK) → action → SET completed
