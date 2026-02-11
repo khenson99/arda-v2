@@ -1271,6 +1271,47 @@ export async function fetchCardQR(
   return { qrDataUrl: response.qrDataUrl ?? response.qrCode ?? "" };
 }
 
+/* ── Card Print Detail (denormalized for label printing) ─────── */
+
+export interface KanbanCardPrintDetail {
+  id: string;
+  cardNumber: number;
+  currentStage: CardStage;
+  loopType?: LoopType;
+  partName?: string;
+  facilityName?: string;
+  minQuantity?: number;
+  orderQuantity?: number;
+  qrCode?: string;
+  scanUrl?: string;
+  loop?: {
+    loopType?: LoopType;
+    numberOfCards?: number;
+    partNumber?: string;
+    partName?: string;
+    partDescription?: string;
+    facilityName?: string;
+    storageLocationName?: string;
+    primarySupplierName?: string;
+    sourceFacilityName?: string;
+    orderQuantity?: number;
+    minQuantity?: number;
+    statedLeadTimeDays?: number;
+    safetyStockDays?: number;
+    notes?: string;
+  } | null;
+}
+
+export async function fetchCardPrintDetail(
+  token: string,
+  cardId: string,
+): Promise<KanbanCardPrintDetail> {
+  return apiRequest<KanbanCardPrintDetail>(
+    `/api/kanban/cards/${encodeURIComponent(cardId)}/print-detail`,
+    { token },
+  );
+}
+
 /* ── Purchase Orders ──────────────────────────────────────────── */
 
 export async function fetchPurchaseOrders(
