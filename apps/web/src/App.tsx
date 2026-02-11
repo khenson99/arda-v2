@@ -18,6 +18,8 @@ import { OrderHistoryRoute } from "@/pages/order-history";
 import { ReceivingRoute } from "@/pages/receiving";
 import { PODetailRoute } from "@/pages/orders/po-detail";
 import { WODetailRoute } from "@/pages/orders/wo-detail";
+import { ProfilePage } from "@/pages/profile";
+import { NotificationsRoute } from "@/pages/notifications";
 import type { AuthResponse, AuthSession } from "@/types";
 
 function detectGuestMobileImportLink(): boolean {
@@ -138,8 +140,9 @@ function App() {
           <Route path="receiving" element={<ErrorBoundary><ReceivingRoute session={session} onUnauthorized={clearSession} /></ErrorBoundary>} />
           <Route path="scan" element={<ErrorBoundary><ScanRoute session={session} onUnauthorized={clearSession} /></ErrorBoundary>} />
           <Route path="scan/:cardId" element={<ErrorBoundary><ScanRoute session={session} onUnauthorized={clearSession} /></ErrorBoundary>} />
+          <Route path="profile" element={<ErrorBoundary><ProfilePage session={session} onUnauthorized={clearSession} /></ErrorBoundary>} />
+          <Route path="notifications" element={<ErrorBoundary><NotificationsRoute session={session} onUnauthorized={clearSession} /></ErrorBoundary>} />
           {/* Legacy redirects */}
-          <Route path="notifications" element={<Navigate to="/orders" replace />} />
           <Route path="order-pulse" element={<Navigate to="/" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
