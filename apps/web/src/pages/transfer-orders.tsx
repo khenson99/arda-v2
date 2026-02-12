@@ -1,14 +1,15 @@
 import * as React from "react";
-import type { AuthSession, TOStatus, TransferOrder, TransferOrderLine, SourceRecommendation, PartRecord, TransferQueueItem } from "@/types";
+import type { AuthSession, TOStatus, TransferOrder, TransferOrderLine, SourceRecommendation, PartRecord, TransferQueueItem, TransferAuditEntry, InventoryLedgerEntry } from "@/types";
 import { useTransferOrders } from "@/hooks/use-transfer-orders";
 import type { TransferTab } from "@/hooks/use-transfer-orders";
 import { fetchParts, fetchTransferQueue } from "@/lib/api-client";
 import { OrderStatusBadge } from "@/components/order-history/order-status-badge";
 import { TransferQueueItemCard } from "@/components/transfer-orders/transfer-queue-item-card";
 import { TransferQueueFilters } from "@/components/transfer-orders/transfer-queue-filters";
+import { TransferOrderTimeline } from "@/components/transfer-orders/transfer-order-timeline";
+import { TransferOrderInventoryImpact } from "@/components/transfer-orders/transfer-order-inventory-impact";
 import {
   Button,
-  Badge,
   Card,
   CardContent,
   CardHeader,
@@ -498,6 +499,9 @@ interface DetailViewProps {
   transitioning: boolean;
   transitionOrder: (status: TOStatus, reason?: string) => Promise<boolean>;
   onBack: () => void;
+  auditEntries: TransferAuditEntry[];
+  sourceInventory: InventoryLedgerEntry[];
+  destinationInventory: InventoryLedgerEntry[];
 }
 
 function DetailView({
@@ -509,6 +513,9 @@ function DetailView({
   transitioning,
   transitionOrder,
   onBack,
+  auditEntries,
+  sourceInventory,
+  destinationInventory,
 }: DetailViewProps) {
   const [reason, setReason] = React.useState("");
 
@@ -596,6 +603,11 @@ function DetailView({
         </CardContent>
       </Card>
 
+      {/* Lifecycle Timeline */}
+      {auditEntries.length > 0 && (
+        <TransferOrderTimeline auditEntries={auditEntries} />
+      )}
+
       {/* Lines table */}
       {order.lines && order.lines.length > 0 && (
         <Card className="rounded-xl shadow-sm">
@@ -651,6 +663,19 @@ function DetailView({
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Inventory Impact */}
+      {order.lines && order.lines.length > 0 && (
+        <TransferOrderInventoryImpact
+          lines={order.lines}
+          sourceFacilityId={order.sourceFacilityId}
+          destinationFacilityId={order.destinationFacilityId}
+          sourceFacilityName={order.sourceFacilityName ?? null}
+          destinationFacilityName={order.destinationFacilityName ?? null}
+          sourceInventory={sourceInventory}
+          destinationInventory={destinationInventory}
+        />
       )}
 
       {/* Lifecycle actions */}
@@ -1049,6 +1074,9 @@ export function TransferOrdersRoute({ session, onUnauthorized }: Props) {
           transitioning={hook.transitioning}
           transitionOrder={hook.transitionOrder}
           onBack={handleBack}
+          auditEntries={hook.auditEntries}
+          sourceInventory={hook.sourceInventory}
+          destinationInventory={hook.destinationInventory}
         />
       )}
 

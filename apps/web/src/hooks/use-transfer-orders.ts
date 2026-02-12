@@ -9,12 +9,16 @@ import {
   createTransferOrder,
   fetchFacilities,
   fetchSourceRecommendations,
+  fetchTransferOrderAudit,
+  fetchInventoryByFacility,
 } from "@/lib/api-client";
 import type {
   TransferOrder,
   TOStatus,
   FacilityRecord,
   SourceRecommendation,
+  TransferAuditEntry,
+  InventoryLedgerEntry,
 } from "@/types";
 
 /* ── Types ─────────────────────────────────────────────────────── */
@@ -53,6 +57,9 @@ export function useTransferOrders(token: string, onUnauthorized: () => void) {
   const [validTransitions, setValidTransitions] = useState<TOStatus[]>([]);
   const [transitionsLoading, setTransitionsLoading] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
+  const [auditEntries, setAuditEntries] = useState<TransferAuditEntry[]>([]);
+  const [sourceInventory, setSourceInventory] = useState<InventoryLedgerEntry[]>([]);
+  const [destinationInventory, setDestinationInventory] = useState<InventoryLedgerEntry[]>([]);
 
   /* ── Create state ───────────────────────────────────────────── */
   const [creating, setCreating] = useState(false);
@@ -129,15 +136,33 @@ export function useTransferOrders(token: string, onUnauthorized: () => void) {
       setDetailLoading(true);
       setDetailError(null);
       setValidTransitions([]);
+      setAuditEntries([]);
+      setSourceInventory([]);
+      setDestinationInventory([]);
 
       try {
-        const [detailRes, transRes] = await Promise.all([
+        const [detailRes, transRes, auditRes] = await Promise.all([
           fetchTransferOrder(token, order.id),
           fetchTransferOrderTransitions(token, order.id),
+          fetchTransferOrderAudit(token, order.id),
         ]);
         if (!isMountedRef.current) return;
-        setSelectedOrder(detailRes.data);
+
+        const orderDetail = detailRes.data;
+        setSelectedOrder(orderDetail);
         setValidTransitions(transRes.data.validTransitions);
+        setAuditEntries(auditRes.data);
+
+        // Fetch inventory for source and destination facilities
+        const [sourceInvRes, destInvRes] = await Promise.all([
+          fetchInventoryByFacility(token, orderDetail.sourceFacilityId, { pageSize: 200 }).catch(() => ({ data: [] })),
+          fetchInventoryByFacility(token, orderDetail.destinationFacilityId, { pageSize: 200 }).catch(() => ({ data: [] })),
+        ]);
+
+        if (isMountedRef.current) {
+          setSourceInventory(sourceInvRes.data);
+          setDestinationInventory(destInvRes.data);
+        }
       } catch (err) {
         if (!isMountedRef.current) return;
         if (isUnauthorized(err)) {
@@ -158,6 +183,9 @@ export function useTransferOrders(token: string, onUnauthorized: () => void) {
     setSelectedOrder(null);
     setDetailError(null);
     setValidTransitions([]);
+    setAuditEntries([]);
+    setSourceInventory([]);
+    setDestinationInventory([]);
   }, []);
 
   /* ── Transition order ───────────────────────────────────────── */
@@ -304,6 +332,9 @@ export function useTransferOrders(token: string, onUnauthorized: () => void) {
     transitioning,
     transitionOrder,
     clearSelectedOrder,
+    auditEntries,
+    sourceInventory,
+    destinationInventory,
 
     /* Create */
     facilities,

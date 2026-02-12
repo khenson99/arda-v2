@@ -641,6 +641,34 @@ export interface TransferOrderLine {
   notes: string | null;
 }
 
+export interface TransferAuditEntry {
+  id: string;
+  tenantId: string;
+  userId: string | null;
+  action: string;
+  entityType: string;
+  entityId: string;
+  previousState: Record<string, unknown> | null;
+  newState: Record<string, unknown> | null;
+  metadata: Record<string, unknown>;
+  ipAddress: string | null;
+  userAgent: string | null;
+  timestamp: string;
+}
+
+export interface TransferLineInventoryImpact {
+  lineId: string;
+  partId: string;
+  partName: string | null;
+  quantityRequested: number;
+  quantityShipped: number;
+  quantityReceived: number;
+  sourceBeforeQty: number | null;
+  sourceAfterQty: number | null;
+  destinationBeforeQty: number | null;
+  destinationAfterQty: number | null;
+}
+
 /* ── Transfer Queue ───────────────────────────────────────────── */
 
 export type TransferQueuePriority = "critical" | "high" | "medium" | "low";

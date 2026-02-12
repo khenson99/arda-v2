@@ -45,6 +45,7 @@ import type {
   ReceivingMetrics,
   ReceivingException,
   ExceptionResolution,
+  TransferAuditEntry,
 } from "@/types";
 
 /* ── Error handling ──────────────────────────────────────────── */
@@ -1632,6 +1633,17 @@ export async function fetchTransferQueue(
   if (params?.maxPriority != null) qs.set("maxPriority", String(params.maxPriority));
   const suffix = qs.toString() ? `?${qs.toString()}` : "";
   return apiRequest(`/api/orders/transfer-orders/queue${suffix}`, { token });
+}
+
+export async function fetchTransferOrderAudit(
+  token: string,
+  transferOrderId: string,
+): Promise<{ data: TransferAuditEntry[] }> {
+  const qs = new URLSearchParams();
+  qs.set("entityType", "transfer_order");
+  qs.set("entityId", transferOrderId);
+  qs.set("limit", "100");
+  return apiRequest(`/api/orders/audit?${qs.toString()}`, { token });
 }
 
 export async function fetchInventoryByFacility(
