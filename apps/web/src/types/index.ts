@@ -641,6 +641,28 @@ export interface TransferOrderLine {
   notes: string | null;
 }
 
+/* ── Transfer Queue ───────────────────────────────────────────── */
+
+export type TransferQueuePriority = "critical" | "high" | "medium" | "low";
+
+export interface TransferQueueItem {
+  id: string;
+  destinationFacilityId: string;
+  destinationFacilityName: string;
+  partId: string;
+  partNumber: string;
+  partName: string;
+  quantityNeeded: number;
+  daysBelowReorder: number | null;
+  priority: TransferQueuePriority;
+  priorityScore: number;
+  recommendedSource: SourceRecommendation | null;
+  status: "pending" | "draft" | "approved";
+  sourceType: "draft_to" | "kanban" | "inventory";
+  linkedEntityId: string | null;
+  createdAt: string;
+}
+
 /* ── Source Recommendation ────────────────────────────────────── */
 
 export interface SourceRecommendation {

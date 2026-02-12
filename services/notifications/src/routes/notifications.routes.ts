@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { db, schema } from '@arda/db';
-import { eq, and, desc, sql } from 'drizzle-orm';
+import { eq, and, desc, sql, inArray, gte, lte } from 'drizzle-orm';
 import { AppError } from '../middleware/error-handler.js';
 
 export const notificationsRouter = Router();
@@ -10,6 +10,10 @@ export const notificationsRouter = Router();
 const listQuerySchema = z.object({
   unreadOnly: z.enum(['true', 'false']).optional().transform(v => v === 'true'),
   type: z.string().optional(),
+  types: z.string().optional(), // CSV of types
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional(),
+  priority: z.enum(['high', 'medium', 'low']).optional(),
   limit: z.coerce.number().int().positive().max(200).default(50),
   offset: z.coerce.number().int().nonnegative().default(0),
 });
@@ -32,10 +36,40 @@ notificationsRouter.get('/', async (req, res, next) => {
       conditions.push(eq(schema.notifications.isRead, false));
     }
 
+    // Single type filter (legacy)
     if (queryParams.type) {
       conditions.push(eq(schema.notifications.type, queryParams.type as (typeof schema.notificationTypeEnum.enumValues)[number]));
     }
 
+    // Multiple types filter (CSV)
+    if (queryParams.types) {
+      const typesList = queryParams.types.split(',').map(t => t.trim()) as Array<(typeof schema.notificationTypeEnum.enumValues)[number]>;
+      conditions.push(inArray(schema.notifications.type, typesList));
+    }
+
+    // Date range filters
+    if (queryParams.startDate) {
+      conditions.push(gte(schema.notifications.createdAt, new Date(queryParams.startDate)));
+    }
+
+    if (queryParams.endDate) {
+      conditions.push(lte(schema.notifications.createdAt, new Date(queryParams.endDate)));
+    }
+
+    // Priority filter (using metadata field)
+    if (queryParams.priority) {
+      conditions.push(sql`${schema.notifications.metadata}->>'priority' = ${queryParams.priority}`);
+    }
+
+    // Get total count matching the filter
+    const countResult = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.notifications)
+      .where(and(...conditions));
+
+    const totalCount = countResult[0]?.count || 0;
+
+    // Get paginated results
     const notifications = await db
       .select()
       .from(schema.notifications)
@@ -44,7 +78,11 @@ notificationsRouter.get('/', async (req, res, next) => {
       .limit(queryParams.limit as number)
       .offset(queryParams.offset as number);
 
-    res.json({ data: notifications, count: notifications.length });
+    res.json({
+      data: notifications,
+      count: notifications.length,
+      totalCount
+    });
   } catch (err) {
     next(err);
   }
@@ -100,6 +138,47 @@ notificationsRouter.patch('/:id/read', async (req, res, next) => {
     const updated = await db
       .update(schema.notifications)
       .set({ isRead: true, readAt: new Date() })
+      .where(
+        and(
+          eq(schema.notifications.id, id),
+          eq(schema.notifications.tenantId, tenantId),
+          eq(schema.notifications.userId, userId)
+        )
+      )
+      .returning();
+
+    res.json({ data: updated[0] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PATCH /:id/unread — Mark single notification as unread
+notificationsRouter.patch('/:id/unread', async (req, res, next) => {
+  try {
+    const id = req.params.id as string;
+    const userId = req.user!.sub;
+    const tenantId = req.user!.tenantId;
+
+    // Verify ownership before updating
+    const notification = await db
+      .select()
+      .from(schema.notifications)
+      .where(
+        and(
+          eq(schema.notifications.id, id),
+          eq(schema.notifications.tenantId, tenantId),
+          eq(schema.notifications.userId, userId)
+        )
+      );
+
+    if (!notification.length) {
+      throw new AppError(404, 'Notification not found', 'NOT_FOUND');
+    }
+
+    const updated = await db
+      .update(schema.notifications)
+      .set({ isRead: false, readAt: null })
       .where(
         and(
           eq(schema.notifications.id, id),
