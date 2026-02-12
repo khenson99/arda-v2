@@ -50,6 +50,13 @@
       "when": 1771023600000,
       "tag": "0006_supplier_order_terms",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1771102800000,
+      "tag": "0007_card_templates",
+      "breakpoints": true
     }
   ]
 }

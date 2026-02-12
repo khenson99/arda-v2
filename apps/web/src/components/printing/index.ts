@@ -20,6 +20,7 @@ export {
   buildPrintStylesheet,
   dispatchPrint,
   printCards,
+  downloadCardsPdf,
 } from './print-pipeline';
 export type { PrintSettings, PrintMargins, PrinterClass, ColorMode, Orientation } from './print-pipeline';
 

@@ -47,6 +47,7 @@ export interface TenantSettings {
   requireApprovalForPO?: boolean;
   autoConsolidateOrders?: boolean;
   reloWisaEnabled?: boolean;
+  cardTemplateDesignerEnabled?: boolean;
   webhookUrl?: string;
   webhookSecret?: string;
   webhookEvents?: string[];

@@ -57,6 +57,7 @@ tenantRouter.patch(
             requireApprovalForPO: z.boolean().optional(),
             autoConsolidateOrders: z.boolean().optional(),
             reloWisaEnabled: z.boolean().optional(),
+            cardTemplateDesignerEnabled: z.boolean().optional(),
           })
           .optional(),
       });

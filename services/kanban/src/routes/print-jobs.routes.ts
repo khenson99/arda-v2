@@ -31,6 +31,7 @@ const createPrintJobSchema = z.object({
     }).optional(),
     colorMode: z.enum(['color', 'monochrome']).optional(),
     orientation: z.enum(['portrait', 'landscape']).optional(),
+    templateId: z.string().uuid().optional(),
   }).optional(),
 });
 

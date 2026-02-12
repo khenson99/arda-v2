@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Button, Input } from "@/components/ui";
 import {
   apiRequest,
+  fetchCurrentTenant,
   fetchCardPrintDetail,
   fetchCards,
   isUnauthorized,
@@ -15,6 +16,7 @@ import {
 } from "@/lib/kanban-printing";
 import { fetchLoopsForPart } from "@/lib/kanban-loops";
 import { KanbanPrintRenderer } from "@/components/printing/kanban-print-renderer";
+import { CardTemplateDesigner } from "@/components/printing/designer/card-template-designer";
 import type { KanbanPrintData } from "@/components/printing/types";
 import type { KanbanCard, PartRecord } from "@/types";
 import { LOOP_META } from "@/types";
@@ -46,6 +48,12 @@ interface EditorDraft {
 const MAX_CARD_PAGES_PER_LOOP = 10;
 const CARD_PREVIEW_LOAD_TIMEOUT_MS = 20_000;
 const DEFAULT_ACCENT = "#2F6FCC";
+
+function isTemplateDesignerEnvEnabled(): boolean {
+  const raw = import.meta.env.VITE_ENABLE_CARD_TEMPLATE_DESIGNER;
+  if (typeof raw !== "string") return false;
+  return raw.toLowerCase() === "true" || raw === "1";
+}
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -147,10 +155,38 @@ export function CardLabelDesigner({
   const [isLoadingPreviewData, setIsLoadingPreviewData] = React.useState(false);
   const [isPrinting, setIsPrinting] = React.useState(false);
   const [isSavingImageUrl, setIsSavingImageUrl] = React.useState(false);
+  const [isTemplateDesignerEnabled, setIsTemplateDesignerEnabled] = React.useState(false);
+  const [useLegacyEditor, setUseLegacyEditor] = React.useState(false);
   const [draft, setDraft] = React.useState<EditorDraft>(() => buildFallbackDraftFromPart(part));
-  const selectedCardId = selectedCard?.id ?? null;
-  const partLoopLookupKey = `${part.id}|${part.eId ?? ""}|${part.partNumber}|${part.externalGuid ?? ""}`;
-  const partForLoop = React.useMemo(() => part, [partLoopLookupKey]);
+
+  React.useEffect(() => {
+    if (!isTemplateDesignerEnvEnabled()) {
+      setIsTemplateDesignerEnabled(false);
+      return;
+    }
+
+    let cancelled = false;
+    async function loadTenantSettings() {
+      try {
+        const tenant = await fetchCurrentTenant(token);
+        if (cancelled) return;
+        setIsTemplateDesignerEnabled(Boolean(tenant.settings?.cardTemplateDesignerEnabled));
+      } catch (error) {
+        if (isUnauthorized(error)) {
+          onUnauthorized();
+          return;
+        }
+        if (!cancelled) {
+          setIsTemplateDesignerEnabled(false);
+        }
+      }
+    }
+
+    void loadTenantSettings();
+    return () => {
+      cancelled = true;
+    };
+  }, [onUnauthorized, token]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -159,7 +195,7 @@ export function CardLabelDesigner({
       setLoadError(null);
       try {
         const loops = await withTimeout(
-          fetchLoopsForPart(token, partForLoop),
+          fetchLoopsForPart(token, part),
           CARD_PREVIEW_LOAD_TIMEOUT_MS,
           "Loading card loops timed out.",
         );
@@ -203,20 +239,21 @@ export function CardLabelDesigner({
     return () => {
       cancelled = true;
     };
-  }, [token, partForLoop, onUnauthorized]);
+  }, [token, part, onUnauthorized]);
 
   React.useEffect(() => {
-    if (!selectedCardId) {
+    if (!selectedCard) {
       setBasePrintData(null);
       setDraft(buildFallbackDraftFromPart(part));
       return;
     }
-    const currentSelectedCardId = selectedCardId;
+
+    const selectedCardId = selectedCard.id;
     let cancelled = false;
     async function loadPreviewData() {
       setIsLoadingPreviewData(true);
       try {
-        const detail = await fetchCardPrintDetail(token, currentSelectedCardId);
+        const detail = await fetchCardPrintDetail(token, selectedCardId);
         if (cancelled) return;
 
         const mapped = mapCardPrintDetailToPrintData(detail, { tenantName, tenantLogoUrl });
@@ -240,7 +277,7 @@ export function CardLabelDesigner({
     return () => {
       cancelled = true;
     };
-  }, [token, selectedCardId, tenantName, tenantLogoUrl, onUnauthorized, part]);
+  }, [token, selectedCard, tenantName, tenantLogoUrl, onUnauthorized, part]);
 
   const previewData = React.useMemo(() => {
     if (!basePrintData) return null;
@@ -408,132 +445,163 @@ export function CardLabelDesigner({
               Loops &amp; Cards
             </Button>
           )}
-        </div>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_330px]">
-        <div className="space-y-3 rounded-md border border-border p-3">
-          <Field label="Title">
-            <Input
-              value={draft.title}
-              onChange={(e) => setDraft((prev) => ({ ...prev, title: e.target.value }))}
-            />
-          </Field>
-          <Field label="SKU">
-            <Input
-              value={draft.sku}
-              onChange={(e) => setDraft((prev) => ({ ...prev, sku: e.target.value }))}
-            />
-          </Field>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Minimum">
-              <Input
-                value={draft.minimumText}
-                onChange={(e) => setDraft((prev) => ({ ...prev, minimumText: e.target.value }))}
-              />
-            </Field>
-            <Field label="Location">
-              <Input
-                value={draft.locationText}
-                onChange={(e) => setDraft((prev) => ({ ...prev, locationText: e.target.value }))}
-              />
-            </Field>
-            <Field label="Order">
-              <Input
-                value={draft.orderText}
-                onChange={(e) => setDraft((prev) => ({ ...prev, orderText: e.target.value }))}
-              />
-            </Field>
-            <Field label="Supplier">
-              <Input
-                value={draft.supplierText}
-                onChange={(e) => setDraft((prev) => ({ ...prev, supplierText: e.target.value }))}
-              />
-            </Field>
-          </div>
-          <Field label="Image URL">
-            <div className="space-y-2">
-              <Input
-                value={draft.imageUrl}
-                onChange={(e) => setDraft((prev) => ({ ...prev, imageUrl: e.target.value }))}
-                placeholder="https://..."
-              />
-              <div className="flex justify-end">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => void handleSaveImageUrl()}
-                  disabled={isSavingImageUrl}
-                >
-                  {isSavingImageUrl ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : null}
-                  Save image URL
-                </Button>
-              </div>
-            </div>
-          </Field>
-          <Field label="Notes">
-            <textarea
-              className="min-h-[72px] w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-              value={draft.notesText}
-              onChange={(e) => setDraft((prev) => ({ ...prev, notesText: e.target.value }))}
-            />
-          </Field>
-          <div className="grid gap-3 sm:grid-cols-[140px_1fr]">
-            <Field label="Accent">
-              <input
-                type="color"
-                className="h-9 w-full cursor-pointer rounded-md border border-border bg-background p-1"
-                value={normalizeColor(draft.accentColor)}
-                onChange={(e) => setDraft((prev) => ({ ...prev, accentColor: e.target.value }))}
-              />
-            </Field>
-            <Field label="Accent (Hex)">
-              <Input
-                value={draft.accentColor}
-                onChange={(e) => setDraft((prev) => ({ ...prev, accentColor: e.target.value }))}
-              />
-            </Field>
-          </div>
-
-          <div className="flex flex-wrap justify-end gap-2">
+          {isTemplateDesignerEnabled && (
             <Button
               size="sm"
               variant="outline"
-              onClick={() => basePrintData && setDraft(buildDraftFromData(basePrintData))}
-              disabled={!basePrintData}
+              onClick={() => setUseLegacyEditor((current) => !current)}
             >
-              Reset
+              {useLegacyEditor ? "Use Template Designer" : "Use Legacy Editor"}
             </Button>
-            <Button
-              size="sm"
-              onClick={() => void handlePrint()}
-              disabled={isPrinting || !basePrintData}
-            >
-              {isPrinting ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Printer className="h-3.5 w-3.5" />
-              )}
-              Print 3x5 Portrait
-            </Button>
-          </div>
-        </div>
-
-        <div className="overflow-auto rounded-md border border-border bg-muted/10 p-2">
-          {isLoadingPreviewData || !previewData ? (
-            <div className="flex min-h-[420px] items-center justify-center text-xs text-muted-foreground">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Loading preview...
-            </div>
-          ) : (
-            <div className="origin-top-left scale-[0.95]">
-              <KanbanPrintRenderer data={previewData} format="order_card_3x5_portrait" />
-            </div>
           )}
         </div>
       </div>
+
+      {isTemplateDesignerEnabled && !useLegacyEditor ? (
+        !selectedCard || isLoadingPreviewData || !basePrintData ? (
+          <div className="flex min-h-[420px] items-center justify-center rounded-md border border-border bg-muted/10 text-xs text-muted-foreground">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Loading template designer...
+          </div>
+        ) : (
+          <CardTemplateDesigner
+            token={token}
+            partId={part.id}
+            selectedCard={selectedCard}
+            basePrintData={basePrintData}
+            onUnauthorized={onUnauthorized}
+            onSaved={onSaved}
+            onImageUrlSaved={(url) => {
+              setDraft((prev) => ({ ...prev, imageUrl: url }));
+              setBasePrintData((current) => (current ? { ...current, imageUrl: url } : current));
+            }}
+          />
+        )
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_330px]">
+          <div className="space-y-3 rounded-md border border-border p-3">
+            <Field label="Title">
+              <Input
+                value={draft.title}
+                onChange={(e) => setDraft((prev) => ({ ...prev, title: e.target.value }))}
+              />
+            </Field>
+            <Field label="SKU">
+              <Input
+                value={draft.sku}
+                onChange={(e) => setDraft((prev) => ({ ...prev, sku: e.target.value }))}
+              />
+            </Field>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Minimum">
+                <Input
+                  value={draft.minimumText}
+                  onChange={(e) => setDraft((prev) => ({ ...prev, minimumText: e.target.value }))}
+                />
+              </Field>
+              <Field label="Location">
+                <Input
+                  value={draft.locationText}
+                  onChange={(e) => setDraft((prev) => ({ ...prev, locationText: e.target.value }))}
+                />
+              </Field>
+              <Field label="Order">
+                <Input
+                  value={draft.orderText}
+                  onChange={(e) => setDraft((prev) => ({ ...prev, orderText: e.target.value }))}
+                />
+              </Field>
+              <Field label="Supplier">
+                <Input
+                  value={draft.supplierText}
+                  onChange={(e) => setDraft((prev) => ({ ...prev, supplierText: e.target.value }))}
+                />
+              </Field>
+            </div>
+            <Field label="Image URL">
+              <div className="space-y-2">
+                <Input
+                  value={draft.imageUrl}
+                  onChange={(e) => setDraft((prev) => ({ ...prev, imageUrl: e.target.value }))}
+                  placeholder="https://..."
+                />
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void handleSaveImageUrl()}
+                    disabled={isSavingImageUrl}
+                  >
+                    {isSavingImageUrl ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : null}
+                    Save image URL
+                  </Button>
+                </div>
+              </div>
+            </Field>
+            <Field label="Notes">
+              <textarea
+                className="min-h-[72px] w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                value={draft.notesText}
+                onChange={(e) => setDraft((prev) => ({ ...prev, notesText: e.target.value }))}
+              />
+            </Field>
+            <div className="grid gap-3 sm:grid-cols-[140px_1fr]">
+              <Field label="Accent">
+                <input
+                  type="color"
+                  className="h-9 w-full cursor-pointer rounded-md border border-border bg-background p-1"
+                  value={normalizeColor(draft.accentColor)}
+                  onChange={(e) => setDraft((prev) => ({ ...prev, accentColor: e.target.value }))}
+                />
+              </Field>
+              <Field label="Accent (Hex)">
+                <Input
+                  value={draft.accentColor}
+                  onChange={(e) => setDraft((prev) => ({ ...prev, accentColor: e.target.value }))}
+                />
+              </Field>
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => basePrintData && setDraft(buildDraftFromData(basePrintData))}
+                disabled={!basePrintData}
+              >
+                Reset
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => void handlePrint()}
+                disabled={isPrinting || !basePrintData}
+              >
+                {isPrinting ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Printer className="h-3.5 w-3.5" />
+                )}
+                Print 3x5 Portrait
+              </Button>
+            </div>
+          </div>
+
+          <div className="overflow-auto rounded-md border border-border bg-muted/10 p-2">
+            {isLoadingPreviewData || !previewData ? (
+              <div className="flex min-h-[420px] items-center justify-center text-xs text-muted-foreground">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Loading preview...
+              </div>
+            ) : (
+              <div className="origin-top-left scale-[0.95]">
+                <KanbanPrintRenderer data={previewData} format="order_card_3x5_portrait" />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,5 +1,11 @@
 import { API_BASE_URL, SESSION_STORAGE_KEY } from "./constants";
 import type {
+  CardFormat,
+  CardTemplateDefinition,
+  CardTemplateRecord,
+  CardTemplateStatus,
+} from "@arda/shared-types";
+import type {
   AuthResponse,
   AuthSession,
   SessionUser,
@@ -73,12 +79,6 @@ export function parseApiError(error: unknown): string {
 
   if (error instanceof Error) {
     const raw = error.message.trim();
-    if (raw.includes("Cannot POST /queue/procurement/create-drafts")) {
-      return "Create-drafts endpoint path mismatch detected. Retrying with compatibility route.";
-    }
-    if (raw.includes("Cannot POST /queue/procurement/verify")) {
-      return "Verify endpoint path mismatch detected. Retrying with compatibility route.";
-    }
     if (raw.startsWith("{") && raw.endsWith("}")) {
       try {
         const parsed = JSON.parse(raw) as Record<string, unknown>;
@@ -227,6 +227,27 @@ export async function login(input: { email: string; password: string }): Promise
     method: "POST",
     body: input,
   });
+}
+
+export interface TenantCurrentResponse {
+  id: string;
+  name: string;
+  slug: string;
+  logoUrl?: string | null;
+  settings?: {
+    timezone?: string;
+    dateFormat?: string;
+    currency?: string;
+    defaultCardFormat?: string;
+    requireApprovalForPO?: boolean;
+    autoConsolidateOrders?: boolean;
+    reloWisaEnabled?: boolean;
+    cardTemplateDesignerEnabled?: boolean;
+  } | null;
+}
+
+export async function fetchCurrentTenant(token: string): Promise<TenantCurrentResponse> {
+  return apiRequest<TenantCurrentResponse>("/api/tenants/current", { token });
 }
 
 export async function register(input: {
@@ -600,68 +621,32 @@ export async function createProcurementDrafts(
   token: string,
   input: CreateProcurementDraftsInput,
 ): Promise<CreateProcurementDraftsResult> {
-  const request = (path: string) =>
-    apiRequest<{
-      success: boolean;
-      data: CreateProcurementDraftsResult;
-    }>(path, {
-      method: "POST",
-      token,
-      body: input,
-    });
+  const response = await apiRequest<{
+    success: boolean;
+    data: CreateProcurementDraftsResult;
+  }>("/api/orders/queue/procurement/create-drafts", {
+    method: "POST",
+    token,
+    body: input,
+  });
 
-  try {
-    const response = await request("/api/orders/queue/procurement/create-drafts");
-    return response.data;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "";
-    const shouldRetryAlias =
-      error instanceof ApiError &&
-      error.status === 404 &&
-      (message.includes("Cannot POST /queue/procurement/create-drafts") ||
-        message.includes("Route not found"));
-
-    if (!shouldRetryAlias) {
-      throw error;
-    }
-
-    const response = await request("/api/orders/queue/create-drafts");
-    return response.data;
-  }
+  return response.data;
 }
 
 export async function verifyProcurementDrafts(
   token: string,
   input: VerifyProcurementDraftsInput,
 ): Promise<{ poIds: string[]; cardIds: string[]; transitionedCards: number }> {
-  const request = (path: string) =>
-    apiRequest<{
-      success: boolean;
-      data: { poIds: string[]; cardIds: string[]; transitionedCards: number };
-    }>(path, {
-      method: "POST",
-      token,
-      body: input,
-    });
+  const response = await apiRequest<{
+    success: boolean;
+    data: { poIds: string[]; cardIds: string[]; transitionedCards: number };
+  }>("/api/orders/queue/procurement/verify", {
+    method: "POST",
+    token,
+    body: input,
+  });
 
-  try {
-    const response = await request("/api/orders/queue/procurement/verify");
-    return response.data;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "";
-    const shouldRetryAlias =
-      error instanceof ApiError &&
-      error.status === 404 &&
-      (message.includes("Cannot POST /queue/procurement/verify") ||
-        message.includes("Route not found"));
-
-    if (!shouldRetryAlias) {
-      throw error;
-    }
-
-    const response = await request("/api/orders/queue/verify");
-    return response.data;
-  }
+  return response.data;
 }
 
 /* ── Data Authority helpers ──────────────────────────────────── */
@@ -1044,8 +1029,15 @@ export async function createPrintJob(
   token: string,
   input: {
     cardIds: string[];
-    format?: string;
+    format?: CardFormat;
     printerClass?: string;
+    settings?: {
+      scale?: number;
+      margins?: { top: number; right: number; bottom: number; left: number };
+      colorMode?: "color" | "monochrome";
+      orientation?: "portrait" | "landscape";
+      templateId?: string;
+    };
   },
 ): Promise<{ id: string }> {
   return apiRequest("/api/kanban/print-jobs", {
@@ -1055,6 +1047,7 @@ export async function createPrintJob(
       cardIds: input.cardIds,
       format: input.format ?? "3x5_card",
       printerClass: input.printerClass ?? "standard",
+      settings: input.settings,
     },
   });
 }
@@ -1257,16 +1250,7 @@ export async function fetchLoopCardSummary(
   token: string,
   loopId: string,
 ): Promise<LoopCardSummary> {
-  const response = await apiRequest<LoopCardSummary & {
-    stageCounts?: Partial<Record<CardStage, number>>;
-    byStage?: Partial<Record<CardStage, number>>;
-  }>(`/api/kanban/lifecycle/loops/${encodeURIComponent(loopId)}/card-summary`, { token });
-
-  return {
-    loopId: response.loopId,
-    totalCards: response.totalCards,
-    byStage: response.byStage ?? response.stageCounts ?? {},
-  };
+  return apiRequest(`/api/kanban/lifecycle/loops/${encodeURIComponent(loopId)}/card-summary`, { token });
 }
 
 export async function fetchLoopVelocity(
@@ -1364,6 +1348,83 @@ export interface KanbanCardPrintDetail {
     imageUrl?: string;
     itemNotes?: string;
   } | null;
+}
+
+export interface CardTemplateListResponse {
+  data: CardTemplateRecord[];
+  currentDefaultId: string | null;
+}
+
+export async function fetchCardTemplates(
+  token: string,
+  format: CardFormat,
+): Promise<CardTemplateListResponse> {
+  return apiRequest<CardTemplateListResponse>(
+    `/api/kanban/card-templates?format=${encodeURIComponent(format)}`,
+    { token },
+  );
+}
+
+export async function createCardTemplate(
+  token: string,
+  input: {
+    name: string;
+    format: CardFormat;
+    definition: CardTemplateDefinition;
+    makeDefault?: boolean;
+  },
+): Promise<CardTemplateRecord> {
+  return apiRequest<CardTemplateRecord>("/api/kanban/card-templates", {
+    method: "POST",
+    token,
+    body: input,
+  });
+}
+
+export async function updateCardTemplate(
+  token: string,
+  templateId: string,
+  input: {
+    name?: string;
+    definition?: CardTemplateDefinition;
+    status?: CardTemplateStatus;
+  },
+): Promise<CardTemplateRecord> {
+  return apiRequest<CardTemplateRecord>(`/api/kanban/card-templates/${encodeURIComponent(templateId)}`, {
+    method: "PATCH",
+    token,
+    body: input,
+  });
+}
+
+export async function setDefaultCardTemplate(
+  token: string,
+  templateId: string,
+): Promise<CardTemplateRecord> {
+  return apiRequest<CardTemplateRecord>(`/api/kanban/card-templates/${encodeURIComponent(templateId)}/set-default`, {
+    method: "POST",
+    token,
+  });
+}
+
+export async function cloneCardTemplate(
+  token: string,
+  templateId: string,
+): Promise<CardTemplateRecord> {
+  return apiRequest<CardTemplateRecord>(`/api/kanban/card-templates/${encodeURIComponent(templateId)}/clone`, {
+    method: "POST",
+    token,
+  });
+}
+
+export async function archiveCardTemplate(token: string, templateId: string): Promise<{ success: boolean; id: string }> {
+  return apiRequest<{ success: boolean; id: string }>(
+    `/api/kanban/card-templates/${encodeURIComponent(templateId)}`,
+    {
+      method: "DELETE",
+      token,
+    },
+  );
 }
 
 export async function fetchCardPrintDetail(
