@@ -34,9 +34,9 @@ export const auditLog = auditSchema.table(
     // ── Hash-chain audit integrity ───────────────────────────────────
     // Each row is linked to the previous via SHA-256 hash, forming an
     // append-only tamper-evident chain per tenant.
-    hashChain: varchar('hash_chain', { length: 64 }).notNull(),
+    hashChain: varchar('hash_chain', { length: 64 }).notNull().default('PENDING'),
     previousHash: varchar('previous_hash', { length: 64 }),
-    sequenceNumber: bigint('sequence_number', { mode: 'number' }).notNull(),
+    sequenceNumber: bigint('sequence_number', { mode: 'number' }).notNull().default(0),
   },
   (table) => [
     index('audit_tenant_idx').on(table.tenantId),
