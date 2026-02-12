@@ -257,7 +257,31 @@ export interface PrintJobSettings {
   margins?: { top: number; right: number; bottom: number; left: number };
   colorMode?: 'color' | 'monochrome';
   orientation?: 'portrait' | 'landscape';
+  templateId?: string;
 }
+
+// ─── Card Templates ───────────────────────────────────────────────────
+// Tenant-shared WYSIWYG templates for printable kanban cards.
+export const cardTemplates = kanbanSchema.table(
+  'card_templates',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    tenantId: uuid('tenant_id').notNull(),
+    name: varchar('name', { length: 120 }).notNull(),
+    format: varchar('format', { length: 50 }).notNull(),
+    isDefault: boolean('is_default').notNull().default(false),
+    status: varchar('status', { length: 20 }).notNull().default('active'),
+    definition: jsonb('definition').$type<Record<string, unknown>>().notNull(),
+    createdByUserId: uuid('created_by_user_id'),
+    updatedByUserId: uuid('updated_by_user_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('card_templates_tenant_fmt_status_idx').on(table.tenantId, table.format, table.status),
+    index('card_templates_tenant_default_idx').on(table.tenantId, table.format, table.isDefault),
+  ]
+);
 
 // ─── Print Job Items ─────────────────────────────────────────────────
 // Each card included in a print job.
@@ -311,6 +335,8 @@ export const cardStageTransitionsRelations = relations(cardStageTransitions, ({ 
 export const printJobsRelations = relations(printJobs, ({ many }) => ({
   items: many(printJobItems),
 }));
+
+export const cardTemplatesRelations = relations(cardTemplates, () => ({}));
 
 export const printJobItemsRelations = relations(printJobItems, ({ one }) => ({
   printJob: one(printJobs, {

@@ -1,4 +1,5 @@
 import type { CardFormat } from "@arda/shared-types";
+import type { CardTemplateDefinition } from "@arda/shared-types";
 import { dispatchPrint, getDefaultSettings, openPrintWindow } from "@/components/printing/print-pipeline";
 import type { KanbanPrintData } from "@/components/printing/types";
 import { createPrintJob, fetchCardPrintDetail, isUnauthorized, parseApiError } from "@/lib/api-client";
@@ -19,6 +20,8 @@ export interface PrintCardsFromIdsInput extends PrintDataDefaults {
   format?: CardFormat;
   onUnauthorized?: () => void;
   overridesByCardId?: Record<string, Partial<KanbanPrintData>>;
+  templateId?: string;
+  templateDefinition?: CardTemplateDefinition;
 }
 
 export interface PrintCardsFromIdsResult {
@@ -60,7 +63,8 @@ function cleanString(value: unknown, fallback = ""): string {
 
 function formatQty(value: unknown): string {
   const qty = toNonNegativeNumber(value, 0);
-  return `${qty} each`;
+  const unit = qty === 1 ? "each" : "each";
+  return `${qty} ${unit}`;
 }
 
 export function mapCardPrintDetailToPrintData(
@@ -136,13 +140,22 @@ export async function printCardsFromIds(input: PrintCardsFromIdsInput): Promise<
       };
     });
 
-    dispatchPrint(printData, format, getDefaultSettings(format), { printWindow });
+    dispatchPrint(printData, format, getDefaultSettings(format), {
+      printWindow,
+      templateDefinition: input.templateDefinition,
+    });
 
     let auditJobId: string | undefined;
     let auditError: string | undefined;
 
     try {
-      const job = await createPrintJob(input.token, { cardIds: uniqueCardIds, format });
+      const job = await createPrintJob(input.token, {
+        cardIds: uniqueCardIds,
+        format,
+        settings: {
+          templateId: input.templateId,
+        },
+      });
       auditJobId = job.id;
     } catch (err) {
       if (isUnauthorized(err)) {

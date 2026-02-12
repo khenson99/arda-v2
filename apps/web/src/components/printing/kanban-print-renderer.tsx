@@ -2,11 +2,13 @@
 // Unified entry point that selects the correct template based on format.
 
 import type { CardFormat } from '@arda/shared-types';
+import type { CardTemplateDefinition } from '@arda/shared-types';
 import type { KanbanPrintData } from './types';
 import { FORMAT_CONFIGS } from './types';
 import { KanbanCardTemplate } from './kanban-card-template';
 import { KanbanLabelTemplate } from './kanban-label-template';
 import { OrderCard3x5Template } from './order-card-3x5-template';
+import { renderTemplateToHtml } from './designer/template-engine';
 import { validatePrintData } from './validation';
 
 const CARD_FORMATS: CardFormat[] = ['order_card_3x5_portrait', '3x5_card', '4x6_card', 'business_card'];
@@ -23,9 +25,10 @@ export function isLabelFormat(format: CardFormat): boolean {
 interface KanbanPrintRendererProps {
   data: KanbanPrintData;
   format: CardFormat;
+  templateDefinition?: CardTemplateDefinition;
 }
 
-export function KanbanPrintRenderer({ data, format }: KanbanPrintRendererProps) {
+export function KanbanPrintRenderer({ data, format, templateDefinition }: KanbanPrintRendererProps) {
   const config = FORMAT_CONFIGS[format];
 
   // Validate before rendering
@@ -45,6 +48,9 @@ export function KanbanPrintRenderer({ data, format }: KanbanPrintRendererProps) 
 
   if (isCardFormat(format)) {
     if (config.layoutVariant === 'order_card_3x5_portrait') {
+      if (templateDefinition) {
+        return <div dangerouslySetInnerHTML={{ __html: renderTemplateToHtml(templateDefinition, data, config) }} />;
+      }
       return <OrderCard3x5Template data={data} format={format} config={config} />;
     }
     return <KanbanCardTemplate data={data} format={format} config={config} />;

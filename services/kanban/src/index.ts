@@ -13,6 +13,7 @@ import { scanRouter } from './routes/scan.routes.js';
 import { velocityRouter } from './routes/velocity.routes.js';
 import { printJobsRouter } from './routes/print-jobs.routes.js';
 import { lifecycleRouter } from './routes/lifecycle.routes.js';
+import { cardTemplatesRouter } from './routes/card-templates.routes.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { initScanDedupeManager, getScanDedupeManager } from './services/card-lifecycle.service.js';
 
@@ -53,6 +54,7 @@ app.use('/cards', cardsRouter);
 app.use('/velocity', velocityRouter);
 app.use('/print-jobs', printJobsRouter);
 app.use('/lifecycle', lifecycleRouter);
+app.use('/card-templates', cardTemplatesRouter);
 
 app.use(errorHandler);
 

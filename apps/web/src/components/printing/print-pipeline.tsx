@@ -5,10 +5,12 @@
 
 import { useState, useCallback } from 'react';
 import type { CardFormat } from '@arda/shared-types';
+import type { CardTemplateDefinition } from '@arda/shared-types';
 import type { KanbanPrintData, FormatConfig } from './types';
 import { FORMAT_CONFIGS } from './types';
 import { KanbanPrintRenderer } from './kanban-print-renderer';
 import { renderOrderCard3x5Html } from './order-card-3x5-template';
+import { renderTemplateToHtml } from './designer/template-engine';
 
 // ─── Print Settings ──────────────────────────────────────────────────
 
@@ -126,15 +128,16 @@ interface PrintPreviewProps {
   data: KanbanPrintData;
   format: CardFormat;
   scale?: number;
+  templateDefinition?: CardTemplateDefinition;
 }
 
-export function PrintPreview({ data, format, scale = 0.8 }: PrintPreviewProps) {
+export function PrintPreview({ data, format, scale = 0.8, templateDefinition }: PrintPreviewProps) {
   return (
     <div
       className="inline-block border border-dashed border-muted-foreground/30 bg-white"
       style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}
     >
-      <KanbanPrintRenderer data={data} format={format} />
+      <KanbanPrintRenderer data={data} format={format} templateDefinition={templateDefinition} />
     </div>
   );
 }
@@ -248,6 +251,7 @@ export function PrintPipeline({ cards, format }: PrintPipelineProps) {
 export interface DispatchPrintOptions {
   printWindow?: Window | null;
   closeWindowAfterPrint?: boolean;
+  templateDefinition?: CardTemplateDefinition;
 }
 
 export function openPrintWindow(): Window | null {
@@ -263,13 +267,20 @@ export function dispatchPrint(
 ): void {
   const config = FORMAT_CONFIGS[format];
   const stylesheet = buildPrintStylesheet(settings, config);
+  const templateDefinition = options.templateDefinition;
 
   // Build the HTML content as a string
   const cardsHtml = cards
     .map(
-      (card) => config.layoutVariant === 'order_card_3x5_portrait'
-        ? renderOrderCard3x5Html(card, config)
-        : `
+      (card) => {
+        if (config.layoutVariant === 'order_card_3x5_portrait') {
+          if (templateDefinition) {
+            return renderTemplateToHtml(templateDefinition, card, config);
+          }
+          return renderOrderCard3x5Html(card, config);
+        }
+
+        return `
     <div class="print-card" style="
       width: ${config.widthPx}px;
       height: ${config.heightPx}px;
@@ -290,7 +301,8 @@ export function dispatchPrint(
       <div style="font-size: 9px; color: #737373; margin-top: 4px;">
         Card ${card.cardNumber} of ${card.totalCards}
       </div>
-    </div>`,
+    </div>`;
+      },
     )
     .join('\n');
 
@@ -405,6 +417,101 @@ export function dispatchPrint(
 export function printCards(cards: KanbanPrintData[], format: CardFormat): void {
   const settings = getDefaultSettings(format);
   dispatchPrint(cards, format, settings);
+}
+
+interface DownloadPdfOptions {
+  filename?: string;
+  settings?: PrintSettings;
+  templateDefinition?: CardTemplateDefinition;
+}
+
+export async function downloadCardsPdf(
+  cards: KanbanPrintData[],
+  format: CardFormat,
+  options: DownloadPdfOptions = {},
+): Promise<void> {
+  if (cards.length === 0) return;
+
+  const config = FORMAT_CONFIGS[format];
+  const settings = options.settings ?? getDefaultSettings(format);
+  const orientation = config.widthIn > config.heightIn ? 'landscape' : 'portrait';
+  const widthPt = config.widthIn * 72;
+  const heightPt = config.heightIn * 72;
+
+  const [{ jsPDF }, html2canvasModule] = await Promise.all([
+    import('jspdf'),
+    import('html2canvas'),
+  ]);
+  const html2canvas = html2canvasModule.default;
+
+  const container = document.createElement('div');
+  container.style.position = 'fixed';
+  container.style.left = '-99999px';
+  container.style.top = '0';
+  container.style.pointerEvents = 'none';
+  container.style.background = 'transparent';
+  document.body.appendChild(container);
+
+  try {
+    const pdf = new jsPDF({
+      orientation,
+      unit: 'pt',
+      format: [widthPt, heightPt],
+      compress: true,
+    });
+
+    for (let i = 0; i < cards.length; i += 1) {
+      const card = cards[i];
+      const cardHtml =
+        config.layoutVariant === 'order_card_3x5_portrait'
+          ? options.templateDefinition
+            ? renderTemplateToHtml(options.templateDefinition, card, config)
+            : renderOrderCard3x5Html(card, config)
+          : `
+            <div class="print-card" style="
+              width:${config.widthPx}px;
+              height:${config.heightPx}px;
+              border:1px solid #e5e5e5;
+              background:white;
+              box-shadow:none;
+              padding:${config.safeInsetPx}px;
+              margin:0;
+              font-family:'Open Sans',system-ui,sans-serif;
+              font-size:10px;">
+              <div style="font-weight:700;font-size:14px;">${escapeHtml(card.partNumber)}</div>
+              <div style="font-size:12px;">${escapeHtml(card.partDescription)}</div>
+              <div style="margin-top:4px;">
+                <img src="${escapeHtml(card.qrCodeDataUrl)}" width="${config.qrSizePx}" height="${config.qrSizePx}" />
+              </div>
+            </div>`;
+
+      const frame = document.createElement('div');
+      frame.style.width = `${config.widthPx}px`;
+      frame.style.height = `${config.heightPx}px`;
+      frame.style.background = '#fff';
+      frame.innerHTML = cardHtml;
+      container.appendChild(frame);
+
+      const canvas = await html2canvas(frame, {
+        scale: Math.max(2, settings.scale * 2),
+        backgroundColor: '#ffffff',
+        useCORS: true,
+        logging: false,
+      });
+      const dataUrl = canvas.toDataURL('image/png');
+
+      if (i > 0) {
+        pdf.addPage([widthPt, heightPt], orientation);
+      }
+      pdf.addImage(dataUrl, 'PNG', 0, 0, widthPt, heightPt, undefined, 'FAST');
+      container.removeChild(frame);
+    }
+
+    const defaultFilename = `card-${cards[0]?.partNumber ?? 'print'}-${new Date().toISOString().slice(0, 10)}.pdf`;
+    pdf.save(options.filename ?? defaultFilename);
+  } finally {
+    document.body.removeChild(container);
+  }
 }
 
 // ─── HTML Escape Utility ─────────────────────────────────────────────
