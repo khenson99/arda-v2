@@ -33,12 +33,12 @@
     "253": {
       "status": "pr-open",
       "agent": "backend-engineer",
-      "pr_number": null,
+      "pr_number": 385,
       "reviewed": false,
       "review_decision": null,
       "reviewed_at": "",
       "ci_status": "pending",
-      "notes": "Code complete. Refactored 6 source files to use writeAuditEntry. 9 new integration tests + 10 existing test files updated. 454 tests passing, 0 failures."
+      "notes": "Code complete. PR #385. Refactored 6 source files to use writeAuditEntry. 9 new integration tests + 10 existing test files updated. 454 tests passing, 0 failures."
     }
   },
   "agents": {
