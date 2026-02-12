@@ -1764,3 +1764,34 @@ export async function fetchReceiptsForOrder(
   );
   return response.data ?? [];
 }
+
+/* ── Analytics KPIs ───────────────────────────────────────────── */
+
+import type { KpiValue as KpiValueType, KpiTrendData as KpiTrendDataType } from "@/types/analytics";
+
+export type KpiValue = KpiValueType;
+export type KpiTrendData = KpiTrendDataType;
+
+export async function fetchKpiAggregates(
+  token: string,
+): Promise<{ data: KpiValue[] }> {
+  return apiRequest<{ data: KpiValue[] }>("/api/analytics/kpis/aggregates", { token });
+}
+
+export async function fetchKpiTrend(
+  token: string,
+  kpiId: string,
+  period: number,
+  facilityIds?: string[],
+): Promise<{ data: KpiTrendData }> {
+  const params = new URLSearchParams();
+  params.set("period", String(period));
+  if (facilityIds && facilityIds.length > 0) {
+    params.set("facilityIds", facilityIds.join(","));
+  }
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return apiRequest<{ data: KpiTrendData }>(
+    `/api/analytics/kpis/${encodeURIComponent(kpiId)}/trend${suffix}`,
+    { token },
+  );
+}
