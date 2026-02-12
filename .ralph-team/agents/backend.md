@@ -74,6 +74,14 @@ patterns, gotchas, and conventions.
 
 ## Stack-Specific Notes
 
+### Migrations
+- Hand-written SQL migrations in `packages/db/drizzle/`, numbered 0000+
+- Journal at `packages/db/drizzle/meta/_journal.json` — must register each new migration
+- 3-phase pattern for adding NOT NULL columns to existing tables: add nullable → backfill → enforce NOT NULL
+- Use `IF NOT EXISTS` / `WHERE ... IS NULL` guards for idempotency
+- Rollback notes in migration header comments
+- Recursive CTE pattern for sequential backfills (hash chains) where each row depends on the previous
+
 ### Drizzle ORM
 - Query API: `db.query.users.findFirst({ where: eq(...) })`
 - Insert/Update: `.insert(...).values(...).returning()` / `.update(...).set(...).where(...).returning()`

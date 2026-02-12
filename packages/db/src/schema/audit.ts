@@ -5,7 +5,9 @@ import {
   text,
   timestamp,
   jsonb,
+  bigint,
   index,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 
 export const auditSchema = pgSchema('audit');
@@ -28,6 +30,13 @@ export const auditLog = auditSchema.table(
     ipAddress: varchar('ip_address', { length: 45 }),
     userAgent: text('user_agent'),
     timestamp: timestamp('timestamp', { withTimezone: true }).notNull().defaultNow(),
+
+    // ── Hash-chain audit integrity ───────────────────────────────────
+    // Each row is linked to the previous via SHA-256 hash, forming an
+    // append-only tamper-evident chain per tenant.
+    hashChain: varchar('hash_chain', { length: 64 }).notNull(),
+    previousHash: varchar('previous_hash', { length: 64 }),
+    sequenceNumber: bigint('sequence_number', { mode: 'number' }).notNull(),
   },
   (table) => [
     index('audit_tenant_idx').on(table.tenantId),
@@ -36,5 +45,7 @@ export const auditLog = auditSchema.table(
     index('audit_action_idx').on(table.action),
     index('audit_time_idx').on(table.timestamp),
     index('audit_tenant_time_idx').on(table.tenantId, table.timestamp),
+    index('audit_tenant_seq_idx').on(table.tenantId, table.sequenceNumber),
+    uniqueIndex('audit_hash_idx').on(table.hashChain),
   ]
 );

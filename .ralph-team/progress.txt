@@ -27,3 +27,27 @@ Learnings:
   - All routes require tenant_admin role via requireRole() middleware
   - Gateway routing: both /api/users and /api/integrations proxy to auth service
   - Test patterns: mock crypto functions would require vi.mock('crypto'), accepted test behavior for actual crypto use
+
+--- Backend Agent Iteration 1 | Issue #250 ---
+Timestamp: 2026-02-12T01:50:00Z
+Status: completed
+Changes:
+  - packages/db/src/schema/audit.ts (added hashChain, previousHash, sequenceNumber columns + 2 new indexes)
+  - packages/db/drizzle/0008_audit_hash_chain.sql (new — 3-phase migration: add columns → backfill → enforce constraints)
+  - packages/db/drizzle/meta/_journal.json (registered migration 0008)
+  - packages/db/src/migrations/audit-hash-chain.test.ts (new — 14 tests for idempotency, structure, hash computation, schema exports)
+Tests: 14 new migration tests + 5 existing audit route tests, all passing (19 total)
+Learnings:
+  - Hash-chain columns: hash_chain (varchar 64, NOT NULL), previous_hash (varchar 64, nullable), sequence_number (bigint, NOT NULL)
+  - Migration pattern: 3-phase for safe production deploy (nullable add → backfill → enforce NOT NULL + indexes)
+  - Backfill uses recursive CTE to chain SHA-256 hashes sequentially per tenant
+  - Deterministic tie-breaker ordering: (timestamp ASC, id ASC) prevents non-repeatable sequence assignment
+  - First row per tenant uses 'GENESIS' sentinel instead of NULL for hash input consistency
+  - Hash input format: tenant_id|seq|action|entity_type|entity_id|timestamp|previous_hash (pipe-delimited)
+  - COALESCE(entity_id::text, '') handles NULL entity_id in hash computation
+  - Idempotency: IF NOT EXISTS for columns/indexes, WHERE IS NULL for backfill targeting
+  - Drizzle bigint mode: 'number' for sequence_number (JS safe integer range sufficient)
+  - Index: (tenant_id, sequence_number DESC) for efficient latest-first per-tenant queries
+  - Unique index on hash_chain ensures tamper-evidence
+  - Existing GET /api/audit routes unaffected — new columns are additive in SELECT * responses
+  - Rollback SQL documented in migration header comments
