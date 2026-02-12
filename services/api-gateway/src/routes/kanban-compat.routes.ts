@@ -236,15 +236,34 @@ kanbanCompatRouter.get('/:id', async (req: AuthRequest, res, next) => {
 
     const fallbackLoop = await db.query.kanbanLoops.findFirst({
       where: and(eq(kanbanLoops.id, loopId), eq(kanbanLoops.tenantId, tenantId)),
-      with: {
-        cards: true,
-        parameterHistory: { orderBy: schema.kanbanParameterHistory.createdAt },
-      },
     });
     if (!fallbackLoop) {
       res.status(404).json({ error: 'Loop not found' });
       return;
     }
+
+    const [cardsRows, parameterHistoryRows] = await Promise.all([
+      db
+        .select()
+        .from(kanbanCards)
+        .where(
+          and(
+            eq(kanbanCards.loopId, loopId),
+            eq(kanbanCards.tenantId, tenantId),
+            eq(kanbanCards.isActive, true),
+          ),
+        )
+        .orderBy(kanbanCards.cardNumber)
+        .execute(),
+      db
+        .select()
+        .from(kanbanParameterHistory)
+        .where(
+          and(eq(kanbanParameterHistory.loopId, loopId), eq(kanbanParameterHistory.tenantId, tenantId)),
+        )
+        .orderBy(kanbanParameterHistory.createdAt)
+        .execute(),
+    ]);
 
     const [enriched] = await enrichLoopRecords(tenantId, [fallbackLoop as LoopRecord]);
     if (!enriched) {
@@ -252,7 +271,7 @@ kanbanCompatRouter.get('/:id', async (req: AuthRequest, res, next) => {
       return;
     }
 
-    const cards = (fallbackLoop.cards ?? []).map((card) => ({
+    const cards = cardsRows.map((card) => ({
       ...card,
       loopType: fallbackLoop.loopType,
       partId: fallbackLoop.partId,
@@ -269,7 +288,7 @@ kanbanCompatRouter.get('/:id', async (req: AuthRequest, res, next) => {
     res.json({
       ...enriched,
       cards,
-      parameterHistory: fallbackLoop.parameterHistory,
+      parameterHistory: parameterHistoryRows,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

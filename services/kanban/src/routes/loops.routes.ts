@@ -133,20 +133,38 @@ loopsRouter.get('/', async (req: AuthRequest, res, next) => {
 loopsRouter.get('/:id', async (req: AuthRequest, res, next) => {
   try {
     const tenantId = req.user!.tenantId;
+    const loopId = req.params.id as string;
     const loop = await db.query.kanbanLoops.findFirst({
-      where: and(eq(kanbanLoops.id, req.params.id as string), eq(kanbanLoops.tenantId, tenantId)),
-      with: {
-        cards: true,
-        parameterHistory: { orderBy: schema.kanbanParameterHistory.createdAt },
-        recommendations: { orderBy: schema.reloWisaRecommendations.createdAt },
-      },
+      where: and(eq(kanbanLoops.id, loopId), eq(kanbanLoops.tenantId, tenantId)),
     });
 
     if (!loop) throw new AppError(404, 'Kanban loop not found');
+    const [cardsRows, parameterHistoryRows, recommendationsRows] = await Promise.all([
+      db
+        .select()
+        .from(kanbanCards)
+        .where(
+          and(eq(kanbanCards.loopId, loopId), eq(kanbanCards.tenantId, tenantId), eq(kanbanCards.isActive, true)),
+        )
+        .orderBy(kanbanCards.cardNumber)
+        .execute(),
+      db
+        .select()
+        .from(schema.kanbanParameterHistory)
+        .where(and(eq(schema.kanbanParameterHistory.loopId, loopId), eq(schema.kanbanParameterHistory.tenantId, tenantId)))
+        .orderBy(schema.kanbanParameterHistory.createdAt)
+        .execute(),
+      db
+        .select()
+        .from(schema.reloWisaRecommendations)
+        .where(and(eq(schema.reloWisaRecommendations.loopId, loopId), eq(schema.reloWisaRecommendations.tenantId, tenantId)))
+        .orderBy(schema.reloWisaRecommendations.createdAt)
+        .execute(),
+    ]);
     const [enrichedLoop] = await enrichLoops(tenantId, [loop as LoopRecord]);
     if (!enrichedLoop) throw new AppError(404, 'Kanban loop not found');
 
-    const cards = (loop.cards ?? []).map((card) => ({
+    const cards = cardsRows.map((card) => ({
       ...card,
       loopType: loop.loopType,
       partId: loop.partId,
@@ -163,8 +181,8 @@ loopsRouter.get('/:id', async (req: AuthRequest, res, next) => {
     res.json({
       ...enrichedLoop,
       cards,
-      parameterHistory: loop.parameterHistory,
-      recommendations: loop.recommendations,
+      parameterHistory: parameterHistoryRows,
+      recommendations: recommendationsRows,
     });
   } catch (err) {
     next(err);

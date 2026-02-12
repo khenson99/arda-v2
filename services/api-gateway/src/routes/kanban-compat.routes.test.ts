@@ -94,6 +94,8 @@ const dbMock = vi.hoisted(() => ({
           if (tableName === 'facilities') return state.facilityRows;
           if (tableName === 'suppliers') return state.supplierRows;
           if (tableName === 'kanbanLoops') return [state.loop];
+          if (tableName === 'kanbanCards') return state.loop.cards as Row[];
+          if (tableName === 'kanbanParameterHistory') return state.loop.parameterHistory as Row[];
           if ('count' in selection) return [{ count: 1 }];
           return [];
         }),
