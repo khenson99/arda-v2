@@ -1,9 +1,11 @@
 import * as React from "react";
-import type { AuthSession, TOStatus, TransferOrder, TransferOrderLine, SourceRecommendation, PartRecord } from "@/types";
+import type { AuthSession, TOStatus, TransferOrder, TransferOrderLine, SourceRecommendation, PartRecord, TransferQueueItem } from "@/types";
 import { useTransferOrders } from "@/hooks/use-transfer-orders";
 import type { TransferTab } from "@/hooks/use-transfer-orders";
-import { fetchParts } from "@/lib/api-client";
+import { fetchParts, fetchTransferQueue } from "@/lib/api-client";
 import { OrderStatusBadge } from "@/components/order-history/order-status-badge";
+import { TransferQueueItemCard } from "@/components/transfer-orders/transfer-queue-item-card";
+import { TransferQueueFilters } from "@/components/transfer-orders/transfer-queue-filters";
 import {
   Button,
   Badge,
@@ -24,6 +26,7 @@ import {
   PackageCheck,
   ArrowRightLeft,
   Loader2,
+  ListChecks,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -108,6 +111,10 @@ function QueueView({
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold">Transfer Orders</h1>
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setActiveTab("transfer-queue")}>
+            <ListChecks className="mr-1.5 h-3.5 w-3.5" />
+            Transfer Queue
+          </Button>
           <Button variant="outline" size="sm" onClick={refreshOrders}>
             <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
             Refresh
@@ -208,6 +215,267 @@ function QueueView({
             size="sm"
             disabled={ordersPage >= ordersTotalPages}
             onClick={() => setOrdersPage(ordersPage + 1)}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+    </>
+  );
+}
+
+/* ================================================================
+   TransferQueueView
+   ================================================================ */
+
+interface TransferQueueViewProps {
+  token: string;
+  facilities: any[];
+  facilitiesLoading: boolean;
+  setActiveTab: (tab: TransferTab) => void;
+  createOrder: (input: {
+    sourceFacilityId: string;
+    destinationFacilityId: string;
+    notes?: string;
+    lines: Array<{ partId: string; quantityRequested: number; notes?: string }>;
+  }) => Promise<boolean>;
+}
+
+function TransferQueueView({
+  token,
+  facilities,
+  facilitiesLoading,
+  setActiveTab,
+  createOrder,
+}: TransferQueueViewProps) {
+  const [queueItems, setQueueItems] = React.useState<TransferQueueItem[]>([]);
+  const [queueLoading, setQueueLoading] = React.useState(true);
+  const [queueError, setQueueError] = React.useState<string | null>(null);
+  const [queuePage, setQueuePage] = React.useState(1);
+  const [queueTotalPages, setQueueTotalPages] = React.useState(1);
+
+  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
+  const [destinationFacilityId, setDestinationFacilityId] = React.useState("");
+  const [partSearch, setPartSearch] = React.useState("");
+  const [statusFilter, setStatusFilter] = React.useState("all");
+  const [priorityFilter, setPriorityFilter] = React.useState<any>(null);
+  const [bulkCreating, setBulkCreating] = React.useState(false);
+
+  /* Load queue items */
+  const loadQueue = React.useCallback(
+    async (page: number) => {
+      setQueueLoading(true);
+      setQueueError(null);
+      try {
+        const params: any = { page, pageSize: 20 };
+        if (destinationFacilityId) params.destinationFacilityId = destinationFacilityId;
+        if (partSearch.trim()) params.partId = partSearch.trim();
+        if (statusFilter !== "all") params.status = statusFilter;
+        if (priorityFilter) params.minPriority = priorityFilter;
+
+        const res = await fetchTransferQueue(token, params);
+        setQueueItems(res.data);
+        setQueuePage(res.pagination.page);
+        setQueueTotalPages(res.pagination.totalPages);
+      } catch (err: any) {
+        setQueueError(err.message || "Failed to load transfer queue");
+      } finally {
+        setQueueLoading(false);
+      }
+    },
+    [token, destinationFacilityId, partSearch, statusFilter, priorityFilter]
+  );
+
+  React.useEffect(() => {
+    loadQueue(1);
+  }, [loadQueue]);
+
+  const refreshQueue = () => loadQueue(queuePage);
+
+  const toggleSelection = (itemId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemId)) {
+        next.delete(itemId);
+      } else {
+        next.add(itemId);
+      }
+      return next;
+    });
+  };
+
+  const selectAll = () => {
+    setSelectedIds(new Set(queueItems.map((i) => i.id)));
+  };
+
+  const deselectAll = () => {
+    setSelectedIds(new Set());
+  };
+
+  const handleCreateTO = async (item: TransferQueueItem) => {
+    if (!item.recommendedSource) {
+      alert("No recommended source available for this item.");
+      return;
+    }
+
+    const success = await createOrder({
+      sourceFacilityId: item.recommendedSource.facilityId,
+      destinationFacilityId: item.destinationFacilityId,
+      notes: `Created from transfer queue for ${item.partNumber}`,
+      lines: [
+        {
+          partId: item.partId,
+          quantityRequested: item.quantityNeeded,
+        },
+      ],
+    });
+
+    if (success) {
+      refreshQueue();
+    }
+  };
+
+  const handleCreateAll = async () => {
+    const selectedItems = queueItems.filter((i) => selectedIds.has(i.id));
+    if (selectedItems.length === 0) return;
+
+    setBulkCreating(true);
+    let successCount = 0;
+
+    for (const item of selectedItems) {
+      if (item.recommendedSource) {
+        const success = await createOrder({
+          sourceFacilityId: item.recommendedSource.facilityId,
+          destinationFacilityId: item.destinationFacilityId,
+          notes: `Batch created from transfer queue for ${item.partNumber}`,
+          lines: [
+            {
+              partId: item.partId,
+              quantityRequested: item.quantityNeeded,
+            },
+          ],
+        });
+        if (success) successCount++;
+      }
+    }
+
+    setBulkCreating(false);
+    alert(`Created ${successCount} of ${selectedItems.length} transfer orders.`);
+    deselectAll();
+    refreshQueue();
+  };
+
+  const clearFilters = () => {
+    setDestinationFacilityId("");
+    setPartSearch("");
+    setStatusFilter("all");
+    setPriorityFilter(null);
+  };
+
+  return (
+    <>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-lg font-semibold">Transfer Queue</h1>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={refreshQueue}>
+            <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+            Refresh
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setActiveTab("queue")}>
+            <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
+            Back to Orders
+          </Button>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <TransferQueueFilters
+        facilities={facilities}
+        facilitiesLoading={facilitiesLoading}
+        destinationFacilityId={destinationFacilityId}
+        partSearch={partSearch}
+        statusFilter={statusFilter}
+        priorityFilter={priorityFilter}
+        onDestinationChange={setDestinationFacilityId}
+        onPartSearchChange={setPartSearch}
+        onStatusFilterChange={setStatusFilter}
+        onPriorityFilterChange={setPriorityFilter}
+        onClearFilters={clearFilters}
+      />
+
+      {/* Bulk Actions */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 px-4 py-2">
+          <p className="text-sm">
+            <span className="font-semibold">{selectedIds.size}</span> item{selectedIds.size !== 1 ? "s" : ""} selected
+          </p>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={deselectAll}>
+              Deselect All
+            </Button>
+            <Button variant="outline" size="sm" onClick={selectAll}>
+              Select All ({queueItems.length})
+            </Button>
+            <Button size="sm" onClick={handleCreateAll} disabled={bulkCreating}>
+              {bulkCreating && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+              Create All ({selectedIds.size})
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* List */}
+      {queueLoading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-32 rounded-xl" />
+          ))}
+        </div>
+      ) : queueError ? (
+        <Card className="rounded-xl">
+          <CardContent className="py-8 text-center text-sm text-destructive">{queueError}</CardContent>
+        </Card>
+      ) : queueItems.length === 0 ? (
+        <Card className="rounded-xl">
+          <CardContent className="py-12 text-center">
+            <ListChecks className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
+            <p className="text-sm text-muted-foreground">No items in transfer queue.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {queueItems.map((item) => (
+            <TransferQueueItemCard
+              key={item.id}
+              item={item}
+              selected={selectedIds.has(item.id)}
+              onSelect={toggleSelection}
+              onCreateTO={handleCreateTO}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {queueTotalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 pt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={queuePage <= 1}
+            onClick={() => loadQueue(queuePage - 1)}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            Page {queuePage} of {queueTotalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={queuePage >= queueTotalPages}
+            onClick={() => loadQueue(queuePage + 1)}
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
@@ -758,6 +1026,16 @@ export function TransferOrdersRoute({ session, onUnauthorized }: Props) {
           refreshOrders={hook.refreshOrders}
           selectOrder={hook.selectOrder}
           setActiveTab={hook.setActiveTab}
+        />
+      )}
+
+      {hook.activeTab === "transfer-queue" && (
+        <TransferQueueView
+          token={session.tokens.accessToken}
+          facilities={hook.facilities}
+          facilitiesLoading={hook.facilitiesLoading}
+          setActiveTab={hook.setActiveTab}
+          createOrder={hook.createOrder}
         />
       )}
 

@@ -38,6 +38,7 @@ import type {
   RoutingStepStatus,
   TransferOrder,
   TOStatus,
+  TransferQueueItem,
   SourceRecommendation,
   InventoryLedgerEntry,
   Receipt,
@@ -1599,6 +1600,35 @@ export async function fetchSourceRecommendations(
   if (params.minQty != null) qs.set("minQty", String(params.minQty));
   if (params.limit != null) qs.set("limit", String(params.limit));
   return apiRequest(`/api/orders/transfer-orders/recommendations/source?${qs.toString()}`, { token });
+}
+
+export async function fetchTransferQueue(
+  token: string,
+  params?: {
+    page?: number;
+    pageSize?: number;
+    destinationFacilityId?: string;
+    sourceFacilityId?: string;
+    partId?: string;
+    status?: string;
+    minPriority?: number;
+    maxPriority?: number;
+  },
+): Promise<{
+  data: TransferQueueItem[];
+  pagination: { page: number; pageSize: number; total: number; totalPages: number };
+}> {
+  const qs = new URLSearchParams();
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.pageSize) qs.set("pageSize", String(params.pageSize));
+  if (params?.destinationFacilityId) qs.set("destinationFacilityId", params.destinationFacilityId);
+  if (params?.sourceFacilityId) qs.set("sourceFacilityId", params.sourceFacilityId);
+  if (params?.partId) qs.set("partId", params.partId);
+  if (params?.status) qs.set("status", params.status);
+  if (params?.minPriority != null) qs.set("minPriority", String(params.minPriority));
+  if (params?.maxPriority != null) qs.set("maxPriority", String(params.maxPriority));
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return apiRequest(`/api/orders/transfer-orders/queue${suffix}`, { token });
 }
 
 export async function fetchInventoryByFacility(

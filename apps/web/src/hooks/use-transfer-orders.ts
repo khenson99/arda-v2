@@ -19,7 +19,7 @@ import type {
 
 /* ── Types ─────────────────────────────────────────────────────── */
 
-export type TransferTab = "queue" | "detail" | "new";
+export type TransferTab = "queue" | "transfer-queue" | "detail" | "new";
 
 export interface CreateTransferInput {
   sourceFacilityId: string;
