@@ -1,5 +1,5 @@
 import { eq, and, sql, desc } from 'drizzle-orm';
-import { db, schema } from '@arda/db';
+import { db, schema, writeAuditEntry } from '@arda/db';
 import { getEventBus } from '@arda/events';
 import { config, createLogger } from '@arda/config';
 import { AppError } from '../middleware/error-handler.js';
@@ -15,7 +15,6 @@ const {
   transferOrders,
   transferOrderLines,
   workOrders,
-  auditLog,
 } = schema;
 
 type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -339,11 +338,11 @@ export async function processReceipt(input: ProcessReceiptInput) {
     // Update the source order
     await updateOrderAfterReceiving(tx, input, status);
 
-    // Audit log
-    await tx.insert(auditLog).values({
+    // Audit log — system-initiated receiving uses userId from input
+    await writeAuditEntry(tx, {
       tenantId: input.tenantId,
-      userId: input.receivedByUserId,
-      action: 'receiving.receipt_created',
+      userId: input.receivedByUserId ?? null,
+      action: 'receipt.created',
       entityType: 'receipt',
       entityId: receipt.id,
       previousState: null,
@@ -356,8 +355,8 @@ export async function processReceipt(input: ProcessReceiptInput) {
       metadata: {
         orderId: input.orderId,
         orderType: input.orderType,
+        ...(!input.receivedByUserId ? { systemActor: 'receiving_service' } : {}),
       },
-      timestamp: new Date(),
     });
 
     const totalAccepted = input.lines.reduce((s, l) => s + l.quantityAccepted, 0);
@@ -538,10 +537,10 @@ export async function resolveException(input: ResolveExceptionInput) {
       .returning();
 
     // Audit log
-    await tx.insert(auditLog).values({
+    await writeAuditEntry(tx, {
       tenantId: input.tenantId,
-      userId: input.resolvedByUserId,
-      action: 'receiving.exception_resolved',
+      userId: input.resolvedByUserId ?? null,
+      action: 'receipt.exception_resolved',
       entityType: 'receiving_exception',
       entityId: input.exceptionId,
       previousState: { status: exception.status },
@@ -549,8 +548,8 @@ export async function resolveException(input: ResolveExceptionInput) {
       metadata: {
         receiptId: exception.receiptId,
         orderId: exception.orderId,
+        ...(!input.resolvedByUserId ? { systemActor: 'receiving_service' } : {}),
       },
-      timestamp: new Date(),
     });
 
     return {

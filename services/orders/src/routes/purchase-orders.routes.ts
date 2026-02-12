@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { eq, and, sql, desc, asc, inArray } from 'drizzle-orm';
-import { db, schema } from '@arda/db';
-import type { AuthRequest } from '@arda/auth-utils';
+import { db, schema, writeAuditEntry } from '@arda/db';
+import type { AuthRequest, AuditContext } from '@arda/auth-utils';
 import { getEventBus } from '@arda/events';
 import { config } from '@arda/config';
 import { AppError } from '../middleware/error-handler.js';
@@ -17,13 +17,7 @@ import {
 
 export const purchaseOrdersRouter = Router();
 
-interface RequestAuditContext {
-  userId?: string;
-  ipAddress?: string;
-  userAgent?: string;
-}
-
-function getRequestAuditContext(req: AuthRequest): RequestAuditContext {
+function getRequestAuditContext(req: AuthRequest): AuditContext {
   const forwarded = req.headers['x-forwarded-for'];
   const forwardedIp = Array.isArray(forwarded)
     ? forwarded[0]
@@ -38,156 +32,6 @@ function getRequestAuditContext(req: AuthRequest): RequestAuditContext {
     ipAddress: rawIp?.slice(0, 45),
     userAgent,
   };
-}
-
-async function writePurchaseOrderStatusAudit(
-  tx: any,
-  input: {
-    tenantId: string;
-    poId: string;
-    fromStatus: string;
-    toStatus: string;
-    orderNumber: string;
-    context: RequestAuditContext;
-    metadata: Record<string, unknown>;
-  }
-) {
-  await tx.insert(schema.auditLog).values({
-    tenantId: input.tenantId,
-    userId: input.context.userId,
-    action: 'purchase_order.status_changed',
-    entityType: 'purchase_order',
-    entityId: input.poId,
-    previousState: { status: input.fromStatus },
-    newState: { status: input.toStatus },
-    metadata: {
-      ...input.metadata,
-      orderNumber: input.orderNumber,
-    },
-    ipAddress: input.context.ipAddress,
-    userAgent: input.context.userAgent,
-    timestamp: new Date(),
-  });
-}
-
-async function writePurchaseOrderCreateAudit(
-  tx: any,
-  input: {
-    tenantId: string;
-    poId: string;
-    orderNumber: string;
-    initialStatus: string;
-    lineCount: number;
-    totalAmount: string;
-    context: RequestAuditContext;
-  }
-) {
-  await tx.insert(schema.auditLog).values({
-    tenantId: input.tenantId,
-    userId: input.context.userId,
-    action: 'purchase_order.created',
-    entityType: 'purchase_order',
-    entityId: input.poId,
-    previousState: null,
-    newState: {
-      status: input.initialStatus,
-      lineCount: input.lineCount,
-      totalAmount: input.totalAmount,
-    },
-    metadata: {
-      source: 'purchase_orders.create',
-      orderNumber: input.orderNumber,
-    },
-    ipAddress: input.context.ipAddress,
-    userAgent: input.context.userAgent,
-    timestamp: new Date(),
-  });
-}
-
-async function writePurchaseOrderLineAddedAudit(
-  tx: any,
-  input: {
-    tenantId: string;
-    poId: string;
-    orderNumber: string;
-    lineId: string;
-    lineNumber: number;
-    partId: string;
-    quantityOrdered: number;
-    previousTotalAmount: string;
-    newTotalAmount: string;
-    context: RequestAuditContext;
-  }
-) {
-  await tx.insert(schema.auditLog).values({
-    tenantId: input.tenantId,
-    userId: input.context.userId,
-    action: 'purchase_order.line_added',
-    entityType: 'purchase_order',
-    entityId: input.poId,
-    previousState: {
-      totalAmount: input.previousTotalAmount,
-    },
-    newState: {
-      totalAmount: input.newTotalAmount,
-      lineId: input.lineId,
-      lineNumber: input.lineNumber,
-      partId: input.partId,
-      quantityOrdered: input.quantityOrdered,
-    },
-    metadata: {
-      source: 'purchase_orders.add_line',
-      orderNumber: input.orderNumber,
-    },
-    ipAddress: input.context.ipAddress,
-    userAgent: input.context.userAgent,
-    timestamp: new Date(),
-  });
-}
-
-async function writePurchaseOrderLinesReceivedAudit(
-  tx: any,
-  input: {
-    tenantId: string;
-    poId: string;
-    orderNumber: string;
-    status: string;
-    receivedLines: Array<{
-      lineId: string;
-      fromQuantityReceived: number;
-      toQuantityReceived: number;
-    }>;
-    context: RequestAuditContext;
-  }
-) {
-  await tx.insert(schema.auditLog).values({
-    tenantId: input.tenantId,
-    userId: input.context.userId,
-    action: 'purchase_order.lines_received',
-    entityType: 'purchase_order',
-    entityId: input.poId,
-    previousState: {
-      status: input.status,
-      lineChanges: input.receivedLines.map((line) => ({
-        lineId: line.lineId,
-        quantityReceived: line.fromQuantityReceived,
-      })),
-    },
-    newState: {
-      status: input.status,
-      lineChanges: input.receivedLines.map((line) => ({
-        lineId: line.lineId,
-        quantityReceived: line.toQuantityReceived,
-      })),
-    },
-    metadata: {
-      source: 'purchase_orders.receive',
-      orderNumber: input.orderNumber,
-    },
-    ipAddress: input.context.ipAddress,
-    userAgent: input.context.userAgent,
-    timestamp: new Date(),
-  });
 }
 
 // Validation schemas
@@ -508,14 +352,24 @@ purchaseOrdersRouter.post('/', async (req: AuthRequest, res, next) => {
         )
         .returning();
 
-      await writePurchaseOrderCreateAudit(tx, {
+      await writeAuditEntry(tx, {
         tenantId,
-        poId: createdPO.id,
-        orderNumber: poNumber,
-        initialStatus: createdPO.status,
-        lineCount: insertedLines.length,
-        totalAmount,
-        context: auditContext,
+        userId: auditContext.userId,
+        action: 'purchase_order.created',
+        entityType: 'purchase_order',
+        entityId: createdPO.id,
+        previousState: null,
+        newState: {
+          status: createdPO.status,
+          lineCount: insertedLines.length,
+          totalAmount,
+        },
+        metadata: {
+          source: 'purchase_orders.create',
+          orderNumber: poNumber,
+        },
+        ipAddress: auditContext.ipAddress,
+        userAgent: auditContext.userAgent,
       });
 
       return { createdPO, insertedLines };
@@ -636,17 +490,28 @@ purchaseOrdersRouter.post('/:id/lines', async (req: AuthRequest, res, next) => {
           )
         );
 
-      await writePurchaseOrderLineAddedAudit(tx, {
+      await writeAuditEntry(tx, {
         tenantId,
-        poId: id,
-        orderNumber: po.poNumber,
-        lineId: newLine.id,
-        lineNumber: newLine.lineNumber,
-        partId: newLine.partId,
-        quantityOrdered: newLine.quantityOrdered,
-        previousTotalAmount: String(po.totalAmount ?? '0.00'),
-        newTotalAmount: totalAmount,
-        context: auditContext,
+        userId: auditContext.userId,
+        action: 'purchase_order.line_added',
+        entityType: 'purchase_order',
+        entityId: id,
+        previousState: {
+          totalAmount: String(po.totalAmount ?? '0.00'),
+        },
+        newState: {
+          totalAmount,
+          lineId: newLine.id,
+          lineNumber: newLine.lineNumber,
+          partId: newLine.partId,
+          quantityOrdered: newLine.quantityOrdered,
+        },
+        metadata: {
+          source: 'purchase_orders.add_line',
+          orderNumber: po.poNumber,
+        },
+        ipAddress: auditContext.ipAddress,
+        userAgent: auditContext.userAgent,
       });
 
       return newLine;
@@ -869,14 +734,34 @@ purchaseOrdersRouter.patch('/:id/status', async (req: AuthRequest, res, next) =>
       if (!cancelReason) {
         throw new AppError(400, 'cancelReason is required when cancelling');
       }
-      await db
+    }
+
+    // Build update object based on new status
+    const updateData: Record<string, any> = {
+      status: newStatus,
+      updatedAt: new Date(),
+    };
+
+    if (newStatus === 'cancelled') {
+      updateData.cancelledAt = new Date();
+      updateData.cancelReason = cancelReason;
+    }
+    if (newStatus === 'approved') {
+      updateData.approvedByUserId = req.user!.sub;
+      updateData.approvedAt = new Date();
+    }
+    if (newStatus === 'sent') {
+      updateData.sentAt = new Date();
+    }
+    if (newStatus === 'received') {
+      updateData.actualDeliveryDate = new Date();
+    }
+
+    // Wrap mutation + audit in same transaction
+    const updated = await db.transaction(async (tx) => {
+      await tx
         .update(schema.purchaseOrders)
-        .set({
-          status: newStatus,
-          cancelledAt: new Date(),
-          cancelReason,
-          updatedAt: new Date(),
-        })
+        .set(updateData)
         .where(
           and(
             eq(schema.purchaseOrders.id, id),
@@ -884,20 +769,24 @@ purchaseOrdersRouter.patch('/:id/status', async (req: AuthRequest, res, next) =>
           ),
         );
 
-      await writePurchaseOrderStatusAudit(db, {
+      await writeAuditEntry(tx, {
         tenantId: req.user!.tenantId,
-        poId: id,
-        fromStatus: po.status,
-        toStatus: newStatus,
-        orderNumber: po.poNumber,
-        context: auditContext,
+        userId: auditContext.userId,
+        action: 'purchase_order.status_changed',
+        entityType: 'purchase_order',
+        entityId: id,
+        previousState: { status: po.status },
+        newState: { status: newStatus },
         metadata: {
           source: 'purchase_orders.status',
-          cancelReason,
+          orderNumber: po.poNumber,
+          ...(cancelReason ? { cancelReason } : {}),
         },
+        ipAddress: auditContext.ipAddress,
+        userAgent: auditContext.userAgent,
       });
 
-      const updated = await db
+      const [result] = await tx
         .select()
         .from(schema.purchaseOrders)
         .where(
@@ -908,62 +797,8 @@ purchaseOrdersRouter.patch('/:id/status', async (req: AuthRequest, res, next) =>
         )
         .limit(1);
 
-      return res.json({
-        data: updated[0],
-      });
-    }
-
-    // Build update object based on new status
-    const updateData: Record<string, any> = {
-      status: newStatus,
-      updatedAt: new Date(),
-    };
-
-    if (newStatus === 'approved') {
-      updateData.approvedByUserId = req.user!.sub;
-      updateData.approvedAt = new Date();
-    }
-
-    if (newStatus === 'sent') {
-      updateData.sentAt = new Date();
-    }
-
-    if (newStatus === 'received') {
-      updateData.actualDeliveryDate = new Date();
-    }
-
-    await db
-      .update(schema.purchaseOrders)
-      .set(updateData)
-      .where(
-        and(
-          eq(schema.purchaseOrders.id, id),
-          eq(schema.purchaseOrders.tenantId, req.user!.tenantId),
-        ),
-      );
-
-    await writePurchaseOrderStatusAudit(db, {
-      tenantId: req.user!.tenantId,
-      poId: id,
-      fromStatus: po.status,
-      toStatus: newStatus,
-      orderNumber: po.poNumber,
-      context: auditContext,
-      metadata: {
-        source: 'purchase_orders.status',
-      },
+      return result;
     });
-
-    const updated = await db
-      .select()
-      .from(schema.purchaseOrders)
-      .where(
-        and(
-          eq(schema.purchaseOrders.id, id),
-          eq(schema.purchaseOrders.tenantId, req.user!.tenantId),
-        ),
-      )
-      .limit(1);
 
     // Publish order.status_changed event
     try {
@@ -983,7 +818,7 @@ purchaseOrdersRouter.patch('/:id/status', async (req: AuthRequest, res, next) =>
     }
 
     res.json({
-      data: updated[0],
+      data: updated,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -1070,13 +905,32 @@ purchaseOrdersRouter.patch('/:id/receive', async (req: AuthRequest, res, next) =
       }
 
       if (receivedLineChanges.length > 0) {
-        await writePurchaseOrderLinesReceivedAudit(tx, {
+        await writeAuditEntry(tx, {
           tenantId,
-          poId: id,
-          orderNumber: po.poNumber,
-          status: po.status,
-          receivedLines: receivedLineChanges,
-          context: auditContext,
+          userId: auditContext.userId,
+          action: 'purchase_order.lines_received',
+          entityType: 'purchase_order',
+          entityId: id,
+          previousState: {
+            status: po.status,
+            lineChanges: receivedLineChanges.map((line) => ({
+              lineId: line.lineId,
+              quantityReceived: line.fromQuantityReceived,
+            })),
+          },
+          newState: {
+            status: po.status,
+            lineChanges: receivedLineChanges.map((line) => ({
+              lineId: line.lineId,
+              quantityReceived: line.toQuantityReceived,
+            })),
+          },
+          metadata: {
+            source: 'purchase_orders.receive',
+            orderNumber: po.poNumber,
+          },
+          ipAddress: auditContext.ipAddress,
+          userAgent: auditContext.userAgent,
         });
       }
 
@@ -1119,17 +973,21 @@ purchaseOrdersRouter.patch('/:id/receive', async (req: AuthRequest, res, next) =
             ),
           );
 
-        await writePurchaseOrderStatusAudit(tx, {
+        await writeAuditEntry(tx, {
           tenantId,
-          poId: id,
-          fromStatus: po.status,
-          toStatus: newStatus,
-          orderNumber: po.poNumber,
-          context: auditContext,
+          userId: auditContext.userId,
+          action: 'purchase_order.status_changed',
+          entityType: 'purchase_order',
+          entityId: id,
+          previousState: { status: po.status },
+          newState: { status: newStatus },
           metadata: {
             source: 'purchase_orders.receive',
+            orderNumber: po.poNumber,
             updatedLineIds: receiveLines.map((line) => line.lineId),
           },
+          ipAddress: auditContext.ipAddress,
+          userAgent: auditContext.userAgent,
         });
       }
 

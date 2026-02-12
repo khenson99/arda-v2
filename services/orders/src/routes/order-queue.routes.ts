@@ -1,10 +1,11 @@
 import { Router, type Response, type NextFunction } from 'express';
 import { z } from 'zod';
 import { eq, and, sql, inArray, asc } from 'drizzle-orm';
-import { db, schema } from '@arda/db';
+import { db, schema, writeAuditEntry, writeAuditEntries } from '@arda/db';
+import type { DbOrTransaction } from '@arda/db';
 import { getEventBus } from '@arda/events';
 import { config } from '@arda/config';
-import type { AuthRequest } from '@arda/auth-utils';
+import type { AuthRequest, AuditContext } from '@arda/auth-utils';
 import { AppError } from '../middleware/error-handler.js';
 import {
   getNextPONumber,
@@ -19,7 +20,6 @@ const {
   kanbanCards,
   kanbanLoops,
   cardStageTransitions,
-  auditLog,
   suppliers,
   supplierParts,
   parts,
@@ -30,14 +30,6 @@ const {
   transferOrders,
   transferOrderLines,
 } = schema;
-
-type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
-
-interface RequestAuditContext {
-  userId?: string;
-  ipAddress?: string;
-  userAgent?: string;
-}
 
 type QueueRiskLevel = 'medium' | 'high';
 
@@ -89,7 +81,7 @@ export interface QueueRiskScanResult {
   risks: QueueRiskItem[];
 }
 
-function getRequestAuditContext(req: AuthRequest): RequestAuditContext {
+function getRequestAuditContext(req: AuthRequest): AuditContext {
   const forwarded = req.headers['x-forwarded-for'];
   const forwardedIp = Array.isArray(forwarded)
     ? forwarded[0]
@@ -218,7 +210,7 @@ function computeQueueRisk(input: {
 }
 
 async function writeOrderQueueAudit(
-  tx: DbTransaction,
+  tx: DbOrTransaction,
   input: {
     tenantId: string;
     action: string;
@@ -226,10 +218,10 @@ async function writeOrderQueueAudit(
     entityId: string;
     newState: Record<string, unknown>;
     metadata: Record<string, unknown>;
-    context: RequestAuditContext;
+    context: AuditContext;
   }
 ) {
-  await tx.insert(auditLog).values({
+  await writeAuditEntry(tx, {
     tenantId: input.tenantId,
     userId: input.context.userId,
     action: input.action,
@@ -240,26 +232,26 @@ async function writeOrderQueueAudit(
     metadata: input.metadata,
     ipAddress: input.context.ipAddress,
     userAgent: input.context.userAgent,
-    timestamp: new Date(),
   });
 }
 
 async function writeCardTransitionAudit(
-  tx: DbTransaction,
+  tx: DbOrTransaction,
   input: {
     tenantId: string;
     transitionedCards: Array<{ cardId: string; loopId: string }>;
     orderType: 'purchase_order' | 'work_order' | 'transfer_order';
     orderId: string;
     orderNumber: string;
-    context: RequestAuditContext;
+    context: AuditContext;
   }
 ) {
   if (input.transitionedCards.length === 0) return;
 
-  await tx.insert(auditLog).values(
+  await writeAuditEntries(
+    tx,
+    input.tenantId,
     input.transitionedCards.map((card) => ({
-      tenantId: input.tenantId,
       userId: input.context.userId,
       action: 'kanban_card.transitioned_to_ordered',
       entityType: 'kanban_card',
@@ -277,24 +269,23 @@ async function writeCardTransitionAudit(
       },
       ipAddress: input.context.ipAddress,
       userAgent: input.context.userAgent,
-      timestamp: new Date(),
-    }))
+    })),
   );
 }
 
 async function writePurchaseOrderStatusAuditFromQueue(
-  tx: DbTransaction,
+  tx: DbOrTransaction,
   input: {
     tenantId: string;
     poId: string;
     orderNumber: string;
     fromStatus: string;
     toStatus: string;
-    context: RequestAuditContext;
+    context: AuditContext;
     metadata: Record<string, unknown>;
   }
 ) {
-  await tx.insert(auditLog).values({
+  await writeAuditEntry(tx, {
     tenantId: input.tenantId,
     userId: input.context.userId,
     action: 'purchase_order.status_changed',
@@ -308,7 +299,6 @@ async function writePurchaseOrderStatusAuditFromQueue(
     },
     ipAddress: input.context.ipAddress,
     userAgent: input.context.userAgent,
-    timestamp: new Date(),
   });
 }
 
