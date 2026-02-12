@@ -8,7 +8,7 @@
  * - Production queue queries with pagination
  */
 
-import { db, schema } from '@arda/db';
+import { db, schema, writeAuditEntry } from '@arda/db';
 import { eq, and, sql, desc, asc, inArray } from 'drizzle-orm';
 import { getEventBus } from '@arda/events';
 import { config, createLogger } from '@arda/config';
@@ -36,10 +36,7 @@ const {
   cardStageTransitions,
   productionQueueEntries,
   routingTemplates,
-  auditLog,
 } = schema;
-
-type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -263,7 +260,7 @@ export async function createWorkOrderFromTrigger(
     }).execute();
 
     // Audit
-    await tx.insert(auditLog).values({
+    await writeAuditEntry(tx, {
       tenantId,
       userId: userId || null,
       action: 'work_order.created_from_trigger',
@@ -271,9 +268,10 @@ export async function createWorkOrderFromTrigger(
       entityId: wo.id,
       previousState: null,
       newState: { woNumber, partId, facilityId, quantity, cardId, loopId },
-      metadata: { source: 'wo_orchestration' },
-      ipAddress: null,
-      userAgent: null,
+      metadata: {
+        source: 'wo_orchestration',
+        ...(!userId ? { systemActor: 'wo_orchestration' } : {}),
+      },
       timestamp: now,
     });
 
@@ -382,12 +380,6 @@ export async function transitionWorkOrderStatus(
     updateValues.cancelReason = cancelReason;
   }
 
-  await db
-    .update(workOrders)
-    .set(updateValues)
-    .where(and(eq(workOrders.id, workOrderId), eq(workOrders.tenantId, tenantId)))
-    .execute();
-
   // Update queue entry status
   const queueStatusMap: Record<string, string> = {
     draft: 'pending',
@@ -407,25 +399,39 @@ export async function transitionWorkOrderStatus(
     queueUpdate.completedAt = now;
   }
 
-  await db
-    .update(productionQueueEntries)
-    .set(queueUpdate)
-    .where(and(eq(productionQueueEntries.workOrderId, workOrderId), eq(productionQueueEntries.tenantId, tenantId)))
-    .execute();
+  // Wrap mutation + audit in same transaction
+  await db.transaction(async (tx) => {
+    await tx
+      .update(workOrders)
+      .set(updateValues)
+      .where(and(eq(workOrders.id, workOrderId), eq(workOrders.tenantId, tenantId)))
+      .execute();
 
-  // Audit
-  await db.insert(auditLog).values({
-    tenantId,
-    userId: userId || null,
-    action: 'work_order.status_changed',
-    entityType: 'work_order',
-    entityId: workOrderId,
-    previousState: { status: fromStatus },
-    newState: { status: toStatus, holdReason, cancelReason },
-    metadata: { workOrderNumber: wo.woNumber, source: 'wo_orchestration' },
-    ipAddress: null,
-    userAgent: null,
-    timestamp: now,
+    await tx
+      .update(productionQueueEntries)
+      .set(queueUpdate)
+      .where(and(eq(productionQueueEntries.workOrderId, workOrderId), eq(productionQueueEntries.tenantId, tenantId)))
+      .execute();
+
+    // Determine the specific action name for hold/resume lifecycle events
+    let auditAction = 'work_order.status_changed';
+    if (toStatus === 'on_hold') auditAction = 'work_order.hold';
+    if (toStatus === 'in_progress' && fromStatus === 'on_hold') auditAction = 'work_order.resume';
+
+    await writeAuditEntry(tx, {
+      tenantId,
+      userId: userId || null,
+      action: auditAction,
+      entityType: 'work_order',
+      entityId: workOrderId,
+      previousState: { status: fromStatus },
+      newState: { status: toStatus, holdReason, cancelReason },
+      metadata: {
+        workOrderNumber: wo.woNumber,
+        source: 'wo_orchestration',
+        ...(!userId ? { systemActor: 'wo_orchestration' } : {}),
+      },
+    });
   });
 
   // Emit events
@@ -498,30 +504,33 @@ export async function expediteWorkOrder(input: ExpediteWOInput): Promise<void> {
   const now = new Date();
   const previousPriority = wo.priority;
 
-  await db
-    .update(workOrders)
-    .set({ priority: 100, isExpedited: true, updatedAt: now })
-    .where(and(eq(workOrders.id, workOrderId), eq(workOrders.tenantId, tenantId)))
-    .execute();
+  await db.transaction(async (tx) => {
+    await tx
+      .update(workOrders)
+      .set({ priority: 100, isExpedited: true, updatedAt: now })
+      .where(and(eq(workOrders.id, workOrderId), eq(workOrders.tenantId, tenantId)))
+      .execute();
 
-  await db
-    .update(productionQueueEntries)
-    .set({ isExpedited: true, priorityScore: '100.0000', updatedAt: now })
-    .where(and(eq(productionQueueEntries.workOrderId, workOrderId), eq(productionQueueEntries.tenantId, tenantId)))
-    .execute();
+    await tx
+      .update(productionQueueEntries)
+      .set({ isExpedited: true, priorityScore: '100.0000', updatedAt: now })
+      .where(and(eq(productionQueueEntries.workOrderId, workOrderId), eq(productionQueueEntries.tenantId, tenantId)))
+      .execute();
 
-  await db.insert(auditLog).values({
-    tenantId,
-    userId: userId || null,
-    action: 'work_order.expedited',
-    entityType: 'work_order',
-    entityId: workOrderId,
-    previousState: { priority: previousPriority, isExpedited: false },
-    newState: { priority: 100, isExpedited: true },
-    metadata: { workOrderNumber: wo.woNumber, source: 'wo_orchestration' },
-    ipAddress: null,
-    userAgent: null,
-    timestamp: now,
+    await writeAuditEntry(tx, {
+      tenantId,
+      userId: userId || null,
+      action: 'work_order.expedite',
+      entityType: 'work_order',
+      entityId: workOrderId,
+      previousState: { priority: previousPriority, isExpedited: false },
+      newState: { priority: 100, isExpedited: true },
+      metadata: {
+        workOrderNumber: wo.woNumber,
+        source: 'wo_orchestration',
+        ...(!userId ? { systemActor: 'wo_orchestration' } : {}),
+      },
+    });
   });
 
   try {
@@ -639,7 +648,7 @@ export async function splitWorkOrder(input: SplitWOInput): Promise<SplitWOResult
       .execute();
 
     // Audit
-    await tx.insert(auditLog).values({
+    await writeAuditEntry(tx, {
       tenantId,
       userId: userId || null,
       action: 'work_order.split',
@@ -647,10 +656,12 @@ export async function splitWorkOrder(input: SplitWOInput): Promise<SplitWOResult
       entityId: workOrderId,
       previousState: { quantityToProduce: wo.quantityToProduce },
       newState: { parentQuantity: parentNewQuantity, childId: child.id, childQuantity: splitQuantity },
-      metadata: { parentWoNumber: wo.woNumber, childWoNumber, source: 'wo_orchestration' },
-      ipAddress: null,
-      userAgent: null,
-      timestamp: now,
+      metadata: {
+        parentWoNumber: wo.woNumber,
+        childWoNumber,
+        source: 'wo_orchestration',
+        ...(!userId ? { systemActor: 'wo_orchestration' } : {}),
+      },
     });
 
     return {

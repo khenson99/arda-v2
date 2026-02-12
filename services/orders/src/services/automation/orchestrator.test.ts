@@ -12,7 +12,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const {
   mockRedisGet, mockRedisSet, mockRedisDel, mockRedisQuit, mockRedisPing,
-  mockDbExecute,
+  mockWriteAuditEntry,
   mockLoadActiveRules, mockEvaluateRules, mockBuildIdempotencyKey,
   mockExecuteWithIdempotency, mockCheckIdempotencyKey, mockClearIdempotencyKey, mockIdempotencyShutdown,
   mockCheckGuardrails, mockRecordPOCreated, mockRecordEmailDispatched,
@@ -23,7 +23,7 @@ const {
   mockRedisDel: vi.fn(),
   mockRedisQuit: vi.fn(),
   mockRedisPing: vi.fn(),
-  mockDbExecute: vi.fn().mockResolvedValue(undefined),
+  mockWriteAuditEntry: vi.fn().mockResolvedValue({ id: 'audit-1', hashChain: 'test-hash', sequenceNumber: 1 }),
   mockLoadActiveRules: vi.fn(),
   mockEvaluateRules: vi.fn(),
   mockBuildIdempotencyKey: vi.fn(),
@@ -60,18 +60,13 @@ vi.mock('@arda/config', () => ({
   }),
 }));
 
-// DB mock (recordDecision uses db.insert)
+// DB mock (recordDecision uses writeAuditEntry)
 vi.mock('@arda/db', () => ({
-  db: {
-    insert: vi.fn().mockReturnValue({
-      values: vi.fn().mockReturnValue({
-        execute: mockDbExecute,
-      }),
-    }),
-  },
+  db: {},
   schema: {
     auditLog: {},
   },
+  writeAuditEntry: (...args: unknown[]) => mockWriteAuditEntry(...args),
 }));
 
 // Rule evaluator mock
@@ -190,7 +185,7 @@ function setupHappyPath() {
   mockRecordPOCreated.mockResolvedValue(undefined);
 
   // DB audit insert succeeds
-  mockDbExecute.mockResolvedValue(undefined);
+  mockWriteAuditEntry.mockResolvedValue({ id: 'audit-1', hashChain: 'test-hash', sequenceNumber: 1 });
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────
@@ -569,7 +564,7 @@ describe('AutomationOrchestrator', () => {
       await expect(orchestrator.executePipeline(job)).rejects.toThrow('Redis connection lost');
 
       // Audit decision should still be recorded
-      expect(mockDbExecute).toHaveBeenCalled();
+      expect(mockWriteAuditEntry).toHaveBeenCalled();
     });
   });
 

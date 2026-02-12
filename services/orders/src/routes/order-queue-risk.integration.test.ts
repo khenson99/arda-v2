@@ -46,11 +46,13 @@ const { dbMock, resetDbMocks } = vi.hoisted(() => {
 
   const dbMock = {
     select: vi.fn(() => makeSelectBuilder(testState.selectResults.shift() ?? [])),
+    execute: vi.fn(async () => testState.selectResults.shift() ?? []),
     transaction: vi.fn(),
   };
 
   const resetDbMocks = () => {
     dbMock.select.mockClear();
+    dbMock.execute.mockClear();
     dbMock.transaction.mockClear();
   };
 
@@ -69,6 +71,8 @@ vi.mock('drizzle-orm', () => ({
 vi.mock('@arda/db', () => ({
   db: dbMock,
   schema: schemaMock,
+  writeAuditEntry: vi.fn(async () => ({ id: 'audit-1', hashChain: 'test-hash', sequenceNumber: 1 })),
+  writeAuditEntries: vi.fn(async () => []),
 }));
 
 vi.mock('@arda/events', () => ({
@@ -140,19 +144,19 @@ describe('queue risk scan endpoint', () => {
     testState.selectResults = [
       [
         {
-          cardId: 'card-1',
-          loopId: 'loop-1',
-          currentStageEnteredAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
-          loopType: 'procurement',
-          partId: 'part-1',
-          facilityId: 'facility-1',
-          minQuantity: 10,
-          orderQuantity: 10,
-          statedLeadTimeDays: 2,
-          safetyStockDays: '0',
+          card_id: 'card-1',
+          loop_id: 'loop-1',
+          current_stage_entered_at: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
+          loop_type: 'procurement',
+          part_id: 'part-1',
+          facility_id: 'facility-1',
+          min_quantity: 10,
+          order_quantity: 10,
+          stated_lead_time_days: 2,
+          safety_stock_days: '0',
+          trigger_count: 6,
         },
       ],
-      [{ loopId: 'loop-1', triggerCount: 6 }],
     ];
 
     const app = createApp();
@@ -188,19 +192,19 @@ describe('queue risk scan endpoint', () => {
     testState.selectResults = [
       [
         {
-          cardId: 'card-2',
-          loopId: 'loop-2',
-          currentStageEnteredAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-          loopType: 'transfer',
-          partId: 'part-2',
-          facilityId: 'facility-2',
-          minQuantity: 6,
-          orderQuantity: 12,
-          statedLeadTimeDays: 1,
-          safetyStockDays: '0',
+          card_id: 'card-2',
+          loop_id: 'loop-2',
+          current_stage_entered_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+          loop_type: 'transfer',
+          part_id: 'part-2',
+          facility_id: 'facility-2',
+          min_quantity: 6,
+          order_quantity: 12,
+          stated_lead_time_days: 1,
+          safety_stock_days: '0',
+          trigger_count: 5,
         },
       ],
-      [{ loopId: 'loop-2', triggerCount: 5 }],
     ];
 
     const app = createApp();
@@ -216,19 +220,19 @@ describe('queue risk scan endpoint', () => {
     testState.selectResults = [
       [
         {
-          cardId: 'card-3',
-          loopId: 'loop-3',
-          currentStageEnteredAt: new Date(Date.now() - 36 * 60 * 60 * 1000),
-          loopType: 'production',
-          partId: 'part-3',
-          facilityId: 'facility-3',
-          minQuantity: 20,
-          orderQuantity: 20,
-          statedLeadTimeDays: 2,
-          safetyStockDays: '0',
+          card_id: 'card-3',
+          loop_id: 'loop-3',
+          current_stage_entered_at: new Date(Date.now() - 36 * 60 * 60 * 1000),
+          loop_type: 'production',
+          part_id: 'part-3',
+          facility_id: 'facility-3',
+          min_quantity: 20,
+          order_quantity: 20,
+          stated_lead_time_days: 2,
+          safety_stock_days: '0',
+          trigger_count: 0,
         },
       ],
-      [],
     ];
 
     const app = createApp();

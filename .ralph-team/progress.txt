@@ -124,3 +124,56 @@ Learnings:
   - 'PENDING' sentinel allows identifying legacy inserts that bypassed writeAuditEntry
   - auditContextMiddleware extracts IP from X-Forwarded-For (first entry) or socket.remoteAddress
   - Pattern: middleware attaches req.auditContext, route handlers spread it into writeAuditEntry call
+
+--- Architect Iteration 4 ---
+Timestamp: 2026-02-12T18:00:00Z
+Tickets assigned: #253 → backend-engineer (orders audit writes, next in MVP-18 sequence)
+Tickets completed: none (PR #382 still pending review)
+Tickets blocked: none
+Decisions made: ADR-005 (Migration Safety fix via migration-approved label)
+Learnings:
+  - PR #382 CI analysis: 4 failing checks, but 3 are pre-existing on main (kanban/orders/web unit tests)
+  - Only PR-specific failure is "Migration Safety" — grep regex matches commented-out DROP in SQL rollback comments
+  - Fix: add `migration-approved` label to PR #382 (low risk — the DROPs are SQL comments, not real DDL)
+  - Alternative: backend-engineer removes commented rollback SQL from migration files
+  - Main branch also fails: Integration Tests, kanban, orders, web — all pre-existing, not caused by PR #382
+  - Lint & Typecheck now PASSING — the .default() fix from iteration 3 resolved all 30 TS2769 errors
+  - All new test suites pass: db (78), auth-utils (9), auth-service, catalog-service, notifications
+  - PR #382 is ready for review once Migration Safety is resolved
+  - Next ticket: #253 (MVP-18/T4 — orders audit writes) can start on a branch off issue-251 while PR #382 awaits review
+
+--- Backend Agent Iteration 4 | Issue #253 ---
+Timestamp: 2026-02-12T22:00:00Z
+Status: completed
+Changes:
+  Source files refactored (inline db.insert(auditLog) → writeAuditEntry):
+  - services/orders/src/routes/purchase-orders.routes.ts (create PO/WO/TO audit writes)
+  - services/orders/src/routes/order-queue.routes.ts (order-from-queue audit writes)
+  - services/orders/src/services/receiving.service.ts (receipt.* audit writes)
+  - services/orders/src/services/work-order-orchestration.service.ts (WO lifecycle audit writes)
+  - services/orders/src/services/automation/action-handlers.ts (automation action audit writes)
+  - services/orders/src/services/automation/orchestrator.ts (automation.decision_logged audit writes)
+  New test files:
+  - services/orders/src/routes/audit-refactor.integration.test.ts (6 tests — PO/WO/TO create + queue batch)
+  - services/orders/src/services/audit-refactor-services.integration.test.ts (3 tests — receiving, WO orchestration, automation)
+  Existing test files updated (added writeAuditEntry/writeAuditEntries to @arda/db mocks):
+  - services/orders/src/routes/order-create-audit.integration.test.ts
+  - services/orders/src/routes/order-mutation-audit.integration.test.ts
+  - services/orders/src/routes/order-queue-risk.integration.test.ts
+  - services/orders/src/routes/order-queue.integration.test.ts
+  - services/orders/src/routes/order-status-events.integration.test.ts
+  - services/orders/src/routes/purchase-orders.receive.events.integration.test.ts
+  - services/orders/src/services/receiving-regression.test.ts
+  - services/orders/src/services/automation/__tests__/resilience/action-handlers-fault-injection.test.ts
+  - services/orders/src/services/automation/__tests__/resilience/orchestrator-fault-injection.test.ts
+  - services/orders/src/services/automation/orchestrator.test.ts
+Tests: 454 total passing (9 new + all existing), 0 failures. TypeScript typecheck clean.
+Learnings:
+  - When refactoring to writeAuditEntry, ALL test files mocking @arda/db must include writeAuditEntry/writeAuditEntries
+  - Tests that assert audit behavior need writeAuditEntry mock that pushes to testState for inspection
+  - Tests that don't assert audit behavior need a simple no-op writeAuditEntry mock to prevent import errors
+  - Automation orchestrator/fault-injection tests used mockDbExecute for db.insert chain — must rename to mockWriteAuditEntry
+  - order-queue-risk CTE query uses db.execute(sql`...`) — dbMock needs execute method, test data must match CTE column names (snake_case)
+  - writeAuditEntry accepts DbOrTransaction — pass tx in transactional contexts, db for standalone calls
+  - State-transition audit entries: capture previousState before mutation, newState after, both as JSON snapshots
+  - System-initiated actions: userId: null, metadata.systemActor: 'automation-engine' (or similar)

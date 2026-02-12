@@ -25,6 +25,7 @@ const {
   mockPublish,
   mockCreateWorkOrderFromTrigger,
   mockProcessExceptionAutomation,
+  mockWriteAuditEntry,
 } = vi.hoisted(() => ({
   mockTransaction: vi.fn(),
   mockInsert: vi.fn(),
@@ -32,6 +33,7 @@ const {
   mockPublish: vi.fn(),
   mockCreateWorkOrderFromTrigger: vi.fn(),
   mockProcessExceptionAutomation: vi.fn(),
+  mockWriteAuditEntry: vi.fn(),
 }));
 
 // ─── Module mocks ──────────────────────────────────────────────────
@@ -64,6 +66,8 @@ vi.mock('@arda/db', () => {
       },
       auditLog: {},
     },
+    writeAuditEntry: (...args: unknown[]) => mockWriteAuditEntry(...args),
+    writeAuditEntries: vi.fn(async () => []),
   };
 });
 
@@ -186,6 +190,7 @@ beforeEach(() => {
   mockPublish.mockResolvedValue(undefined);
   mockInsert.mockResolvedValue([{ id: 'po-1', poNumber: 'PO-AUTO-TEST' }]);
   mockUpdate.mockResolvedValue([{ id: 'card-1' }]);
+  mockWriteAuditEntry.mockResolvedValue({ id: 'audit-1', hashChain: 'test-hash', sequenceNumber: 1 });
   mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
     const txInsertChain = {
       values: vi.fn().mockReturnThis(),
@@ -378,7 +383,7 @@ describe('Action Handlers — Fault Injection', () => {
     });
 
     it('escalate handler fails when both audit insert and event bus fail', async () => {
-      mockInsert.mockRejectedValueOnce(new Error('DB connection pool exhausted'));
+      mockWriteAuditEntry.mockRejectedValueOnce(new Error('DB connection pool exhausted'));
 
       const result = await dispatchAction('escalate', escalateParams());
 
@@ -484,7 +489,7 @@ describe('Action Handlers — Fault Injection', () => {
 
   describe('Escalation — compound failures', () => {
     it('returns failure when audit log insert fails before event publish', async () => {
-      mockInsert.mockRejectedValueOnce(new Error('relation "audit_log" does not exist'));
+      mockWriteAuditEntry.mockRejectedValueOnce(new Error('relation "audit_log" does not exist'));
 
       const result = await dispatchAction('escalate', escalateParams());
 
@@ -493,7 +498,6 @@ describe('Action Handlers — Fault Injection', () => {
     });
 
     it('returns failure when event bus publish fails after successful audit', async () => {
-      mockInsert.mockResolvedValueOnce([{ id: 'audit-1' }]);
       mockPublish.mockRejectedValueOnce(new Error('publish rejected'));
 
       const result = await dispatchAction('escalate', escalateParams());
@@ -532,6 +536,7 @@ describe('Action Handlers — Fault Injection', () => {
       mockTransaction.mockRejectedValue(dbError);
       mockInsert.mockRejectedValue(dbError);
       mockUpdate.mockRejectedValue(dbError);
+      mockWriteAuditEntry.mockRejectedValue(dbError);
 
       const poResult = await dispatchAction('create_purchase_order', poContext());
       const toResult = await dispatchAction('create_transfer_order', toContext());
@@ -547,6 +552,7 @@ describe('Action Handlers — Fault Injection', () => {
       mockTransaction.mockReset();
       mockInsert.mockReset();
       mockUpdate.mockReset();
+      mockWriteAuditEntry.mockReset();
     });
 
     it('external service actions fail when services are unavailable', async () => {

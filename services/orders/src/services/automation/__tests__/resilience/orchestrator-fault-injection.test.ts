@@ -21,7 +21,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const {
   mockRedisGet, mockRedisSet, mockRedisDel, mockRedisQuit, mockRedisPing,
-  mockDbExecute,
+  mockWriteAuditEntry,
   mockLoadActiveRules, mockEvaluateRules, mockBuildIdempotencyKey,
   mockExecuteWithIdempotency, mockCheckIdempotencyKey, mockClearIdempotencyKey, mockIdempotencyShutdown,
   mockCheckGuardrails, mockRecordPOCreated, mockRecordEmailDispatched,
@@ -32,7 +32,7 @@ const {
   mockRedisDel: vi.fn(),
   mockRedisQuit: vi.fn(),
   mockRedisPing: vi.fn(),
-  mockDbExecute: vi.fn().mockResolvedValue(undefined),
+  mockWriteAuditEntry: vi.fn().mockResolvedValue({ id: 'audit-1', hashChain: 'test-hash', sequenceNumber: 1 }),
   mockLoadActiveRules: vi.fn(),
   mockEvaluateRules: vi.fn(),
   mockBuildIdempotencyKey: vi.fn(),
@@ -69,18 +69,13 @@ vi.mock('@arda/config', () => ({
   }),
 }));
 
-// DB mock (recordDecision uses db.insert)
+// DB mock (recordDecision uses writeAuditEntry)
 vi.mock('@arda/db', () => ({
-  db: {
-    insert: vi.fn().mockReturnValue({
-      values: vi.fn().mockReturnValue({
-        execute: mockDbExecute,
-      }),
-    }),
-  },
+  db: {},
   schema: {
     auditLog: {},
   },
+  writeAuditEntry: (...args: unknown[]) => mockWriteAuditEntry(...args),
 }));
 
 // Rule evaluator mock
@@ -182,7 +177,7 @@ function setupHappyPath() {
     data: { purchaseOrderId: 'PO-001', poNumber: 'PO-AUTO-ABC' },
   });
   mockRecordPOCreated.mockResolvedValue(undefined);
-  mockDbExecute.mockResolvedValue(undefined);
+  mockWriteAuditEntry.mockResolvedValue(undefined);
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────
@@ -287,14 +282,14 @@ describe('Orchestrator Fault Injection', () => {
         allMatchingRules: [{ id: 'D-01' }],
         evaluation: { totalRulesEvaluated: 1, allowMatches: 0, denyMatches: 1 },
       });
-      mockDbExecute.mockResolvedValue(undefined);
+      mockWriteAuditEntry.mockResolvedValue(undefined);
 
       const job = makeJob();
       const result = await orchestrator.executePipeline(job);
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('Denied by rule: D-01');
-      expect(mockDbExecute).toHaveBeenCalled(); // audit recorded
+      expect(mockWriteAuditEntry).toHaveBeenCalled(); // audit recorded
     });
 
     it('should handle evaluateRules returning undefined result', async () => {
@@ -306,7 +301,7 @@ describe('Orchestrator Fault Injection', () => {
         allMatchingRules: [],
         evaluation: { totalRulesEvaluated: 0, allowMatches: 0, denyMatches: 0 },
       });
-      mockDbExecute.mockResolvedValue(undefined);
+      mockWriteAuditEntry.mockResolvedValue(undefined);
 
       const job = makeJob();
       const result = await orchestrator.executePipeline(job);
@@ -353,7 +348,7 @@ describe('Orchestrator Fault Injection', () => {
           { guardrailId: 'G-05', description: 'Daily limit exceeded', currentValue: 60000, threshold: 50000 },
         ],
       });
-      mockDbExecute.mockResolvedValue(undefined);
+      mockWriteAuditEntry.mockResolvedValue(undefined);
 
       const job = makeJob();
       const result = await orchestrator.executePipeline(job);
@@ -389,7 +384,7 @@ describe('Orchestrator Fault Injection', () => {
         data: { purchaseOrderId: 'PO-002', poNumber: 'PO-AUTO-DEF' },
       });
       mockRecordPOCreated.mockResolvedValue(undefined);
-      mockDbExecute.mockResolvedValue(undefined);
+      mockWriteAuditEntry.mockResolvedValue(undefined);
 
       const job = makeJob();
       const result = await orchestrator.executePipeline(job);
@@ -432,7 +427,7 @@ describe('Orchestrator Fault Injection', () => {
         evaluation: { totalRulesEvaluated: 1, allowMatches: 1, denyMatches: 0 },
       });
       mockCheckGuardrails.mockResolvedValue({ passed: true, violations: [] });
-      mockDbExecute.mockResolvedValue(undefined);
+      mockWriteAuditEntry.mockResolvedValue(undefined);
 
       const job = makeJob({
         approval: { required: true, strategy: 'always_manual' },
@@ -453,7 +448,7 @@ describe('Orchestrator Fault Injection', () => {
         evaluation: { totalRulesEvaluated: 1, allowMatches: 1, denyMatches: 0 },
       });
       mockCheckGuardrails.mockResolvedValue({ passed: true, violations: [] });
-      mockDbExecute.mockResolvedValue(undefined);
+      mockWriteAuditEntry.mockResolvedValue(undefined);
 
       const job = makeJob({
         context: {
@@ -527,7 +522,7 @@ describe('Orchestrator Fault Injection', () => {
           { guardrailId: 'G-08', description: 'Dual approval threshold exceeded', currentValue: 16000, threshold: 15000 },
         ],
       });
-      mockDbExecute.mockResolvedValue(undefined);
+      mockWriteAuditEntry.mockResolvedValue(undefined);
 
       const job = makeJob({
         context: {
@@ -566,7 +561,7 @@ describe('Orchestrator Fault Injection', () => {
         evaluation: { totalRulesEvaluated: 1, allowMatches: 1, denyMatches: 0 },
       });
       mockCheckGuardrails.mockResolvedValue({ passed: true, violations: [] });
-      mockDbExecute.mockResolvedValue(undefined);
+      mockWriteAuditEntry.mockResolvedValue(undefined);
 
       const job = makeJob({
         approval: {
@@ -588,7 +583,7 @@ describe('Orchestrator Fault Injection', () => {
     it('should complete pipeline successfully even when audit insert fails', async () => {
       setupHappyPath();
       // DB fails on audit write but we override setupHappyPath's mock
-      mockDbExecute.mockRejectedValue(new Error('Database connection pool exhausted'));
+      mockWriteAuditEntry.mockRejectedValue(new Error('Database connection pool exhausted'));
 
       const job = makeJob();
       const result = await orchestrator.executePipeline(job);
@@ -599,7 +594,7 @@ describe('Orchestrator Fault Injection', () => {
 
     it('should still deny when kill switch active, even if audit recording fails', async () => {
       mockRedisGet.mockResolvedValue('active');
-      mockDbExecute.mockRejectedValue(new Error('DB write timeout'));
+      mockWriteAuditEntry.mockRejectedValue(new Error('DB write timeout'));
 
       const job = makeJob();
       const result = await orchestrator.executePipeline(job);
@@ -617,7 +612,7 @@ describe('Orchestrator Fault Injection', () => {
         allMatchingRules: [],
         evaluation: { totalRulesEvaluated: 1, allowMatches: 0, denyMatches: 1 },
       });
-      mockDbExecute.mockRejectedValue(new Error('DB write timeout'));
+      mockWriteAuditEntry.mockRejectedValue(new Error('DB write timeout'));
 
       const job = makeJob();
       const result = await orchestrator.executePipeline(job);
@@ -650,7 +645,7 @@ describe('Orchestrator Fault Injection', () => {
         success: false,
         error: 'DB transaction deadlock',
       });
-      mockDbExecute.mockResolvedValue(undefined);
+      mockWriteAuditEntry.mockResolvedValue(undefined);
 
       const job = makeJob({
         fallback: {
@@ -706,11 +701,11 @@ describe('Orchestrator Fault Injection', () => {
       });
       mockCheckGuardrails.mockResolvedValue({ passed: true, violations: [] });
       mockExecuteWithIdempotency.mockRejectedValue(new Error('Unexpected: memory allocation failed'));
-      mockDbExecute.mockResolvedValue(undefined);
+      mockWriteAuditEntry.mockResolvedValue(undefined);
 
       const job = makeJob();
       await expect(orchestrator.executePipeline(job)).rejects.toThrow('memory allocation failed');
-      expect(mockDbExecute).toHaveBeenCalled(); // audit should have been recorded
+      expect(mockWriteAuditEntry).toHaveBeenCalled(); // audit should have been recorded
     });
 
     it('should return wasReplay=true when idempotency detects replay', async () => {
@@ -727,7 +722,7 @@ describe('Orchestrator Fault Injection', () => {
         result: { success: true, data: { purchaseOrderId: 'PO-001' } },
         wasReplay: true,
       });
-      mockDbExecute.mockResolvedValue(undefined);
+      mockWriteAuditEntry.mockResolvedValue(undefined);
 
       const job = makeJob();
       const result = await orchestrator.executePipeline(job);
@@ -752,14 +747,14 @@ describe('Orchestrator Fault Injection', () => {
         result: { success: true, data: { purchaseOrderId: 'PO-002' } },
         wasReplay: true,
       });
-      mockDbExecute.mockResolvedValue(undefined);
+      mockWriteAuditEntry.mockResolvedValue(undefined);
 
       const job = makeJob({ actionType: 'dispatch_email' });
       const result = await orchestrator.executePipeline(job);
 
       expect(result.success).toBe(true);
       expect(mockRecordEmailDispatched).not.toHaveBeenCalled();
-      expect(mockDbExecute).toHaveBeenCalled(); // audit still recorded
+      expect(mockWriteAuditEntry).toHaveBeenCalled(); // audit still recorded
     });
   });
 
