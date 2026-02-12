@@ -49,9 +49,12 @@ app.use(cors({
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000, // per IP per window
+  max: config.NODE_ENV === 'production' ? 5000 : 10000,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => `${req.ip}:${req.get('user-agent') ?? 'unknown'}`,
+  // Auth routes have dedicated limiter below. Avoid global lockout on login/register.
+  skip: (req) => req.path.startsWith('/api/auth/') || req.path.startsWith('/auth/'),
   message: { error: 'Too many requests, please try again later' },
 });
 app.use(limiter);
