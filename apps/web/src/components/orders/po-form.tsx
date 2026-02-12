@@ -293,18 +293,58 @@ export function POForm({
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Line Items</CardTitle>
+          {mode === "edit" && (
+            <p className="text-sm text-muted-foreground">
+              Line items cannot be modified after creation. To change line items, cancel this PO and create a new one.
+            </p>
+          )}
         </CardHeader>
         <CardContent className="space-y-3">
-          {validationErrors.lines && (
-            <p className="text-sm text-[hsl(var(--arda-error))]">{validationErrors.lines}</p>
+          {mode === "create" ? (
+            <>
+              {validationErrors.lines && (
+                <p className="text-sm text-[hsl(var(--arda-error))]">{validationErrors.lines}</p>
+              )}
+              <POLineEditor
+                lines={lines}
+                onAddLine={handleAddLine}
+                onUpdateLine={handleUpdateLine}
+                onRemoveLine={handleRemoveLine}
+                validationErrors={validationErrors}
+              />
+            </>
+          ) : (
+            <div className="space-y-2">
+              {lines.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No line items.</p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted text-left text-muted-foreground">
+                      <th className="px-3 py-2">#</th>
+                      <th className="px-3 py-2">Part</th>
+                      <th className="px-3 py-2 text-right">Qty</th>
+                      <th className="px-3 py-2 text-right">Unit Cost</th>
+                      <th className="px-3 py-2 text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lines.map((line, idx) => (
+                      <tr key={idx} className="border-b hover:bg-muted/50">
+                        <td className="px-3 py-2">{idx + 1}</td>
+                        <td className="px-3 py-2">{line.partName || line.partNumber || line.partId}</td>
+                        <td className="px-3 py-2 text-right">{line.quantityOrdered}</td>
+                        <td className="px-3 py-2 text-right">${line.unitCost.toFixed(2)}</td>
+                        <td className="px-3 py-2 text-right font-semibold">
+                          ${(line.quantityOrdered * line.unitCost).toFixed(2)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
           )}
-          <POLineEditor
-            lines={lines}
-            onAddLine={handleAddLine}
-            onUpdateLine={handleUpdateLine}
-            onRemoveLine={handleRemoveLine}
-            validationErrors={validationErrors}
-          />
         </CardContent>
       </Card>
 
