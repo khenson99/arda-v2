@@ -27,8 +27,8 @@ if (!allowedCorsOrigins.includes(config.APP_URL)) {
   allowedCorsOrigins.push(config.APP_URL);
 }
 
-// Trust the first proxy (Railway's reverse proxy) for correct client IPs
-app.set('trust proxy', 1);
+// Trust proxy chain in hosted environments so req.ip reflects end-user IP.
+app.set('trust proxy', true);
 
 // ─── Global Middleware ────────────────────────────────────────────────
 app.use(helmet());
@@ -49,9 +49,12 @@ app.use(cors({
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000, // per IP per window
+  max: config.NODE_ENV === 'production' ? 5000 : 10000,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => `${req.ip}:${req.get('user-agent') ?? 'unknown'}`,
+  // Auth routes have dedicated limiter below. Avoid global lockout on login/register.
+  skip: (req) => req.path.startsWith('/api/auth/') || req.path.startsWith('/auth/'),
   message: { error: 'Too many requests, please try again later' },
 });
 app.use(limiter);
@@ -59,7 +62,11 @@ app.use(limiter);
 // Stricter rate limit for auth endpoints
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 30,
+  max: config.NODE_ENV === 'production' ? 120 : 500,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  keyGenerator: (req) => `${req.ip}:${req.get('user-agent') ?? 'unknown'}`,
   message: { error: 'Too many authentication attempts, please try again later' },
 });
 app.use('/api/auth/login', authLimiter);
