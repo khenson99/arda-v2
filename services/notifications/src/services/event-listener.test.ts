@@ -52,6 +52,9 @@ const schemaMock = vi.hoisted(() => ({
       'wo_status_change',
       'transfer_status_change',
       'system_alert',
+      'receiving_completed',
+      'production_hold',
+      'automation_escalated',
     ] as const,
   },
 }));
@@ -326,6 +329,119 @@ describe('event-listener service', () => {
     expect(publishMock).toHaveBeenCalledWith(
       expect.objectContaining({
         notificationType: 'stockout_warning',
+      })
+    );
+  });
+
+  it('creates receiving_completed notifications (not po_received) for receiving.completed events', async () => {
+    testState.activeUsers = [{ id: 'user-1' }];
+    await startEventListener('redis://test:6379');
+
+    await dispatchEvent({
+      type: 'receiving.completed',
+      tenantId: 'tenant-1',
+      receiptId: 'receipt-123',
+      receiptNumber: 'REC-1001',
+      orderType: 'purchase_order',
+      orderId: 'po-1',
+      status: 'completed',
+      totalAccepted: 100,
+      totalDamaged: 5,
+      totalRejected: 0,
+      exceptionsCreated: 0,
+      timestamp: new Date().toISOString(),
+    });
+
+    expect(testState.insertedRows[0]).toEqual(
+      expect.objectContaining({
+        type: 'receiving_completed',
+        title: 'Receiving completed successfully',
+        actionUrl: '/receiving/receipt-123',
+      })
+    );
+    expect(publishMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        notificationType: 'receiving_completed',
+      })
+    );
+  });
+
+  it('creates production_hold notifications with holdReason in body and work-order action URL', async () => {
+    testState.activeUsers = [{ id: 'user-1' }];
+    await startEventListener('redis://test:6379');
+
+    await dispatchEvent({
+      type: 'production.hold',
+      tenantId: 'tenant-1',
+      workOrderId: 'wo-456',
+      workOrderNumber: 'WO-2001',
+      holdReason: 'Material shortage',
+      holdNotes: 'Waiting for supplier delivery',
+      userId: 'user-123',
+      timestamp: new Date().toISOString(),
+    });
+
+    expect(testState.insertedRows[0]).toEqual(
+      expect.objectContaining({
+        type: 'production_hold',
+        title: 'Work order placed on hold',
+        body: expect.stringContaining('Material shortage'),
+        actionUrl: '/work-orders/wo-456',
+      })
+    );
+    expect(testState.insertedRows[0].body).toContain('WO-2001');
+    expect(publishMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        notificationType: 'production_hold',
+      })
+    );
+  });
+
+  it('creates automation_escalated notifications with entity-aware actionUrl', async () => {
+    testState.activeUsers = [{ id: 'user-1' }];
+    await startEventListener('redis://test:6379');
+
+    await dispatchEvent({
+      type: 'automation.escalated',
+      tenantId: 'tenant-1',
+      reason: 'Unable to auto-create PO: supplier email missing',
+      entityType: 'card',
+      entityId: 'card-789',
+      source: 'automation',
+      timestamp: new Date().toISOString(),
+    });
+
+    expect(testState.insertedRows[0]).toEqual(
+      expect.objectContaining({
+        type: 'automation_escalated',
+        title: 'Automation escalation',
+        body: 'Automated action requires attention: Unable to auto-create PO: supplier email missing',
+        actionUrl: '/cards/card-789',
+      })
+    );
+    expect(publishMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        notificationType: 'automation_escalated',
+      })
+    );
+  });
+
+  it('creates automation_escalated notifications with fallback actionUrl when entity info is missing', async () => {
+    testState.activeUsers = [{ id: 'user-1' }];
+    await startEventListener('redis://test:6379');
+
+    await dispatchEvent({
+      type: 'automation.escalated',
+      tenantId: 'tenant-1',
+      reason: 'General automation failure',
+      source: 'automation',
+      timestamp: new Date().toISOString(),
+    });
+
+    expect(testState.insertedRows[0]).toEqual(
+      expect.objectContaining({
+        type: 'automation_escalated',
+        actionUrl: '/queue',
       })
     );
   });

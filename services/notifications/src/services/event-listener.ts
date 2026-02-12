@@ -224,7 +224,7 @@ export async function startEventListener(redisUrl: string): Promise<void> {
           const hasExceptions = event.exceptionsCreated > 0;
           await createNotification(eventBus, {
             tenantId: event.tenantId,
-            type: hasExceptions ? 'exception_alert' : 'po_received',
+            type: 'receiving_completed',
             title: hasExceptions
               ? `Receiving completed with ${event.exceptionsCreated} exception(s)`
               : 'Receiving completed successfully',
@@ -277,6 +277,41 @@ export async function startEventListener(redisUrl: string): Promise<void> {
               exceptionType: event.exceptionType,
               resolutionType: event.resolutionType,
               followUpOrderId: event.followUpOrderId,
+            },
+          });
+          break;
+
+        case 'production.hold':
+          await createNotification(eventBus, {
+            tenantId: event.tenantId,
+            type: 'production_hold',
+            title: 'Work order placed on hold',
+            body: `${event.workOrderNumber} has been placed on hold: ${event.holdReason}${event.holdNotes ? ` — ${event.holdNotes}` : ''}`,
+            actionUrl: `/work-orders/${event.workOrderId}`,
+            metadata: {
+              workOrderId: event.workOrderId,
+              workOrderNumber: event.workOrderNumber,
+              holdReason: event.holdReason,
+              holdNotes: event.holdNotes,
+              userId: event.userId,
+            },
+          });
+          break;
+
+        case 'automation.escalated':
+          await createNotification(eventBus, {
+            tenantId: event.tenantId,
+            type: 'automation_escalated',
+            title: 'Automation escalation',
+            body: `Automated action requires attention: ${event.reason}`,
+            actionUrl: event.entityType && event.entityId
+              ? `/${event.entityType}s/${event.entityId}`
+              : '/queue',
+            metadata: {
+              reason: event.reason,
+              entityType: event.entityType,
+              entityId: event.entityId,
+              source: event.source,
             },
           });
           break;
