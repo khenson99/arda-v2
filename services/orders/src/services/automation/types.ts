@@ -279,6 +279,57 @@ export interface ExceptionResolutionContext {
   resolutionType: string;
 }
 
+// ─── Shopping List Context ───────────────────────────────────────────
+
+export interface ShoppingListContext {
+  tenantId: string;
+  partId: string;
+  quantity: number;
+  supplierId?: string;
+  facilityId?: string;
+  urgency?: 'low' | 'normal' | 'high' | 'critical';
+  cardId?: string;
+  loopId?: string;
+  notes?: string;
+}
+
+// ─── URL Handoff Context ────────────────────────────────────────────
+
+export interface URLHandoffContext {
+  tenantId: string;
+  targetUrl: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  expiresInSeconds?: number;
+  params?: Record<string, string>;
+}
+
+export interface URLHandoffResult {
+  signedUrl: string;
+  expiresAt: string;
+  token: string;
+}
+
+// ─── Adapter Interface ──────────────────────────────────────────────
+
+/**
+ * Normalized adapter interface that all action adapters implement.
+ * Provides a consistent contract for the dispatch layer.
+ */
+export interface ActionAdapter<TContext, TResult = Record<string, unknown>> {
+  readonly name: string;
+  execute(context: TContext): Promise<ActionAdapterResult<TResult>>;
+}
+
+export interface ActionAdapterResult<T = Record<string, unknown>> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  /** Whether this action can safely be retried on failure. */
+  retryable: boolean;
+}
+
 // ─── Guardrail Results ───────────────────────────────────────────────
 
 export interface GuardrailCheckResult {

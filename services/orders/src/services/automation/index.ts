@@ -72,3 +72,45 @@ export {
 // ─── Action Handlers ────────────────────────────────────────────────
 export { dispatchAction } from './action-handlers.js';
 export type { ActionHandlerResult } from './action-handlers.js';
+
+// ─── Action Adapters ────────────────────────────────────────────────
+export {
+  EmailActionAdapter,
+  ConsoleEmailBackend,
+  EventBusEmailBackend,
+  renderTemplate,
+  URLHandoffAdapter,
+  buildSignedUrl,
+  verifySignedUrl,
+  POCreationAdapter,
+  ShoppingListAdapter,
+  EventBusShoppingListPublisher,
+  InMemoryShoppingListPersistence,
+  buildGroupKey,
+} from './adapters/index.js';
+export type {
+  EmailDeliveryBackend,
+  EmailDeliveryResult,
+  EmailTemplate,
+  EmailAdapterResult,
+  URLSignerOptions,
+  POPersistence,
+  POCreationRecord,
+  POGuardrailChecker,
+  POEventPublisher,
+  POCreationAdapterResult,
+  ShoppingListPersistence,
+  ShoppingListItem,
+  ShoppingListRecord,
+  ShoppingListEventPublisher,
+  ShoppingListAdapterResult,
+} from './adapters/index.js';
+
+// ─── Adapter-Level Types (from types.ts) ────────────────────────────
+export type {
+  ShoppingListContext,
+  URLHandoffContext,
+  URLHandoffResult,
+  ActionAdapter,
+  ActionAdapterResult,
+} from './types.js';
