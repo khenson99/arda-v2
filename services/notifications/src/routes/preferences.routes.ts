@@ -43,6 +43,9 @@ const DEFAULT_PREFERENCES = {
   wo_status_change: { inApp: true, email: false, webhook: false },
   transfer_status_change: { inApp: true, email: false, webhook: false },
   system_alert: { inApp: true, email: true, webhook: false },
+  receiving_completed: { inApp: true, email: true, webhook: false },
+  production_hold: { inApp: true, email: true, webhook: false },
+  automation_escalated: { inApp: true, email: true, webhook: true },
 };
 
 const DEFAULT_CHANNEL_PREFERENCES = { inApp: true, email: true, webhook: false };

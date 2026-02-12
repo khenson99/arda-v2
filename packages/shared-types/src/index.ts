@@ -93,7 +93,17 @@ export type NotificationType =
   | 'exception_alert'
   | 'wo_status_change'
   | 'transfer_status_change'
-  | 'system_alert';
+  | 'system_alert'
+  | 'receiving_completed'
+  | 'production_hold'
+  | 'automation_escalated';
+
+export type DeliveryStatus =
+  | 'pending'
+  | 'sent'
+  | 'delivered'
+  | 'failed'
+  | 'bounced';
 
 // ─── Audit Summary API ───────────────────────────────────────────────
 export type AuditSummaryGranularity = 'day' | 'week';
