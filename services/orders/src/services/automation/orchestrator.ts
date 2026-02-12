@@ -11,7 +11,8 @@
 
 import { Redis } from 'ioredis';
 import { db, schema } from '@arda/db';
-import { createLogger } from '@arda/config';
+import { createLogger, config } from '@arda/config';
+import { getEventBus } from '@arda/events';
 import { evaluateRules, buildIdempotencyKey, loadActiveRules } from './rule-evaluator.js';
 
 
@@ -27,7 +28,7 @@ import type {
   DecisionOutcome,
   TenantAutomationLimits,
 } from './types.js';
-import { DEFAULT_TENANT_LIMITS } from './types.js';
+import { DEFAULT_TENANT_LIMITS, isValidUUID } from './types.js';
 
 const log = createLogger('automation:orchestrator');
 
@@ -87,10 +88,42 @@ export class AutomationOrchestrator {
     );
 
     try {
+      // ── Step 0: Tenant ID Validation ─────────────────────────
+      if (!isValidUUID(tenantId)) {
+        log.error(
+          { tenantId, actionType, ruleId },
+          'Invalid tenant ID format — rejecting automation job',
+        );
+        await this.emitSecurityEvent({
+          type: 'security.automation.tenant_validation_failed',
+          tenantId,
+          actionType,
+          ruleId,
+          reason: 'Invalid tenant ID format',
+          timestamp: new Date().toISOString(),
+        });
+        return {
+          success: false,
+          actionType,
+          error: 'Invalid tenant ID format',
+          wasReplay: false,
+          durationMs: Date.now() - startMs,
+        };
+      }
+
       // ── Step 1: Kill Switch ────────────────────────────────────
       const isKilled = await this.isKillSwitchActive(tenantId);
       if (isKilled) {
         log.warn({ tenantId }, 'Kill switch is active, skipping automation');
+        await this.emitSecurityEvent({
+          type: 'security.automation.action_blocked',
+          tenantId,
+          actionType,
+          ruleId,
+          idempotencyKey,
+          reason: 'kill_switch_active',
+          timestamp: new Date().toISOString(),
+        });
         await this.recordDecision(tenantId, triggerEvent, 'denied', {
           reason: 'kill_switch_active',
           ruleId,
@@ -117,6 +150,16 @@ export class AutomationOrchestrator {
           { actionType, tenantId, deniedBy },
           'Action denied by rule evaluation',
         );
+        await this.emitSecurityEvent({
+          type: 'security.automation.action_blocked',
+          tenantId,
+          actionType,
+          ruleId,
+          idempotencyKey,
+          reason: `denied_by_rule:${deniedBy}`,
+          details: { deniedByRule: deniedBy },
+          timestamp: new Date().toISOString(),
+        });
         await this.recordDecision(tenantId, triggerEvent, 'denied', {
           deniedByRule: deniedBy,
           ruleId,
@@ -146,6 +189,19 @@ export class AutomationOrchestrator {
       );
 
       if (!guardrailResult.passed) {
+        // Emit guardrail violation event for all violations (blocking or not)
+        await this.emitSecurityEvent({
+          type: 'security.automation.guardrail_violation',
+          tenantId,
+          actionType,
+          violations: guardrailResult.violations.map((v) => ({
+            guardrailId: v.guardrailId,
+            description: v.description,
+          })),
+          blocked: guardrailResult.violations.some((v) => v.guardrailId !== 'G-08'),
+          timestamp: new Date().toISOString(),
+        });
+
         // G-08 violations don't block but require approval escalation
         const blockingViolations = guardrailResult.violations.filter(
           (v) => v.guardrailId !== 'G-08',
@@ -156,6 +212,16 @@ export class AutomationOrchestrator {
             { actionType, tenantId, violations: blockingViolations },
             'Action blocked by guardrails',
           );
+          await this.emitSecurityEvent({
+            type: 'security.automation.action_blocked',
+            tenantId,
+            actionType,
+            ruleId,
+            idempotencyKey,
+            reason: 'guardrail_violation',
+            details: { violations: blockingViolations.map((v) => v.guardrailId) },
+            timestamp: new Date().toISOString(),
+          });
           await this.recordDecision(tenantId, triggerEvent, 'denied', {
             reason: 'guardrail_violation',
             violations: blockingViolations,
@@ -187,6 +253,16 @@ export class AutomationOrchestrator {
             { actionType, tenantId, strategy: approval.strategy },
             'Manual approval required, escalating',
           );
+          await this.emitSecurityEvent({
+            type: 'security.automation.action_blocked',
+            tenantId,
+            actionType,
+            ruleId,
+            idempotencyKey,
+            reason: 'manual_approval_required',
+            details: { strategy: approval.strategy },
+            timestamp: new Date().toISOString(),
+          });
           await this.recordDecision(tenantId, triggerEvent, 'escalated', {
             reason: 'manual_approval_required',
             strategy: approval.strategy,
@@ -219,6 +295,16 @@ export class AutomationOrchestrator {
           { actionType, tenantId, error: handlerResult.error },
           'Action handler failed',
         );
+        await this.emitSecurityEvent({
+          type: 'security.automation.action_blocked',
+          tenantId,
+          actionType,
+          ruleId,
+          idempotencyKey,
+          reason: 'action_failed',
+          details: { error: handlerResult.error },
+          timestamp: new Date().toISOString(),
+        });
         await this.recordDecision(tenantId, triggerEvent, 'denied', {
           reason: 'action_failed',
           error: handlerResult.error,
@@ -264,6 +350,19 @@ export class AutomationOrchestrator {
       });
 
       const durationMs = Date.now() - startMs;
+
+      // Emit security event: action approved & executed
+      await this.emitSecurityEvent({
+        type: 'security.automation.action_approved',
+        tenantId,
+        actionType,
+        ruleId,
+        idempotencyKey,
+        wasReplay,
+        durationMs,
+        timestamp: new Date().toISOString(),
+      });
+
       log.info(
         { actionType, tenantId, wasReplay, durationMs },
         'TCAAF pipeline completed successfully',
@@ -308,6 +407,21 @@ export class AutomationOrchestrator {
       });
 
       throw err;
+    }
+  }
+
+  // ─── Security Event Emission ────────────────────────────────────
+
+  /**
+   * Emit a security event to the EventBus (non-fatal).
+   * Failures are logged but never break the pipeline.
+   */
+  private async emitSecurityEvent(event: Record<string, unknown>): Promise<void> {
+    try {
+      const eventBus = getEventBus(config.REDIS_URL);
+      await eventBus.publish(event as any);
+    } catch (err) {
+      log.error({ err, eventType: event.type }, 'Failed to emit security event (non-fatal)');
     }
   }
 

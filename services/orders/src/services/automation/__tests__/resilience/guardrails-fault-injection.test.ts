@@ -464,7 +464,12 @@ describe('Guardrails Fault Injection', () => {
         totalAmount: 2500,
       };
 
-      const result = await checkGuardrails(redis, 'dispatch_email', ctx, makeLimits());
+      const result = await checkGuardrails(
+        redis,
+        'dispatch_email',
+        ctx,
+        makeLimits({ allowedEmailDomains: ['supplier.com'] }),
+      );
       expect(result.passed).toBe(true);
     });
 

@@ -186,6 +186,7 @@ export interface TenantAutomationLimits {
   maxEmailDispatchPerHour: number;          // G-06: 50
   maxFollowUpPOsPerDay: number;            // G-07: 10
   dualApprovalThreshold: number;            // G-08: $15,000
+  allowedEmailDomains: string[];            // O-01: Outbound email domain whitelist
 }
 
 export const DEFAULT_TENANT_LIMITS: Omit<TenantAutomationLimits, 'tenantId'> = {
@@ -197,6 +198,7 @@ export const DEFAULT_TENANT_LIMITS: Omit<TenantAutomationLimits, 'tenantId'> = {
   maxEmailDispatchPerHour: 50,
   maxFollowUpPOsPerDay: 10,
   dualApprovalThreshold: 15_000,
+  allowedEmailDomains: [],  // Empty = no outbound emails allowed (must be configured per tenant)
 };
 
 // ─── Evaluation Results ──────────────────────────────────────────────
@@ -291,4 +293,26 @@ export interface GuardrailViolation {
   description: string;
   currentValue: number;
   threshold: number;
+}
+
+// ─── Security Validation ────────────────────────────────────────────
+
+const UUID_V4_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** Validate that a string is a well-formed UUID v4. */
+export function isValidUUID(value: string): boolean {
+  return UUID_V4_RE.test(value);
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Basic email format validation (RFC 5321 simplified). */
+export function isValidEmail(value: string): boolean {
+  return EMAIL_RE.test(value) && value.length <= 254;
+}
+
+/** Extract domain from an email address (lowercase). Returns undefined if invalid. */
+export function extractEmailDomain(email: string): string | undefined {
+  if (!isValidEmail(email)) return undefined;
+  return email.split('@')[1]?.toLowerCase();
 }

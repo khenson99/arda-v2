@@ -366,6 +366,10 @@ export {
   type TokenRevokedEvent,
   type AuthorizationDeniedEvent,
   type TenantContextViolationEvent,
+  type AutomationActionBlockedEvent,
+  type AutomationActionApprovedEvent,
+  type AutomationGuardrailViolationEvent,
+  type AutomationTenantValidationFailedEvent,
   SecurityEventType,
   isSecurityEvent,
 } from './security-events.js';

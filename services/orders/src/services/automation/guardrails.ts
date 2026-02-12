@@ -35,7 +35,7 @@ import type {
   PurchaseOrderContext,
   EmailDispatchContext,
 } from './types.js';
-import { DEFAULT_TENANT_LIMITS } from './types.js';
+import { DEFAULT_TENANT_LIMITS, isValidEmail, extractEmailDomain } from './types.js';
 
 const log = createLogger('automation:guardrails');
 
@@ -182,21 +182,41 @@ export async function checkOutboundGuardrails(
     tenantId: context.tenantId,
     ...DEFAULT_TENANT_LIMITS,
   },
-  allowedDomains?: Set<string>,
 ): Promise<GuardrailCheckResult> {
   const violations: GuardrailViolation[] = [];
 
-  // O-01: Domain whitelist check
-  if (allowedDomains && allowedDomains.size > 0) {
-    const emailDomain = context.supplierEmail.split('@')[1]?.toLowerCase();
-    if (emailDomain && !allowedDomains.has(emailDomain)) {
-      violations.push({
-        guardrailId: 'O-01',
-        description: `Email domain "${emailDomain}" is not in the allowed domain whitelist`,
-        currentValue: 0,
-        threshold: 0,
-      });
-    }
+  // O-00: Email format validation (must pass before any other outbound checks)
+  if (!isValidEmail(context.supplierEmail)) {
+    violations.push({
+      guardrailId: 'O-00',
+      description: `Invalid email format: "${context.supplierEmail}"`,
+      currentValue: 0,
+      threshold: 0,
+    });
+    // Return early — no point checking domain rules on a malformed address
+    return { passed: false, violations };
+  }
+
+  const emailDomain = extractEmailDomain(context.supplierEmail);
+
+  // O-01: Domain whitelist check (MANDATORY — empty whitelist blocks all outbound)
+  const allowedDomains = new Set(
+    limits.allowedEmailDomains.map((d) => d.toLowerCase()),
+  );
+  if (allowedDomains.size === 0) {
+    violations.push({
+      guardrailId: 'O-01',
+      description: 'No allowed email domains configured for tenant — all outbound email blocked',
+      currentValue: 0,
+      threshold: 0,
+    });
+  } else if (emailDomain && !allowedDomains.has(emailDomain)) {
+    violations.push({
+      guardrailId: 'O-01',
+      description: `Email domain "${emailDomain}" is not in the allowed domain whitelist`,
+      currentValue: 0,
+      threshold: 0,
+    });
   }
 
   // O-02: Email deduplication (same PO + supplier within 1 hour)
@@ -212,7 +232,6 @@ export async function checkOutboundGuardrails(
   }
 
   // O-03: Internal-only domain check
-  const emailDomain = context.supplierEmail.split('@')[1]?.toLowerCase();
   if (emailDomain && INTERNAL_ONLY_DOMAINS.has(emailDomain)) {
     violations.push({
       guardrailId: 'O-03',

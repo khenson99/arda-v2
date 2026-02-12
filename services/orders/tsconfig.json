@@ -8,6 +8,7 @@
   "references": [
     { "path": "../../packages/config" },
     { "path": "../../packages/db" },
-    { "path": "../../packages/auth-utils" }
+    { "path": "../../packages/auth-utils" },
+    { "path": "../../packages/events" }
   ]
 }

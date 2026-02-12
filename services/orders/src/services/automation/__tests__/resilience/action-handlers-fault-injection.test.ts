@@ -16,6 +16,8 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+const DEFAULT_TENANT = 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
+
 // ─── Hoisted mocks ─────────────────────────────────────────────────
 
 const {
@@ -23,6 +25,7 @@ const {
   mockInsert,
   mockUpdate,
   mockPublish,
+  mockWithTenantContext,
   mockCreateWorkOrderFromTrigger,
   mockProcessExceptionAutomation,
 } = vi.hoisted(() => ({
@@ -30,6 +33,7 @@ const {
   mockInsert: vi.fn(),
   mockUpdate: vi.fn(),
   mockPublish: vi.fn(),
+  mockWithTenantContext: vi.fn(),
   mockCreateWorkOrderFromTrigger: vi.fn(),
   mockProcessExceptionAutomation: vi.fn(),
 }));
@@ -53,6 +57,7 @@ vi.mock('@arda/db', () => {
       insert: vi.fn(() => insertChain),
       update: vi.fn(() => updateChain),
     },
+    withTenantContext: mockWithTenantContext,
     schema: {
       purchaseOrders: { id: 'id', poNumber: 'poNumber' },
       purchaseOrderLines: {},
@@ -104,7 +109,7 @@ import { dispatchAction } from '../../action-handlers.js';
 
 function poContext() {
   return {
-    tenantId: 'tenant-1',
+    tenantId: DEFAULT_TENANT,
     cardId: 'card-1',
     loopId: 'loop-1',
     partId: 'part-1',
@@ -118,7 +123,7 @@ function poContext() {
 
 function woContext() {
   return {
-    tenantId: 'tenant-1',
+    tenantId: DEFAULT_TENANT,
     cardId: 'card-1',
     loopId: 'loop-1',
     facilityId: 'facility-1',
@@ -129,7 +134,7 @@ function woContext() {
 
 function toContext() {
   return {
-    tenantId: 'tenant-1',
+    tenantId: DEFAULT_TENANT,
     cardId: 'card-1',
     loopId: 'loop-1',
     sourceFacilityId: 'facility-src',
@@ -140,7 +145,7 @@ function toContext() {
 
 function emailContext() {
   return {
-    tenantId: 'tenant-1',
+    tenantId: DEFAULT_TENANT,
     poId: 'po-1',
     supplierId: 'supplier-1',
     supplierEmail: 'vendor@example.com',
@@ -150,7 +155,7 @@ function emailContext() {
 
 function cardTransitionContext() {
   return {
-    tenantId: 'tenant-1',
+    tenantId: DEFAULT_TENANT,
     cardId: 'card-1',
     loopId: 'loop-1',
     fromStage: 'triggered',
@@ -161,7 +166,7 @@ function cardTransitionContext() {
 
 function exceptionContext() {
   return {
-    tenantId: 'tenant-1',
+    tenantId: DEFAULT_TENANT,
     exceptionId: 'exc-1',
     exceptionType: 'missing_part',
     severity: 'high',
@@ -171,7 +176,7 @@ function exceptionContext() {
 
 function escalateParams() {
   return {
-    tenantId: 'tenant-1',
+    tenantId: DEFAULT_TENANT,
     reason: 'Action failed: create_purchase_order',
     entityType: 'automation_job',
     entityId: 'key-123',
@@ -186,7 +191,9 @@ beforeEach(() => {
   mockPublish.mockResolvedValue(undefined);
   mockInsert.mockResolvedValue([{ id: 'po-1', poNumber: 'PO-AUTO-TEST' }]);
   mockUpdate.mockResolvedValue([{ id: 'card-1' }]);
-  mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
+
+  // withTenantContext wraps db.transaction — call callback with a mock tx
+  const makeTx = () => {
     const txInsertChain = {
       values: vi.fn().mockReturnThis(),
       returning: vi.fn().mockReturnThis(),
@@ -196,13 +203,26 @@ beforeEach(() => {
       values: vi.fn().mockReturnThis(),
       execute: vi.fn().mockResolvedValue(undefined),
     };
-    const tx = {
+    const txUpdateChain = {
+      set: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      execute: vi.fn().mockResolvedValue([{ id: 'card-1' }]),
+    };
+    return {
       insert: vi.fn()
-        .mockReturnValueOnce(txInsertChain)   // PO insert
+        .mockReturnValueOnce(txInsertChain)   // PO / TO insert
         .mockReturnValueOnce(txInsertChain)   // PO line insert
         .mockReturnValueOnce(txAuditChain),   // audit log insert
+      update: vi.fn(() => txUpdateChain),
     };
-    return fn(tx);
+  };
+
+  mockWithTenantContext.mockImplementation(
+    async (_tenantId: string, fn: (tx: unknown) => Promise<unknown>) => fn(makeTx()),
+  );
+
+  mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
+    return fn(makeTx());
   });
   mockCreateWorkOrderFromTrigger.mockResolvedValue({
     workOrderId: 'wo-1',
@@ -226,7 +246,7 @@ describe('Action Handlers — Fault Injection', () => {
 
   describe('PO creation — DB transaction failures', () => {
     it('returns failure when db.transaction throws ECONNREFUSED', async () => {
-      mockTransaction.mockRejectedValueOnce(new Error('connect ECONNREFUSED'));
+      mockWithTenantContext.mockRejectedValueOnce(new Error('connect ECONNREFUSED'));
 
       const result = await dispatchAction('create_purchase_order', poContext());
 
@@ -235,7 +255,7 @@ describe('Action Handlers — Fault Injection', () => {
     });
 
     it('returns failure when PO insert inside transaction throws unique violation', async () => {
-      mockTransaction.mockImplementationOnce(async (fn: (tx: unknown) => Promise<unknown>) => {
+      mockWithTenantContext.mockImplementationOnce(async (_tenantId: string, fn: (tx: unknown) => Promise<unknown>) => {
         const tx = {
           insert: vi.fn(() => ({
             values: vi.fn(() => ({
@@ -257,7 +277,7 @@ describe('Action Handlers — Fault Injection', () => {
     });
 
     it('returns failure when PO line insert inside transaction fails', async () => {
-      mockTransaction.mockImplementationOnce(async (fn: (tx: unknown) => Promise<unknown>) => {
+      mockWithTenantContext.mockImplementationOnce(async (_tenantId: string, fn: (tx: unknown) => Promise<unknown>) => {
         let callCount = 0;
         const tx = {
           insert: vi.fn(() => {
@@ -290,7 +310,7 @@ describe('Action Handlers — Fault Injection', () => {
     });
 
     it('returns failure when transaction times out', async () => {
-      mockTransaction.mockRejectedValueOnce(new Error('query timeout exceeded'));
+      mockWithTenantContext.mockRejectedValueOnce(new Error('query timeout exceeded'));
 
       const result = await dispatchAction('create_purchase_order', poContext());
 
@@ -314,7 +334,16 @@ describe('Action Handlers — Fault Injection', () => {
 
   describe('Transfer order creation — DB insert failures', () => {
     it('returns failure when db.insert throws ECONNREFUSED', async () => {
-      mockInsert.mockRejectedValueOnce(new Error('connect ECONNREFUSED'));
+      mockWithTenantContext.mockImplementationOnce(async (_tenantId: string, fn: (tx: unknown) => Promise<unknown>) => {
+        const tx = {
+          insert: vi.fn(() => ({
+            values: vi.fn().mockReturnThis(),
+            returning: vi.fn().mockReturnThis(),
+            execute: vi.fn().mockRejectedValueOnce(new Error('connect ECONNREFUSED')),
+          })),
+        };
+        return fn(tx);
+      });
 
       const result = await dispatchAction('create_transfer_order', toContext());
 
@@ -323,7 +352,16 @@ describe('Action Handlers — Fault Injection', () => {
     });
 
     it('returns failure when insert returns empty array', async () => {
-      mockInsert.mockResolvedValueOnce([]);
+      mockWithTenantContext.mockImplementationOnce(async (_tenantId: string, fn: (tx: unknown) => Promise<unknown>) => {
+        const tx = {
+          insert: vi.fn(() => ({
+            values: vi.fn().mockReturnThis(),
+            returning: vi.fn().mockReturnThis(),
+            execute: vi.fn().mockResolvedValue([]),
+          })),
+        };
+        return fn(tx);
+      });
 
       const result = await dispatchAction('create_transfer_order', toContext());
 
@@ -332,7 +370,6 @@ describe('Action Handlers — Fault Injection', () => {
     });
 
     it('returns failure when event bus publish fails after TO insertion', async () => {
-      mockInsert.mockResolvedValueOnce([{ id: 'to-1', toNumber: 'TO-AUTO-TEST' }]);
       mockPublish.mockRejectedValueOnce(new Error('event bus unavailable'));
 
       const result = await dispatchAction('create_transfer_order', toContext());
@@ -358,7 +395,7 @@ describe('Action Handlers — Fault Injection', () => {
       mockPublish.mockRejectedValueOnce(new Error('publish timeout'));
 
       const result = await dispatchAction('add_to_shopping_list', {
-        tenantId: 'tenant-1',
+        tenantId: DEFAULT_TENANT,
         partId: 'part-1',
         quantity: 10,
       });
@@ -368,7 +405,7 @@ describe('Action Handlers — Fault Injection', () => {
     });
 
     it('transition_card DB update succeeds but event publish fails', async () => {
-      mockUpdate.mockResolvedValueOnce([{ id: 'card-1' }]);
+      // withTenantContext happy path already set in beforeEach
       mockPublish.mockRejectedValueOnce(new Error('Redis cluster failover'));
 
       const result = await dispatchAction('transition_card', cardTransitionContext());
@@ -378,7 +415,15 @@ describe('Action Handlers — Fault Injection', () => {
     });
 
     it('escalate handler fails when both audit insert and event bus fail', async () => {
-      mockInsert.mockRejectedValueOnce(new Error('DB connection pool exhausted'));
+      mockWithTenantContext.mockImplementationOnce(async (_tenantId: string, fn: (tx: unknown) => Promise<unknown>) => {
+        const tx = {
+          insert: vi.fn(() => ({
+            values: vi.fn().mockReturnThis(),
+            execute: vi.fn().mockRejectedValueOnce(new Error('DB connection pool exhausted')),
+          })),
+        };
+        return fn(tx);
+      });
 
       const result = await dispatchAction('escalate', escalateParams());
 
@@ -462,7 +507,16 @@ describe('Action Handlers — Fault Injection', () => {
 
   describe('Card transition — DB update failures', () => {
     it('returns failure when db.update throws', async () => {
-      mockUpdate.mockRejectedValueOnce(new Error('deadlock detected'));
+      mockWithTenantContext.mockImplementationOnce(async (_tenantId: string, fn: (tx: unknown) => Promise<unknown>) => {
+        const tx = {
+          update: vi.fn(() => ({
+            set: vi.fn().mockReturnThis(),
+            where: vi.fn().mockReturnThis(),
+            execute: vi.fn().mockRejectedValueOnce(new Error('deadlock detected')),
+          })),
+        };
+        return fn(tx);
+      });
 
       const result = await dispatchAction('transition_card', cardTransitionContext());
 
@@ -471,7 +525,16 @@ describe('Action Handlers — Fault Injection', () => {
     });
 
     it('returns failure when db.update connection is refused', async () => {
-      mockUpdate.mockRejectedValueOnce(new Error('connect ECONNREFUSED'));
+      mockWithTenantContext.mockImplementationOnce(async (_tenantId: string, fn: (tx: unknown) => Promise<unknown>) => {
+        const tx = {
+          update: vi.fn(() => ({
+            set: vi.fn().mockReturnThis(),
+            where: vi.fn().mockReturnThis(),
+            execute: vi.fn().mockRejectedValueOnce(new Error('connect ECONNREFUSED')),
+          })),
+        };
+        return fn(tx);
+      });
 
       const result = await dispatchAction('transition_card', cardTransitionContext());
 
@@ -484,7 +547,15 @@ describe('Action Handlers — Fault Injection', () => {
 
   describe('Escalation — compound failures', () => {
     it('returns failure when audit log insert fails before event publish', async () => {
-      mockInsert.mockRejectedValueOnce(new Error('relation "audit_log" does not exist'));
+      mockWithTenantContext.mockImplementationOnce(async (_tenantId: string, fn: (tx: unknown) => Promise<unknown>) => {
+        const tx = {
+          insert: vi.fn(() => ({
+            values: vi.fn().mockReturnThis(),
+            execute: vi.fn().mockRejectedValueOnce(new Error('relation "audit_log" does not exist')),
+          })),
+        };
+        return fn(tx);
+      });
 
       const result = await dispatchAction('escalate', escalateParams());
 
@@ -493,7 +564,6 @@ describe('Action Handlers — Fault Injection', () => {
     });
 
     it('returns failure when event bus publish fails after successful audit', async () => {
-      mockInsert.mockResolvedValueOnce([{ id: 'audit-1' }]);
       mockPublish.mockRejectedValueOnce(new Error('publish rejected'));
 
       const result = await dispatchAction('escalate', escalateParams());
@@ -514,7 +584,7 @@ describe('Action Handlers — Fault Injection', () => {
 
       const emailResult = await dispatchAction('dispatch_email', emailContext());
       const shoppingResult = await dispatchAction('add_to_shopping_list', {
-        tenantId: 'tenant-1',
+        tenantId: DEFAULT_TENANT,
         partId: 'part-1',
         quantity: 5,
       });
@@ -529,9 +599,7 @@ describe('Action Handlers — Fault Injection', () => {
     it('DB-dependent actions fail when database is down', async () => {
       const dbError = new Error('connect ECONNREFUSED 127.0.0.1:5432');
 
-      mockTransaction.mockRejectedValue(dbError);
-      mockInsert.mockRejectedValue(dbError);
-      mockUpdate.mockRejectedValue(dbError);
+      mockWithTenantContext.mockRejectedValue(dbError);
 
       const poResult = await dispatchAction('create_purchase_order', poContext());
       const toResult = await dispatchAction('create_transfer_order', toContext());
@@ -544,9 +612,7 @@ describe('Action Handlers — Fault Injection', () => {
       expect(escalateResult.success).toBe(false);
 
       // Reset for later tests
-      mockTransaction.mockReset();
-      mockInsert.mockReset();
-      mockUpdate.mockReset();
+      mockWithTenantContext.mockReset();
     });
 
     it('external service actions fail when services are unavailable', async () => {
@@ -563,18 +629,7 @@ describe('Action Handlers — Fault Injection', () => {
     });
 
     it('successful actions return expected data shapes', async () => {
-      // Reset to happy path
-      mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
-        const txChain = {
-          values: vi.fn().mockReturnThis(),
-          returning: vi.fn().mockReturnThis(),
-          execute: vi.fn().mockResolvedValue([{ id: 'po-1', poNumber: 'PO-AUTO-TEST' }]),
-        };
-        const tx = {
-          insert: vi.fn(() => txChain),
-        };
-        return fn(tx);
-      });
+      // Reset to happy path (already set in beforeEach via mockWithTenantContext)
 
       const poResult = await dispatchAction('create_purchase_order', poContext());
 

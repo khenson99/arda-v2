@@ -131,15 +131,17 @@ import type { AutomationJobPayload } from '../../types.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 
+const DEFAULT_TENANT = 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
+
 function makeJob(overrides: Partial<AutomationJobPayload> = {}): AutomationJobPayload {
   return {
     actionType: 'create_purchase_order',
     ruleId: 'P-01',
-    tenantId: 'T1',
+    tenantId: DEFAULT_TENANT,
     triggerEvent: 'card.stage.triggered',
     idempotencyKey: 'po_create:T1:S1:F1:2025-01-01',
     context: {
-      tenantId: 'T1',
+      tenantId: DEFAULT_TENANT,
       supplierId: 'S1',
       facilityId: 'F1',
       partId: 'PART-01',
@@ -457,7 +459,7 @@ describe('Orchestrator Fault Injection', () => {
 
       const job = makeJob({
         context: {
-          tenantId: 'T1',
+          tenantId: DEFAULT_TENANT,
           supplierId: 'S1',
           facilityId: 'F1',
           partId: 'PART-01',
@@ -488,7 +490,7 @@ describe('Orchestrator Fault Injection', () => {
 
       const job = makeJob({
         context: {
-          tenantId: 'T1',
+          tenantId: DEFAULT_TENANT,
           supplierId: 'S1',
           facilityId: 'F1',
           partId: 'PART-01',
@@ -531,7 +533,7 @@ describe('Orchestrator Fault Injection', () => {
 
       const job = makeJob({
         context: {
-          tenantId: 'T1',
+          tenantId: DEFAULT_TENANT,
           supplierId: 'S1',
           facilityId: 'F1',
           partId: 'PART-01',
@@ -669,7 +671,7 @@ describe('Orchestrator Fault Injection', () => {
       expect(mockDispatchAction).toHaveBeenCalledTimes(2); // once for action, once for escalation
       expect(mockDispatchAction).toHaveBeenLastCalledWith(
         'escalate',
-        expect.objectContaining({ tenantId: 'T1' }),
+        expect.objectContaining({ tenantId: DEFAULT_TENANT }),
       );
     });
 

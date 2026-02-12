@@ -84,6 +84,48 @@ export interface TenantContextViolationEvent {
   timestamp: string;
 }
 
+// ─── Automation Security Events ─────────────────────────────────────
+
+export interface AutomationActionBlockedEvent {
+  type: 'security.automation.action_blocked';
+  tenantId: string;
+  actionType: string;
+  ruleId?: string;
+  idempotencyKey?: string;
+  reason: string;
+  details?: Record<string, unknown>;
+  timestamp: string;
+}
+
+export interface AutomationActionApprovedEvent {
+  type: 'security.automation.action_approved';
+  tenantId: string;
+  actionType: string;
+  ruleId?: string;
+  idempotencyKey?: string;
+  wasReplay: boolean;
+  durationMs: number;
+  timestamp: string;
+}
+
+export interface AutomationGuardrailViolationEvent {
+  type: 'security.automation.guardrail_violation';
+  tenantId: string;
+  actionType: string;
+  violations: Array<{ guardrailId: string; description: string }>;
+  blocked: boolean;
+  timestamp: string;
+}
+
+export interface AutomationTenantValidationFailedEvent {
+  type: 'security.automation.tenant_validation_failed';
+  tenantId: string;
+  actionType: string;
+  ruleId?: string;
+  reason: string;
+  timestamp: string;
+}
+
 // ─── Union Type ─────────────────────────────────────────────────────
 
 export type SecurityEvent =
@@ -94,7 +136,11 @@ export type SecurityEvent =
   | TokenReplayDetectedEvent
   | TokenRevokedEvent
   | AuthorizationDeniedEvent
-  | TenantContextViolationEvent;
+  | TenantContextViolationEvent
+  | AutomationActionBlockedEvent
+  | AutomationActionApprovedEvent
+  | AutomationGuardrailViolationEvent
+  | AutomationTenantValidationFailedEvent;
 
 // ─── Security Event Type Constants ──────────────────────────────────
 
@@ -107,6 +153,10 @@ export const SecurityEventType = {
   TOKEN_REVOKED: 'security.token.revoked',
   AUTHORIZATION_DENIED: 'security.authorization.denied',
   TENANT_CONTEXT_VIOLATION: 'security.tenant.context_violation',
+  AUTOMATION_ACTION_BLOCKED: 'security.automation.action_blocked',
+  AUTOMATION_ACTION_APPROVED: 'security.automation.action_approved',
+  AUTOMATION_GUARDRAIL_VIOLATION: 'security.automation.guardrail_violation',
+  AUTOMATION_TENANT_VALIDATION_FAILED: 'security.automation.tenant_validation_failed',
 } as const;
 
 // ─── Type Guard ─────────────────────────────────────────────────────
