@@ -291,7 +291,7 @@ partsRouter.delete('/:id', async (req: AuthRequest, res, next) => {
         action: 'part.deactivated',
         entityType: 'part',
         entityId: row.id,
-        previousState: { isActive: true },
+        previousState: { isActive: existing.isActive },
         newState: { isActive: false },
         metadata: { source: 'parts.deactivate', partNumber: existing.partNumber },
         ipAddress: auditContext.ipAddress,
