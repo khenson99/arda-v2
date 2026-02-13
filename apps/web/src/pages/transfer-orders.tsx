@@ -6,6 +6,10 @@ import { fetchParts, fetchTransferQueue } from "@/lib/api-client";
 import { OrderStatusBadge } from "@/components/order-history/order-status-badge";
 import { TransferQueueItemCard } from "@/components/transfer-orders/transfer-queue-item-card";
 import { TransferQueueFilters } from "@/components/transfer-orders/transfer-queue-filters";
+import { LeadTimeTrendChart } from "@/components/transfer-orders/lead-time-trend-chart";
+import { LeadTimeSummaryTable } from "@/components/transfer-orders/lead-time-summary-table";
+import { LeadTimeFilters } from "@/components/transfer-orders/lead-time-filters";
+import { useLeadTimeAnalytics } from "@/hooks/use-lead-time-analytics";
 import {
   Button,
   Badge,
@@ -27,6 +31,7 @@ import {
   ArrowRightLeft,
   Loader2,
   ListChecks,
+  TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -111,6 +116,10 @@ function QueueView({
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold">Transfer Orders</h1>
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setActiveTab("analytics")}>
+            <TrendingUp className="mr-1.5 h-3.5 w-3.5" />
+            Analytics
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setActiveTab("transfer-queue")}>
             <ListChecks className="mr-1.5 h-3.5 w-3.5" />
             Transfer Queue
@@ -996,6 +1005,92 @@ function NewTransferView({
 }
 
 /* ================================================================
+   AnalyticsView
+   ================================================================ */
+
+interface AnalyticsViewProps {
+  token: string;
+  facilities: any[];
+  facilitiesLoading: boolean;
+  setActiveTab: (tab: TransferTab) => void;
+}
+
+function AnalyticsView({
+  token,
+  facilities,
+  facilitiesLoading,
+  setActiveTab,
+}: AnalyticsViewProps) {
+  const analytics = useLeadTimeAnalytics(token, () => {});
+  const [parts, setParts] = React.useState<PartRecord[]>([]);
+  const [partsLoading, setPartsLoading] = React.useState(false);
+
+  /* Load parts for filters */
+  React.useEffect(() => {
+    let cancelled = false;
+    setPartsLoading(true);
+    fetchParts(token)
+      .then((res) => {
+        if (!cancelled) setParts(res.data);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setPartsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  return (
+    <>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-lg font-semibold">Lead-Time Analytics</h1>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={analytics.refresh}>
+            <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+            Refresh
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setActiveTab("queue")}>
+            <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
+            Back to Orders
+          </Button>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <LeadTimeFilters
+        filters={analytics.filters}
+        facilities={facilities}
+        parts={parts}
+        facilitiesLoading={facilitiesLoading}
+        partsLoading={partsLoading}
+        onFiltersChange={analytics.updateFilters}
+        onClearFilters={analytics.clearFilters}
+      />
+
+      {/* Trend Chart */}
+      <LeadTimeTrendChart
+        data={analytics.trend}
+        loading={analytics.trendLoading}
+        error={analytics.trendError}
+      />
+
+      {/* Summary Table */}
+      <LeadTimeSummaryTable
+        data={analytics.summary}
+        loading={analytics.summaryLoading}
+        error={analytics.summaryError}
+        page={analytics.summaryPage}
+        totalPages={analytics.summaryTotalPages}
+        onPageChange={analytics.setSummaryPage}
+      />
+    </>
+  );
+}
+
+/* ================================================================
    Main Route Component
    ================================================================ */
 
@@ -1064,6 +1159,15 @@ export function TransferOrdersRoute({ session, onUnauthorized }: Props) {
           creating={hook.creating}
           createError={hook.createError}
           onCancel={handleCancelNew}
+        />
+      )}
+
+      {hook.activeTab === "analytics" && (
+        <AnalyticsView
+          token={session.tokens.accessToken}
+          facilities={hook.facilities}
+          facilitiesLoading={hook.facilitiesLoading}
+          setActiveTab={hook.setActiveTab}
         />
       )}
     </div>

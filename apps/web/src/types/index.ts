@@ -688,6 +688,53 @@ export interface SourceRecommendation {
   score: number;
 }
 
+/* ── Lead-Time Analytics ────────────────────────────────────────── */
+
+export interface LeadTimeSummaryRow {
+  routeKey: string;
+  sourceFacilityId: string;
+  sourceFacilityName: string;
+  destinationFacilityId: string;
+  destinationFacilityName: string;
+  partId: string | null;
+  partNumber: string | null;
+  partName: string | null;
+  avgLeadTimeDays: number;
+  medianLeadTimeDays: number;
+  p90LeadTimeDays: number;
+  minLeadTimeDays: number;
+  maxLeadTimeDays: number;
+  transferCount: number;
+}
+
+export interface LeadTimeTrendPoint {
+  date: string;
+  avgLeadTimeDays: number;
+  transferCount: number;
+}
+
+export interface LeadTimeFilters {
+  dateFrom?: string;
+  dateTo?: string;
+  sourceFacilityId?: string;
+  destinationFacilityId?: string;
+  partId?: string;
+}
+
+export interface LeadTimeSummaryResponse {
+  data: LeadTimeSummaryRow[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export interface LeadTimeTrendResponse {
+  data: LeadTimeTrendPoint[];
+}
+
 /* ── Inventory Ledger ─────────────────────────────────────────── */
 
 export interface InventoryLedgerEntry {
