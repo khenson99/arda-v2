@@ -74,6 +74,12 @@ const envSchema = z.object({
   ORDERS_QUEUE_RISK_MIN_LEVEL: z.enum(['medium', 'high']).default('medium'),
   ORDERS_QUEUE_RISK_SCAN_LIMIT: z.coerce.number().int().positive().max(500).default(100),
 
+  // Audit Retention Archival (Orders Service)
+  AUDIT_RETENTION_ENABLED: booleanFromEnv.default(false),
+  AUDIT_RETENTION_DAYS: z.coerce.number().int().min(1).default(90),
+  AUDIT_RETENTION_BATCH_SIZE: z.coerce.number().int().min(100).max(5000).default(1000),
+  AUDIT_RETENTION_INTERVAL_HOURS: z.coerce.number().int().min(1).default(24),
+
   // Railway dynamic port (overrides service-specific ports)
   PORT: z.coerce.number().optional(),
 

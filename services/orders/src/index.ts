@@ -19,6 +19,7 @@ import { automationRouter } from './routes/automation.routes.js';
 import { inventoryRouter } from './routes/inventory.routes.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { startQueueRiskScheduler } from './services/queue-risk-scheduler.service.js';
+import { startAuditRetentionScheduler } from './workers/audit-retention.worker.js';
 
 const app = express();
 
@@ -76,10 +77,13 @@ const queueRiskScheduler = startQueueRiskScheduler({
 });
 void queueRiskScheduler.runOnce();
 
+const auditRetentionScheduler = startAuditRetentionScheduler();
+
 // ─── Graceful Shutdown ───────────────────────────────────────────────
 function shutdown(signal: string) {
   log.info({ signal }, 'Shutting down gracefully');
   queueRiskScheduler.stop();
+  auditRetentionScheduler.stop();
   server.close(() => {
     log.info('HTTP server closed');
     process.exit(0);
