@@ -116,6 +116,7 @@ vi.mock('ioredis', () => {
 
 vi.mock('@arda/db', () => ({
   db: dbMocks,
+  writeAuditEntry: vi.fn(async () => undefined),
   schema: {
     kanbanCards: {
       id: 'id',
