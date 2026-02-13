@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, gte, lte } from 'drizzle-orm';
 import { db, schema, writeAuditEntry } from '@arda/db';
 import type { DbOrTransaction } from '@arda/db';
 import type { AuthRequest } from '@arda/auth-utils';
@@ -16,7 +16,7 @@ import {
 import { recommendSources } from '../services/source-recommendation.service.js';
 
 export const transferOrdersRouter = Router();
-const { transferOrders, transferOrderLines } = schema;
+const { transferOrders, transferOrderLines, leadTimeHistory } = schema;
 
 interface RequestAuditContext {
   userId?: string;
@@ -323,6 +323,117 @@ transferOrdersRouter.get('/recommendations/source', async (req: AuthRequest, res
   }
 });
 
+// ─── Lead-Time Analytics ─────────────────────────────────────────────────
+
+const leadTimeFilterSchema = z.object({
+  sourceFacilityId: z.string().uuid().optional(),
+  destinationFacilityId: z.string().uuid().optional(),
+  partId: z.string().uuid().optional(),
+  fromDate: z.string().optional(),
+  toDate: z.string().optional(),
+});
+
+// GET /lead-times — aggregate lead-time statistics
+transferOrdersRouter.get('/lead-times', async (req: AuthRequest, res, next) => {
+  try {
+    const tenantId = req.user!.tenantId;
+    if (!tenantId) throw new AppError(401, 'Unauthorized');
+
+    const filters = leadTimeFilterSchema.parse(req.query);
+    const conditions = [eq(leadTimeHistory.tenantId, tenantId)];
+
+    if (filters.sourceFacilityId) {
+      conditions.push(eq(leadTimeHistory.sourceFacilityId, filters.sourceFacilityId));
+    }
+    if (filters.destinationFacilityId) {
+      conditions.push(eq(leadTimeHistory.destinationFacilityId, filters.destinationFacilityId));
+    }
+    if (filters.partId) {
+      conditions.push(eq(leadTimeHistory.partId, filters.partId));
+    }
+    if (filters.fromDate) {
+      conditions.push(gte(leadTimeHistory.receivedAt, new Date(filters.fromDate)));
+    }
+    if (filters.toDate) {
+      conditions.push(lte(leadTimeHistory.receivedAt, new Date(filters.toDate)));
+    }
+
+    const [result] = await db
+      .select({
+        avgLeadTimeDays: sql<string>`round(avg(${leadTimeHistory.leadTimeDays}::numeric), 2)`,
+        medianLeadTimeDays: sql<string>`round(percentile_cont(0.5) within group (order by ${leadTimeHistory.leadTimeDays}::numeric), 2)`,
+        p90LeadTimeDays: sql<string>`round(percentile_cont(0.9) within group (order by ${leadTimeHistory.leadTimeDays}::numeric), 2)`,
+        minLeadTimeDays: sql<string>`round(min(${leadTimeHistory.leadTimeDays}::numeric), 2)`,
+        maxLeadTimeDays: sql<string>`round(max(${leadTimeHistory.leadTimeDays}::numeric), 2)`,
+        count: sql<string>`count(*)::int`,
+      })
+      .from(leadTimeHistory)
+      .where(and(...conditions));
+
+    res.json(result ?? {
+      avgLeadTimeDays: null,
+      medianLeadTimeDays: null,
+      p90LeadTimeDays: null,
+      minLeadTimeDays: null,
+      maxLeadTimeDays: null,
+      count: 0,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return next(new AppError(400, 'Invalid query parameters'));
+    }
+    next(error);
+  }
+});
+
+const leadTimeTrendSchema = leadTimeFilterSchema.extend({
+  interval: z.enum(['day', 'week', 'month']).default('week'),
+});
+
+// GET /lead-times/trend — time-series buckets
+transferOrdersRouter.get('/lead-times/trend', async (req: AuthRequest, res, next) => {
+  try {
+    const tenantId = req.user!.tenantId;
+    if (!tenantId) throw new AppError(401, 'Unauthorized');
+
+    const filters = leadTimeTrendSchema.parse(req.query);
+    const conditions = [eq(leadTimeHistory.tenantId, tenantId)];
+
+    if (filters.sourceFacilityId) {
+      conditions.push(eq(leadTimeHistory.sourceFacilityId, filters.sourceFacilityId));
+    }
+    if (filters.destinationFacilityId) {
+      conditions.push(eq(leadTimeHistory.destinationFacilityId, filters.destinationFacilityId));
+    }
+    if (filters.partId) {
+      conditions.push(eq(leadTimeHistory.partId, filters.partId));
+    }
+    if (filters.fromDate) {
+      conditions.push(gte(leadTimeHistory.receivedAt, new Date(filters.fromDate)));
+    }
+    if (filters.toDate) {
+      conditions.push(lte(leadTimeHistory.receivedAt, new Date(filters.toDate)));
+    }
+
+    const rows = await db
+      .select({
+        bucket: sql<string>`date_trunc(${filters.interval}, ${leadTimeHistory.receivedAt})`,
+        avgLeadTimeDays: sql<string>`round(avg(${leadTimeHistory.leadTimeDays}::numeric), 2)`,
+        count: sql<string>`count(*)::int`,
+      })
+      .from(leadTimeHistory)
+      .where(and(...conditions))
+      .orderBy(sql`1`);
+
+    res.json(rows);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return next(new AppError(400, 'Invalid query parameters'));
+    }
+    next(error);
+  }
+});
+
 // GET /:id - Get transfer order detail with lines
 transferOrdersRouter.get('/:id', async (req: AuthRequest, res, next) => {
   try {
@@ -516,11 +627,11 @@ transferOrdersRouter.patch('/:id/status', async (req: AuthRequest, res, next) =>
         throw new AppError(400, transition.error!);
       }
 
-      const updateData: Record<string, any> = {
+      const updateData: Partial<typeof transferOrders.$inferInsert> = {
         status: newStatus,
         updatedAt: new Date(),
         // Spread auto-populated fields (e.g. requestedDate, shippedDate, receivedDate)
-        ...transition.autoFields,
+        ...(transition.autoFields as Partial<typeof transferOrders.$inferInsert>),
       };
 
       // If cancelling, store the reason in notes
@@ -877,6 +988,28 @@ transferOrdersRouter.patch('/:id/receive', async (req: AuthRequest, res, next) =
             updatedLineIds: receiveLines.map((line) => line.lineId),
           },
         });
+
+        // Persist lead-time history — one row per line
+        if (order.shippedDate) {
+          const receivedAt = new Date();
+          const shippedAt = new Date(order.shippedDate);
+          const leadTimeDays = Number(
+            ((receivedAt.getTime() - shippedAt.getTime()) / (1000 * 60 * 60 * 24)).toFixed(2)
+          );
+
+          await tx.insert(leadTimeHistory).values(
+            updatedLines.map((line) => ({
+              tenantId,
+              sourceFacilityId: order.sourceFacilityId,
+              destinationFacilityId: order.destinationFacilityId,
+              partId: line.partId,
+              transferOrderId: order.id,
+              shippedAt,
+              receivedAt,
+              leadTimeDays: leadTimeDays.toFixed(2),
+            }))
+          );
+        }
       }
 
       const [updatedOrder] = await tx
