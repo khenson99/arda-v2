@@ -1,6 +1,20 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import type { CardTemplateDefinition } from '@arda/shared-types';
-import { _validateTemplateDefinitionForTests } from './card-templates.routes.js';
+
+let validateTemplateDefinitionForTests: ((definition: CardTemplateDefinition) => void) | null = null;
+
+beforeAll(async () => {
+  process.env.DATABASE_URL ??= 'postgresql://postgres:postgres@localhost:5432/arda_v2_test';
+  const module = await import('./card-templates.routes.js');
+  validateTemplateDefinitionForTests = module._validateTemplateDefinitionForTests;
+});
+
+function requireValidator(): (definition: CardTemplateDefinition) => void {
+  if (!validateTemplateDefinitionForTests) {
+    throw new Error('Template validator failed to initialize');
+  }
+  return validateTemplateDefinitionForTests;
+}
 
 function buildValidDefinition(): CardTemplateDefinition {
   return {
@@ -39,18 +53,21 @@ function buildValidDefinition(): CardTemplateDefinition {
 
 describe('card template definition validation', () => {
   it('accepts a valid template definition', () => {
-    expect(() => _validateTemplateDefinitionForTests(buildValidDefinition())).not.toThrow();
+    const validate = requireValidator();
+    expect(() => validate(buildValidDefinition())).not.toThrow();
   });
 
   it('rejects missing required key registrations', () => {
     const def = buildValidDefinition();
     def.requiredElementKeys = def.requiredElementKeys.filter((key) => key !== 'qr');
-    expect(() => _validateTemplateDefinitionForTests(def)).toThrow(/requiredElementKeys entry: qr/);
+    const validate = requireValidator();
+    expect(() => validate(def)).toThrow(/requiredElementKeys entry: qr/);
   });
 
   it('rejects out-of-bounds elements', () => {
     const def = buildValidDefinition();
     def.elements[0] = { ...def.elements[0], x: 0 } as CardTemplateDefinition['elements'][number];
-    expect(() => _validateTemplateDefinitionForTests(def)).toThrow(/outside safe bounds/);
+    const validate = requireValidator();
+    expect(() => validate(def)).toThrow(/outside safe bounds/);
   });
 });
