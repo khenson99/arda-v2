@@ -81,8 +81,24 @@
       "notes": "Code complete. PR #389. Category/notifications audit writes (facilities/storage read-only, no audit needed). 7 new tests. Ready for merge."
     },
     "258": {
-      "status": "in-progress",
-      "agent": "backend-engineer"
+      "status": "pr-open",
+      "agent": "backend-engineer",
+      "pr_number": 390,
+      "reviewed": false,
+      "review_decision": null,
+      "reviewed_at": "",
+      "ci_status": "passing-except-preexisting",
+      "notes": "Code complete. PR #390. Enhanced audit query APIs: actorName/entityName/search/includeArchived filters, entity history, distinct actions/entity-types endpoints, UNION ALL archive support. 17 new tests, 479 total passing."
+    },
+    "259": {
+      "status": "pr-open",
+      "agent": "backend-engineer",
+      "pr_number": 393,
+      "reviewed": false,
+      "review_decision": null,
+      "reviewed_at": "",
+      "ci_status": "passing-except-preexisting",
+      "notes": "Code complete. PR #393. Hash-chain integrity check endpoint (tenant_admin only). Recompute hashes, detect violations. 14 new tests, 493 total passing."
     }
   },
   "agents": {
@@ -112,13 +128,11 @@
       "iterations": 0
     },
     "backend-engineer": {
-      "status": "working",
-      "current_ticket": 258,
-      "iterations": 4,
-      "last_completed": 257,
-      "queue": [
-        259
-      ]
+      "status": "idle",
+      "current_ticket": null,
+      "iterations": 6,
+      "last_completed": 259,
+      "queue": []
     }
   },
   "sprint": {
