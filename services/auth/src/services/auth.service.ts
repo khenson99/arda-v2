@@ -438,6 +438,9 @@ export async function register(input: RegisterInput, auditCtx?: AuthAuditContext
     return { tenant, user };
   });
 
+  // Initialize default notification preferences (fire-and-forget; errors logged internally)
+  void initializeUserNotificationPreferences(result.tenant.id, result.user.id);
+
   // Generate tokens
   const tokens = await createTokenPair(result.user.id, result.tenant.id, result.user.email, result.user.role);
 
@@ -969,6 +972,9 @@ export async function handleGoogleOAuth(profile: {
 
     return { tenant, user };
   });
+
+  // Initialize default notification preferences (fire-and-forget; errors logged internally)
+  void initializeUserNotificationPreferences(result.tenant.id, result.user.id);
 
   const tokens = await createTokenPair(
     result.user.id,
