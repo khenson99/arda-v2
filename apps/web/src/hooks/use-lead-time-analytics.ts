@@ -37,7 +37,8 @@ export function useLeadTimeAnalytics(token: string, onUnauthorized: () => void) 
 
   /* ── Refs ────────────────────────────────────────────────────── */
   const isMountedRef = useRef(true);
-  const fetchIdRef = useRef(0);
+  const summaryFetchIdRef = useRef(0);
+  const trendFetchIdRef = useRef(0);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -50,7 +51,7 @@ export function useLeadTimeAnalytics(token: string, onUnauthorized: () => void) 
 
   const loadSummary = useCallback(
     async (page: number) => {
-      const id = ++fetchIdRef.current;
+      const id = ++summaryFetchIdRef.current;
       setSummaryLoading(true);
       setSummaryError(null);
       try {
@@ -59,19 +60,19 @@ export function useLeadTimeAnalytics(token: string, onUnauthorized: () => void) 
           pageSize: 20,
           ...filters,
         });
-        if (id !== fetchIdRef.current || !isMountedRef.current) return;
+        if (id !== summaryFetchIdRef.current || !isMountedRef.current) return;
         setSummary(res.data);
         setSummaryPage(res.pagination.page);
         setSummaryTotalPages(res.pagination.totalPages);
       } catch (err) {
-        if (id !== fetchIdRef.current || !isMountedRef.current) return;
+        if (id !== summaryFetchIdRef.current || !isMountedRef.current) return;
         if (isUnauthorized(err)) {
           onUnauthorized();
           return;
         }
         setSummaryError(parseApiError(err));
       } finally {
-        if (id === fetchIdRef.current && isMountedRef.current) {
+        if (id === summaryFetchIdRef.current && isMountedRef.current) {
           setSummaryLoading(false);
         }
       }
@@ -82,22 +83,22 @@ export function useLeadTimeAnalytics(token: string, onUnauthorized: () => void) 
   /* ── Load trend ───────────────────────────────────────────────── */
 
   const loadTrend = useCallback(async () => {
-    const id = ++fetchIdRef.current;
+    const id = ++trendFetchIdRef.current;
     setTrendLoading(true);
     setTrendError(null);
     try {
       const res = await fetchLeadTimeTrend(token, filters);
-      if (id !== fetchIdRef.current || !isMountedRef.current) return;
+      if (id !== trendFetchIdRef.current || !isMountedRef.current) return;
       setTrend(res.data);
     } catch (err) {
-      if (id !== fetchIdRef.current || !isMountedRef.current) return;
+      if (id !== trendFetchIdRef.current || !isMountedRef.current) return;
       if (isUnauthorized(err)) {
         onUnauthorized();
         return;
       }
       setTrendError(parseApiError(err));
     } finally {
-      if (id === fetchIdRef.current && isMountedRef.current) {
+      if (id === trendFetchIdRef.current && isMountedRef.current) {
         setTrendLoading(false);
       }
     }
