@@ -1,11 +1,23 @@
 import { createHash } from 'node:crypto';
+import { createReadStream } from 'node:fs';
 import { Router } from 'express';
 import { z } from 'zod';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { db, schema } from '@arda/db';
 import type { AuthRequest } from '@arda/auth-utils';
 import { requireRole } from '@arda/auth-utils';
+import { createLogger } from '@arda/config';
 import { AppError } from '../middleware/error-handler.js';
+import {
+  ASYNC_THRESHOLD,
+  createExportJob,
+  getExportJobStatus,
+  getExportJobFile,
+  processExportJob,
+} from '../services/audit-export-job.service.js';
+import type { ExportJobFilters } from '../services/audit-export-job.service.js';
+
+const log = createLogger('audit-export-routes');
 
 export const auditRouter = Router();
 
@@ -649,6 +661,292 @@ auditRouter.get('/integrity-check', requireRole('tenant_admin'), async (req: Aut
         violations: violations.slice(0, 100), // Cap violations to avoid huge responses
       },
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ─── POST /export — Audit log export (sync for small, async for large) ──
+
+const exportRequestSchema = z.object({
+  format: z.enum(['csv', 'json', 'pdf']).default('csv'),
+  action: z.string().max(100).optional(),
+  entityType: z.string().max(100).optional(),
+  entityId: z.string().uuid().optional(),
+  userId: z.string().uuid().optional(),
+  dateFrom: z.string().datetime().optional(),
+  dateTo: z.string().datetime().optional(),
+  actorName: z.string().max(200).optional(),
+  entityName: z.string().max(200).optional(),
+  search: z.string().max(200).optional(),
+  includeArchived: z.boolean().optional().default(false),
+});
+
+/**
+ * Generate CSV from audit entries.
+ */
+function generateCsv(entries: Record<string, unknown>[]): string {
+  if (entries.length === 0) return '';
+
+  const headers = Object.keys(entries[0]);
+  const headerLine = headers.join(',');
+  const rows = entries.map((entry) =>
+    headers
+      .map((h) => {
+        const val = entry[h];
+        if (val === null || val === undefined) return '';
+        const str = typeof val === 'object' ? JSON.stringify(val) : String(val);
+        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      })
+      .join(','),
+  );
+  return [headerLine, ...rows].join('\n');
+}
+
+/**
+ * Generate JSON export from audit entries.
+ */
+function generateJsonExport(entries: unknown[]): string {
+  return JSON.stringify({ entries, exportedAt: new Date().toISOString(), count: entries.length }, null, 2);
+}
+
+/**
+ * Compute SHA-256 checksum of export data.
+ */
+function computeExportChecksum(data: string | Buffer): string {
+  return createHash('sha256')
+    .update(typeof data === 'string' ? data : data)
+    .digest('hex');
+}
+
+/**
+ * Fetch audit entries using the shared filter logic.
+ */
+async function fetchAuditEntries(
+  tenantId: string,
+  filters: AuditFilters,
+): Promise<unknown[]> {
+  const conditions = buildAuditConditions(tenantId, filters);
+  const joinUsers = needsUserJoin(filters);
+
+  if (joinUsers) {
+    const rawRows = await db
+      .select()
+      .from(schema.auditLog)
+      .leftJoin(schema.users, eq(schema.auditLog.userId, schema.users.id))
+      .where(and(...conditions))
+      .orderBy(desc(schema.auditLog.timestamp));
+    return rawRows.map((r) => r.audit_log);
+  }
+
+  return db
+    .select()
+    .from(schema.auditLog)
+    .where(and(...conditions))
+    .orderBy(desc(schema.auditLog.timestamp));
+}
+
+/**
+ * Count audit entries matching the given filters (for threshold check).
+ */
+async function countAuditEntries(
+  tenantId: string,
+  filters: AuditFilters,
+): Promise<number> {
+  const conditions = buildAuditConditions(tenantId, filters);
+  const joinUsers = needsUserJoin(filters);
+
+  let countResult: { count: number } | undefined;
+
+  if (joinUsers) {
+    [countResult] = await (db
+      .select({ count: sql<number>`CAST(COUNT(*) AS INTEGER)` })
+      .from(schema.auditLog)
+      .leftJoin(schema.users, eq(schema.auditLog.userId, schema.users.id))
+      .where(and(...conditions)) as any);
+  } else {
+    [countResult] = await db
+      .select({ count: sql<number>`CAST(COUNT(*) AS INTEGER)` })
+      .from(schema.auditLog)
+      .where(and(...conditions));
+  }
+
+  return countResult?.count ?? 0;
+}
+
+auditRouter.post('/export', async (req: AuthRequest, res, next) => {
+  try {
+    const tenantId = req.user?.tenantId;
+    const userId = req.user?.userId;
+    if (!tenantId || !userId) {
+      throw new AppError(401, 'Unauthorized');
+    }
+
+    const parsed = exportRequestSchema.parse(req.body);
+    const { format, includeArchived, ...filterFields } = parsed;
+
+    const filters: AuditFilters = {
+      ...filterFields,
+      includeArchived,
+    };
+
+    // Count matching rows to determine sync vs async path
+    const estimatedRows = await countAuditEntries(tenantId, filters);
+
+    if (estimatedRows >= ASYNC_THRESHOLD) {
+      // ── Async path: create job and return 202 ──────────────────
+      const jobResult = createExportJob(
+        tenantId,
+        userId,
+        format,
+        filters as ExportJobFilters,
+        estimatedRows,
+      );
+
+      log.info(
+        { jobId: jobResult.jobId, tenantId, estimatedRows, format },
+        'Async export job created',
+      );
+
+      // Kick off processing in background (fire-and-forget)
+      const jobFilters = { ...filters };
+      setImmediate(() => {
+        processExportJob(
+          jobResult.jobId,
+          () => fetchAuditEntries(tenantId, jobFilters),
+          async (entries) => {
+            let data: string;
+            if (format === 'csv') {
+              data = generateCsv(entries as Record<string, unknown>[]);
+            } else {
+              data = generateJsonExport(entries);
+            }
+            const checksum = computeExportChecksum(data);
+            return { data, checksum };
+          },
+        ).catch((err) => {
+          log.error(
+            { jobId: jobResult.jobId, error: (err as Error).message },
+            'Background export processing error',
+          );
+        });
+      });
+
+      res.status(202).json(jobResult);
+      return;
+    }
+
+    // ── Sync path: export immediately for smaller result sets ──────
+    const entries = await fetchAuditEntries(tenantId, filters);
+
+    let data: string;
+    let contentType: string;
+    let fileExtension: string;
+
+    if (format === 'csv') {
+      data = generateCsv(entries as Record<string, unknown>[]);
+      contentType = 'text/csv';
+      fileExtension = 'csv';
+    } else {
+      data = generateJsonExport(entries);
+      contentType = 'application/json';
+      fileExtension = 'json';
+    }
+
+    const checksum = computeExportChecksum(data);
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="audit-export-${new Date().toISOString().slice(0, 10)}.${fileExtension}"`,
+    );
+    res.setHeader('X-Export-Checksum', checksum);
+    res.setHeader('X-Export-Row-Count', String(entries.length));
+    res.send(data);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return next(new AppError(400, 'Invalid export parameters'));
+    }
+    next(error);
+  }
+});
+
+// ─── GET /export/:jobId — Poll async export job status ───────────────
+
+auditRouter.get('/export/:jobId', async (req: AuthRequest, res, next) => {
+  try {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) {
+      throw new AppError(401, 'Unauthorized');
+    }
+
+    const jobId = req.params.jobId as string;
+
+    // Validate jobId is a UUID
+    const uuidSchema = z.string().uuid();
+    const parseResult = uuidSchema.safeParse(jobId);
+    if (!parseResult.success) {
+      throw new AppError(400, 'Invalid job ID format');
+    }
+
+    const status = getExportJobStatus(jobId, tenantId);
+
+    if (!status) {
+      throw new AppError(404, 'Export job not found');
+    }
+
+    res.json(status);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return next(new AppError(400, 'Invalid parameters'));
+    }
+    next(error);
+  }
+});
+
+// ─── GET /export/:jobId/download — Download completed export artifact ─
+
+auditRouter.get('/export/:jobId/download', async (req: AuthRequest, res, next) => {
+  try {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) {
+      throw new AppError(401, 'Unauthorized');
+    }
+
+    const jobId = req.params.jobId as string;
+
+    const uuidSchema = z.string().uuid();
+    const parseResult = uuidSchema.safeParse(jobId);
+    if (!parseResult.success) {
+      throw new AppError(400, 'Invalid job ID format');
+    }
+
+    const fileInfo = getExportJobFile(jobId, tenantId);
+
+    if (!fileInfo) {
+      throw new AppError(404, 'Export file not found or not ready');
+    }
+
+    const contentTypes: Record<string, string> = {
+      csv: 'text/csv',
+      json: 'application/json',
+      pdf: 'application/pdf',
+    };
+
+    res.setHeader('Content-Type', contentTypes[fileInfo.format] || 'application/octet-stream');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="audit-export-${jobId}.${fileInfo.format}"`,
+    );
+    if (fileInfo.checksum) {
+      res.setHeader('X-Export-Checksum', fileInfo.checksum);
+    }
+
+    const stream = createReadStream(fileInfo.filePath);
+    stream.pipe(res);
   } catch (error) {
     next(error);
   }
