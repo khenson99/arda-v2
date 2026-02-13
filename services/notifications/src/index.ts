@@ -7,7 +7,6 @@ import { sql } from 'drizzle-orm';
 import { getEventBus } from '@arda/events';
 import { authMiddleware } from '@arda/auth-utils';
 import { notificationsRouter } from './routes/notifications.routes.js';
-import { deliveriesRouter } from './routes/deliveries.routes.js';
 import { preferencesRouter } from './routes/preferences.routes.js';
 import { unsubscribeRouter } from './routes/unsubscribe.routes.js';
 import { errorHandler } from './middleware/error-handler.js';
@@ -59,7 +58,6 @@ app.use('/notifications', unsubscribeRouter);
 // Authenticated routes — behind auth via the API gateway
 app.use(authMiddleware);
 app.use('/notifications', notificationsRouter);
-app.use('/notifications', deliveriesRouter);
 app.use('/preferences', preferencesRouter);
 
 app.use(errorHandler);
