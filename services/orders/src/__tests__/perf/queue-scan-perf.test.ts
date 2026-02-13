@@ -16,15 +16,41 @@
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
-import { db, schema } from '@arda/db';
 import { eq, and, sql } from 'drizzle-orm';
-import { runQueueRiskScanForTenant } from '../../routes/order-queue.routes.js';
+type DbModule = typeof import('@arda/db');
+type OrderQueueRoutesModule = typeof import('../../routes/order-queue.routes.js');
 
-const { kanbanCards, kanbanLoops } = schema;
+let db: DbModule['db'] | null = null;
+let schema: DbModule['schema'] | null = null;
+let runQueueRiskScanForTenant: OrderQueueRoutesModule['runQueueRiskScanForTenant'] | null = null;
 
 const ENABLED = process.env.PERF_TEST === '1';
 const TENANT_ID = process.env.PERF_TENANT_ID ?? 'perf-test-tenant';
 const ITERATIONS = 20;
+
+async function loadPerfDeps(): Promise<void> {
+  if (db && schema && runQueueRiskScanForTenant) {
+    return;
+  }
+
+  const dbModule = await import('@arda/db');
+  const orderQueueModule = await import('../../routes/order-queue.routes.js');
+  db = dbModule.db;
+  schema = dbModule.schema;
+  runQueueRiskScanForTenant = orderQueueModule.runQueueRiskScanForTenant;
+}
+
+function requirePerfDeps(): {
+  db: DbModule['db'];
+  schema: DbModule['schema'];
+  runQueueRiskScanForTenant: OrderQueueRoutesModule['runQueueRiskScanForTenant'];
+} {
+  if (!db || !schema || !runQueueRiskScanForTenant) {
+    throw new Error('Performance test dependencies are not loaded');
+  }
+
+  return { db, schema, runQueueRiskScanForTenant };
+}
 
 function percentile(sortedValues: number[], p: number): number {
   const index = Math.ceil((p / 100) * sortedValues.length) - 1;
@@ -41,6 +67,10 @@ describe.skipIf(!ENABLED)('Queue & Scan Performance', () => {
   let triggeredCardCount = 0;
 
   beforeAll(async () => {
+    await loadPerfDeps();
+    const { db, schema } = requirePerfDeps();
+    const { kanbanCards } = schema;
+
     // Verify test data exists
     const [{ count }] = await db
       .select({ count: sql<number>`CAST(COUNT(*) AS INTEGER)` })
@@ -63,6 +93,8 @@ describe.skipIf(!ENABLED)('Queue & Scan Performance', () => {
   });
 
   it('queue list query should complete within p95 < 200ms', async () => {
+    const { db, schema } = requirePerfDeps();
+    const { kanbanCards, kanbanLoops } = schema;
     const durations: number[] = [];
 
     for (let i = 0; i < ITERATIONS; i++) {
@@ -103,6 +135,7 @@ describe.skipIf(!ENABLED)('Queue & Scan Performance', () => {
   });
 
   it('risk scan should complete within p95 < 300ms', async () => {
+    const { runQueueRiskScanForTenant } = requirePerfDeps();
     const durations: number[] = [];
 
     for (let i = 0; i < ITERATIONS; i++) {
@@ -131,6 +164,8 @@ describe.skipIf(!ENABLED)('Queue & Scan Performance', () => {
   });
 
   it('draft PO lookup should complete within p95 < 150ms', async () => {
+    const { db, schema } = requirePerfDeps();
+    const { kanbanCards } = schema;
     // Fetch card IDs to use for the draft PO lookup
     const cards = await db
       .select({ id: kanbanCards.id })
