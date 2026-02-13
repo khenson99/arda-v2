@@ -202,7 +202,7 @@ function buildPOAdapter(): POCreationAdapter {
 function buildEmailAdapter(): EmailActionAdapter {
   const eventBus = getEventBus(config.REDIS_URL);
   const backend = new EventBusEmailBackend(
-    (event) => eventBus.publish(event as Parameters<typeof eventBus.publish>[0]),
+    (event) => eventBus.publish(event as unknown as Parameters<typeof eventBus.publish>[0]),
   );
   return new EmailActionAdapter(backend);
 }
@@ -226,7 +226,7 @@ function buildShoppingListAdapter(): ShoppingListAdapter {
   };
 
   const publisher = new EventBusShoppingListPublisher(
-    (event) => eventBus.publish(event as Parameters<typeof eventBus.publish>[0]),
+    (event) => eventBus.publish(event as unknown as Parameters<typeof eventBus.publish>[0]),
   );
 
   return new ShoppingListAdapter(persistence, publisher);
