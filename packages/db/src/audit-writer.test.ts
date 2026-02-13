@@ -1,6 +1,10 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { _computeHash as computeHash } from './audit-writer.js';
+import {
+  _computeHash as computeHash,
+  _canonicalTimestamp as canonicalTimestamp,
+  _tenantLockKeys as tenantLockKeys,
+} from './audit-writer.js';
 
 // ─── Test Constants ─────────────────────────────────────────────────
 
@@ -8,6 +12,9 @@ const TENANT_A = '00000000-0000-0000-0000-000000000001';
 const TENANT_B = '00000000-0000-0000-0000-000000000002';
 const USER_ID = '11111111-1111-4111-8111-111111111111';
 const ENTITY_ID = '22222222-2222-4222-8222-222222222222';
+
+// UUID with high hex prefix that would overflow signed int8
+const TENANT_HIGH_HEX = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
 
 // ─── computeHash Tests ──────────────────────────────────────────────
 
@@ -40,7 +47,7 @@ describe('computeHash', () => {
       previousHash: null,
     });
 
-    // Manual computation
+    // Manual computation using canonical timestamp
     const input = `${TENANT_A}|1|purchase_order.created|purchase_order|${ENTITY_ID}|${baseTimestamp.toISOString()}|GENESIS`;
     const expected = createHash('sha256').update(input).digest('hex');
     expect(hash).toBe(expected);
@@ -220,11 +227,73 @@ describe('computeHash', () => {
   });
 });
 
+// ─── canonicalTimestamp Tests ────────────────────────────────────────
+
+describe('canonicalTimestamp', () => {
+  it('returns ISO 8601 format with milliseconds and Z suffix', () => {
+    const ts = new Date('2026-01-15T10:00:00.000Z');
+    expect(canonicalTimestamp(ts)).toBe('2026-01-15T10:00:00.000Z');
+  });
+
+  it('preserves sub-second precision', () => {
+    const ts = new Date('2026-06-01T23:59:59.123Z');
+    expect(canonicalTimestamp(ts)).toBe('2026-06-01T23:59:59.123Z');
+  });
+
+  it('matches JS Date.toISOString() exactly', () => {
+    const ts = new Date('2026-03-15T14:30:00.500Z');
+    expect(canonicalTimestamp(ts)).toBe(ts.toISOString());
+  });
+});
+
+// ─── tenantLockKeys Tests ───────────────────────────────────────────
+
+describe('tenantLockKeys', () => {
+  it('returns two 32-bit integers', () => {
+    const [hi, lo] = tenantLockKeys(TENANT_A);
+    expect(typeof hi).toBe('number');
+    expect(typeof lo).toBe('number');
+    // Both should be safe 32-bit signed integers
+    expect(hi).toBeGreaterThanOrEqual(-2147483648);
+    expect(hi).toBeLessThanOrEqual(2147483647);
+    expect(lo).toBeGreaterThanOrEqual(-2147483648);
+    expect(lo).toBeLessThanOrEqual(2147483647);
+  });
+
+  it('handles UUIDs with high hex values without overflow', () => {
+    // This UUID would cause BigInt overflow with the old single-bigint approach
+    const [hi, lo] = tenantLockKeys(TENANT_HIGH_HEX);
+    expect(typeof hi).toBe('number');
+    expect(typeof lo).toBe('number');
+    expect(Number.isFinite(hi)).toBe(true);
+    expect(Number.isFinite(lo)).toBe(true);
+    // ffffffff in signed 32-bit = -1
+    expect(hi).toBe(-1);
+  });
+
+  it('different tenants produce different lock key pairs', () => {
+    // Use UUIDs that differ in the first 16 hex characters (after hyphen stripping)
+    const keysA = tenantLockKeys('aaaaaaaa-bbbb-0000-0000-000000000000');
+    const keysB = tenantLockKeys('cccccccc-dddd-0000-0000-000000000000');
+    // At least one component should differ
+    expect(keysA[0] !== keysB[0] || keysA[1] !== keysB[1]).toBe(true);
+  });
+
+  it('strips hyphens and uses first 16 hex chars', () => {
+    // These two UUIDs share the first 16 hex chars (after stripping hyphens)
+    const uuid1 = '12345678-abcd-0000-0000-000000000001';
+    const uuid2 = '12345678-abcd-0000-9999-999999999999';
+    const keys1 = tenantLockKeys(uuid1);
+    const keys2 = tenantLockKeys(uuid2);
+    expect(keys1).toEqual(keys2);
+  });
+});
+
 // ─── writeAuditEntry Tests (mocked DB) ──────────────────────────────
 
 describe('writeAuditEntry', () => {
-  // We test the DB interaction layer via mocked Drizzle methods.
-  // The core hash computation is thoroughly tested above.
+  // The mock now needs a `transaction` method since writeAuditEntry is self-transactional.
+  // The transaction mock passes itself as the `tx` argument to the callback.
 
   const mockExecute = vi.fn();
   const mockSelect = vi.fn();
@@ -238,14 +307,18 @@ describe('writeAuditEntry', () => {
   const mockValues = vi.fn();
   const mockReturning = vi.fn();
 
-  const mockDbOrTx = {
-    execute: mockExecute,
-    select: mockSelect,
-    insert: mockInsert,
-  };
+  // Mock that acts as both db and tx — transaction() passes itself
+  let mockDbOrTx: any;
 
   beforeEach(() => {
     vi.resetAllMocks();
+
+    mockDbOrTx = {
+      execute: mockExecute,
+      select: mockSelect,
+      insert: mockInsert,
+      transaction: vi.fn(async (fn: (tx: any) => Promise<any>) => fn(mockDbOrTx)),
+    };
 
     // Default chain: select -> from -> where -> orderBy -> limit -> returns empty
     mockSelect.mockReturnValue({ from: mockFrom });
@@ -264,10 +337,25 @@ describe('writeAuditEntry', () => {
     }]);
   });
 
+  it('wraps operations in a transaction (self-transactional)', async () => {
+    const { writeAuditEntry } = await import('./audit-writer.js');
+
+    await writeAuditEntry(mockDbOrTx, {
+      tenantId: TENANT_A,
+      userId: USER_ID,
+      action: 'purchase_order.created',
+      entityType: 'purchase_order',
+      entityId: ENTITY_ID,
+    });
+
+    // transaction() was called on the db/tx handle
+    expect(mockDbOrTx.transaction).toHaveBeenCalledTimes(1);
+  });
+
   it('acquires advisory lock, reads latest, computes hash, and inserts', async () => {
     const { writeAuditEntry } = await import('./audit-writer.js');
 
-    const result = await writeAuditEntry(mockDbOrTx as any, {
+    const result = await writeAuditEntry(mockDbOrTx, {
       tenantId: TENANT_A,
       userId: USER_ID,
       action: 'purchase_order.created',
@@ -276,7 +364,7 @@ describe('writeAuditEntry', () => {
       newState: { status: 'draft' },
     });
 
-    // 1. Advisory lock acquired
+    // 1. Advisory lock acquired (two-int form)
     expect(mockExecute).toHaveBeenCalledTimes(1);
 
     // 2. Select latest was called
@@ -293,11 +381,27 @@ describe('writeAuditEntry', () => {
     });
   });
 
+  it('uses two-int advisory lock form (no bigint overflow)', async () => {
+    const { writeAuditEntry } = await import('./audit-writer.js');
+
+    await writeAuditEntry(mockDbOrTx, {
+      tenantId: TENANT_A,
+      action: 'test',
+      entityType: 'test',
+    });
+
+    // Verify the SQL uses pg_advisory_xact_lock(int, int) format
+    const lockCall = mockExecute.mock.calls[0][0];
+    // sql.raw() stores the raw string — stringify and check for two-int form
+    const sqlStr = JSON.stringify(lockCall);
+    expect(sqlStr).toMatch(/pg_advisory_xact_lock\(-?\d+,\s*-?\d+\)/);
+  });
+
   it('starts at sequence 1 when no previous entries exist', async () => {
     const { writeAuditEntry } = await import('./audit-writer.js');
     mockLimit.mockResolvedValue([]); // No previous entries
 
-    await writeAuditEntry(mockDbOrTx as any, {
+    await writeAuditEntry(mockDbOrTx, {
       tenantId: TENANT_A,
       action: 'user.login',
       entityType: 'session',
@@ -316,7 +420,7 @@ describe('writeAuditEntry', () => {
       sequenceNumber: 42,
     }]);
 
-    await writeAuditEntry(mockDbOrTx as any, {
+    await writeAuditEntry(mockDbOrTx, {
       tenantId: TENANT_A,
       action: 'user.login',
       entityType: 'session',
@@ -331,7 +435,7 @@ describe('writeAuditEntry', () => {
     const { writeAuditEntry } = await import('./audit-writer.js');
     const customTs = new Date('2026-06-15T12:00:00.000Z');
 
-    await writeAuditEntry(mockDbOrTx as any, {
+    await writeAuditEntry(mockDbOrTx, {
       tenantId: TENANT_A,
       action: 'user.login',
       entityType: 'session',
@@ -345,7 +449,7 @@ describe('writeAuditEntry', () => {
   it('defaults optional fields to null or empty', async () => {
     const { writeAuditEntry } = await import('./audit-writer.js');
 
-    await writeAuditEntry(mockDbOrTx as any, {
+    await writeAuditEntry(mockDbOrTx, {
       tenantId: TENANT_A,
       action: 'system.maintenance',
       entityType: 'system',
@@ -364,7 +468,7 @@ describe('writeAuditEntry', () => {
   it('passes through all provided fields', async () => {
     const { writeAuditEntry } = await import('./audit-writer.js');
 
-    await writeAuditEntry(mockDbOrTx as any, {
+    await writeAuditEntry(mockDbOrTx, {
       tenantId: TENANT_A,
       userId: USER_ID,
       action: 'purchase_order.updated',
@@ -404,14 +508,17 @@ describe('writeAuditEntries', () => {
   const mockValues = vi.fn();
   const mockReturning = vi.fn();
 
-  const mockDbOrTx = {
-    execute: mockExecute,
-    select: mockSelect,
-    insert: mockInsert,
-  };
+  let mockDbOrTx: any;
 
   beforeEach(() => {
     vi.resetAllMocks();
+
+    mockDbOrTx = {
+      execute: mockExecute,
+      select: mockSelect,
+      insert: mockInsert,
+      transaction: vi.fn(async (fn: (tx: any) => Promise<any>) => fn(mockDbOrTx)),
+    };
 
     mockSelect.mockReturnValue({ from: mockFrom });
     mockFrom.mockReturnValue({ where: mockWhere });
@@ -436,16 +543,26 @@ describe('writeAuditEntries', () => {
   it('returns empty array for empty input', async () => {
     const { writeAuditEntries } = await import('./audit-writer.js');
 
-    const results = await writeAuditEntries(mockDbOrTx as any, TENANT_A, []);
+    const results = await writeAuditEntries(mockDbOrTx, TENANT_A, []);
 
     expect(results).toEqual([]);
     expect(mockExecute).not.toHaveBeenCalled();
   });
 
+  it('wraps batch operations in a transaction', async () => {
+    const { writeAuditEntries } = await import('./audit-writer.js');
+
+    await writeAuditEntries(mockDbOrTx, TENANT_A, [
+      { action: 'card.triggered', entityType: 'kanban_card', entityId: 'card-1' },
+    ]);
+
+    expect(mockDbOrTx.transaction).toHaveBeenCalledTimes(1);
+  });
+
   it('writes multiple entries with sequential sequences', async () => {
     const { writeAuditEntries } = await import('./audit-writer.js');
 
-    const results = await writeAuditEntries(mockDbOrTx as any, TENANT_A, [
+    const results = await writeAuditEntries(mockDbOrTx, TENANT_A, [
       { action: 'card.triggered', entityType: 'kanban_card', entityId: 'card-1' },
       { action: 'card.triggered', entityType: 'kanban_card', entityId: 'card-2' },
       { action: 'card.triggered', entityType: 'kanban_card', entityId: 'card-3' },
@@ -467,7 +584,7 @@ describe('writeAuditEntries', () => {
   it('chains hashes sequentially across batch entries', async () => {
     const { writeAuditEntries } = await import('./audit-writer.js');
 
-    await writeAuditEntries(mockDbOrTx as any, TENANT_A, [
+    await writeAuditEntries(mockDbOrTx, TENANT_A, [
       { action: 'a', entityType: 'x', entityId: 'e1' },
       { action: 'b', entityType: 'x', entityId: 'e2' },
     ]);
@@ -495,6 +612,16 @@ describe('module exports', () => {
   it('exports _computeHash for testing', async () => {
     const mod = await import('./audit-writer.js');
     expect(typeof mod._computeHash).toBe('function');
+  });
+
+  it('exports _canonicalTimestamp for testing', async () => {
+    const mod = await import('./audit-writer.js');
+    expect(typeof mod._canonicalTimestamp).toBe('function');
+  });
+
+  it('exports _tenantLockKeys for testing', async () => {
+    const mod = await import('./audit-writer.js');
+    expect(typeof mod._tenantLockKeys).toBe('function');
   });
 });
 

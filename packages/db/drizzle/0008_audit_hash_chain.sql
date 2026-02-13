@@ -47,6 +47,10 @@ WHERE al.id = numbered.id;
 -- SHA-256 hash of (tenant_id || sequence_number || action || entity_type
 --   || entity_id || timestamp || previous_hash)
 -- First row per tenant has previous_hash = NULL, uses 'GENESIS' sentinel.
+--
+-- IMPORTANT: Timestamp serialization uses ISO 8601 format matching JS
+-- Date.toISOString() output: "YYYY-MM-DD\"T\"HH24:MI:SS.MSZ"
+-- This ensures backfilled hashes are verifiable against runtime-computed hashes.
 -- ═══════════════════════════════════════════════════════════════════════
 
 -- Use a recursive CTE to chain hashes sequentially per tenant.
@@ -64,7 +68,9 @@ ordered_rows AS (
     al.action,
     al.entity_type,
     al.entity_id,
-    al."timestamp",
+    -- Convert timestamp to ISO 8601 format matching JS toISOString():
+    -- "2026-01-15T10:00:00.000Z"
+    to_char(al."timestamp" AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS ts_iso,
     ROW_NUMBER() OVER (
       PARTITION BY al.tenant_id
       ORDER BY al.sequence_number ASC
@@ -87,7 +93,7 @@ chained AS (
           || '|' || o.action
           || '|' || o.entity_type
           || '|' || COALESCE(o.entity_id::text, '')
-          || '|' || o."timestamp"::text
+          || '|' || o.ts_iso
           || '|' || 'GENESIS'
         )::bytea
       ),
@@ -112,7 +118,7 @@ chained AS (
           || '|' || o.action
           || '|' || o.entity_type
           || '|' || COALESCE(o.entity_id::text, '')
-          || '|' || o."timestamp"::text
+          || '|' || o.ts_iso
           || '|' || c.hash_val
         )::bytea
       ),

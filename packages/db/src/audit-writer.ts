@@ -30,16 +30,26 @@ export interface AuditEntryResult {
 const GENESIS_SENTINEL = 'GENESIS';
 
 /**
- * Deterministic advisory lock key derived from tenant UUID.
- * pg_advisory_xact_lock takes a bigint, so we use the first 8 bytes
- * of the tenant UUID (stripped of hyphens) as a stable numeric key.
+ * Deterministic advisory lock key pair derived from tenant UUID.
+ * Uses pg_advisory_xact_lock(int, int) (two 32-bit integers) to avoid
+ * bigint overflow — some UUID prefixes exceed signed int8 max.
  */
-function tenantLockKey(tenantId: string): string {
-  // Convert first 16 hex chars of UUID to a bigint for the advisory lock.
-  // This gives us a unique-enough key per tenant.
-  const hex = tenantId.replace(/-/g, '').slice(0, 16);
-  // Use BigInt to handle the full range, then convert to string for SQL
-  return BigInt(`0x${hex}`).toString();
+function tenantLockKeys(tenantId: string): [number, number] {
+  const hex = tenantId.replace(/-/g, '');
+  // Split first 16 hex chars into two 8-char groups → two signed 32-bit ints
+  const hi = parseInt(hex.slice(0, 8), 16) | 0; // signed 32-bit via | 0
+  const lo = parseInt(hex.slice(8, 16), 16) | 0;
+  return [hi, lo];
+}
+
+/**
+ * Canonical timestamp serialization used in hash computation.
+ * Both the JS runtime writer and the SQL backfill migration (0008) MUST
+ * use this same format: ISO 8601 with milliseconds and Z suffix.
+ * Example: "2026-01-15T10:00:00.000Z"
+ */
+function canonicalTimestamp(ts: Date): string {
+  return ts.toISOString();
 }
 
 /**
@@ -50,6 +60,7 @@ function tenantLockKey(tenantId: string): string {
  *
  * - First entry per tenant uses 'GENESIS' as previous_hash input
  * - NULL entity_id is represented as empty string
+ * - Timestamp uses canonicalTimestamp() (ISO 8601)
  */
 function computeHash(input: {
   tenantId: string;
@@ -68,45 +79,24 @@ function computeHash(input: {
     input.action,
     input.entityType,
     entityId,
-    input.timestamp.toISOString(),
+    canonicalTimestamp(input.timestamp),
     prevHash,
   ].join('|');
 
   return createHash('sha256').update(payload).digest('hex');
 }
 
-// ─── Core Writer ────────────────────────────────────────────────────
+// ─── Internal: lock + chain + insert (runs inside a transaction) ────
 
-/**
- * Write an immutable, hash-chained audit log entry.
- *
- * This function:
- * 1. Acquires a per-tenant advisory lock (transaction-scoped) to serialize writes
- * 2. Reads the latest sequence number and hash for the tenant
- * 3. Computes the next sequence number and SHA-256 hash chain value
- * 4. Inserts the new audit row with computed integrity fields
- *
- * Must be called within a transaction (`db.transaction(async (tx) => { ... })`).
- * The advisory lock is automatically released when the transaction commits/rolls back.
- *
- * @param dbOrTx - Drizzle database or transaction instance
- * @param entry - The audit entry fields
- * @returns The inserted row's id, hashChain, and sequenceNumber
- */
-export async function writeAuditEntry(
-  dbOrTx: DbOrTransaction,
+async function writeEntryInTx(
+  tx: DbOrTransaction,
   entry: AuditEntryInput,
+  ts: Date,
 ): Promise<AuditEntryResult> {
-  const ts = entry.timestamp ?? new Date();
+  const [hi, lo] = tenantLockKeys(entry.tenantId);
+  await tx.execute(sql.raw(`SELECT pg_advisory_xact_lock(${hi}, ${lo})`));
 
-  // 1. Acquire per-tenant advisory lock (scoped to the current transaction).
-  //    This serializes concurrent audit writes for the same tenant,
-  //    preventing sequence gaps and hash-chain forks.
-  const lockKey = tenantLockKey(entry.tenantId);
-  await dbOrTx.execute(sql.raw(`SELECT pg_advisory_xact_lock(${lockKey})`));
-
-  // 2. Read the latest entry for this tenant to get previous hash + sequence.
-  const [latest] = await dbOrTx
+  const [latest] = await tx
     .select({
       hashChain: auditLog.hashChain,
       sequenceNumber: auditLog.sequenceNumber,
@@ -114,7 +104,6 @@ export async function writeAuditEntry(
     .from(auditLog)
     .where(and(
       eq(auditLog.tenantId, entry.tenantId),
-      // Exclude rows with PENDING hash (written by legacy code)
       sql`${auditLog.hashChain} != 'PENDING'`,
     ))
     .orderBy(desc(auditLog.sequenceNumber))
@@ -123,7 +112,6 @@ export async function writeAuditEntry(
   const previousHash = latest?.hashChain ?? null;
   const nextSequence = latest ? latest.sequenceNumber + 1 : 1;
 
-  // 3. Compute SHA-256 hash chain value.
   const hashChain = computeHash({
     tenantId: entry.tenantId,
     sequenceNumber: nextSequence,
@@ -134,8 +122,7 @@ export async function writeAuditEntry(
     previousHash,
   });
 
-  // 4. Insert the audit row.
-  const [inserted] = await dbOrTx
+  const [inserted] = await tx
     .insert(auditLog)
     .values({
       tenantId: entry.tenantId,
@@ -162,11 +149,35 @@ export async function writeAuditEntry(
   return inserted;
 }
 
+// ─── Core Writer ────────────────────────────────────────────────────
+
+/**
+ * Write an immutable, hash-chained audit log entry.
+ *
+ * This function is self-transactional: it always wraps its internal
+ * logic in a transaction. If called with a bare `db`, it creates a new
+ * transaction. If called with an existing `tx`, Drizzle creates a
+ * savepoint (nested transaction), so the advisory lock and
+ * read-compute-insert sequence are always serialized.
+ *
+ * @param dbOrTx - Drizzle database or transaction instance
+ * @param entry - The audit entry fields
+ * @returns The inserted row's id, hashChain, and sequenceNumber
+ */
+export async function writeAuditEntry(
+  dbOrTx: DbOrTransaction,
+  entry: AuditEntryInput,
+): Promise<AuditEntryResult> {
+  const ts = entry.timestamp ?? new Date();
+  return dbOrTx.transaction(async (tx) => writeEntryInTx(tx, entry, ts));
+}
+
 /**
  * Write multiple audit entries for the same tenant in a single call.
  * Each entry is chained sequentially (entry N's hash depends on entry N-1).
  *
- * Must be called within a transaction.
+ * Self-transactional: wraps lock + reads + inserts in a single transaction
+ * (or savepoint if already inside a tx).
  *
  * @param dbOrTx - Drizzle database or transaction instance
  * @param tenantId - The tenant all entries belong to
@@ -180,73 +191,73 @@ export async function writeAuditEntries(
 ): Promise<AuditEntryResult[]> {
   if (entries.length === 0) return [];
 
-  // Acquire the advisory lock once for the batch.
-  const lockKey = tenantLockKey(tenantId);
-  await dbOrTx.execute(sql.raw(`SELECT pg_advisory_xact_lock(${lockKey})`));
+  return dbOrTx.transaction(async (tx) => {
+    const [hi, lo] = tenantLockKeys(tenantId);
+    await tx.execute(sql.raw(`SELECT pg_advisory_xact_lock(${hi}, ${lo})`));
 
-  // Read latest chain state.
-  const [latest] = await dbOrTx
-    .select({
-      hashChain: auditLog.hashChain,
-      sequenceNumber: auditLog.sequenceNumber,
-    })
-    .from(auditLog)
-    .where(and(
-      eq(auditLog.tenantId, tenantId),
-      sql`${auditLog.hashChain} != 'PENDING'`,
-    ))
-    .orderBy(desc(auditLog.sequenceNumber))
-    .limit(1);
+    const [latest] = await tx
+      .select({
+        hashChain: auditLog.hashChain,
+        sequenceNumber: auditLog.sequenceNumber,
+      })
+      .from(auditLog)
+      .where(and(
+        eq(auditLog.tenantId, tenantId),
+        sql`${auditLog.hashChain} != 'PENDING'`,
+      ))
+      .orderBy(desc(auditLog.sequenceNumber))
+      .limit(1);
 
-  let previousHash = latest?.hashChain ?? null;
-  let nextSequence = latest ? latest.sequenceNumber + 1 : 1;
+    let previousHash = latest?.hashChain ?? null;
+    let nextSequence = latest ? latest.sequenceNumber + 1 : 1;
 
-  const results: AuditEntryResult[] = [];
+    const results: AuditEntryResult[] = [];
 
-  for (const entry of entries) {
-    const ts = entry.timestamp ?? new Date();
+    for (const entry of entries) {
+      const ts = entry.timestamp ?? new Date();
 
-    const hashChain = computeHash({
-      tenantId,
-      sequenceNumber: nextSequence,
-      action: entry.action,
-      entityType: entry.entityType,
-      entityId: entry.entityId ?? null,
-      timestamp: ts,
-      previousHash,
-    });
-
-    const [inserted] = await dbOrTx
-      .insert(auditLog)
-      .values({
+      const hashChain = computeHash({
         tenantId,
-        userId: entry.userId ?? null,
+        sequenceNumber: nextSequence,
         action: entry.action,
         entityType: entry.entityType,
         entityId: entry.entityId ?? null,
-        previousState: entry.previousState ?? null,
-        newState: entry.newState ?? null,
-        metadata: entry.metadata ?? {},
-        ipAddress: entry.ipAddress ?? null,
-        userAgent: entry.userAgent ?? null,
         timestamp: ts,
-        hashChain,
         previousHash,
-        sequenceNumber: nextSequence,
-      })
-      .returning({
-        id: auditLog.id,
-        hashChain: auditLog.hashChain,
-        sequenceNumber: auditLog.sequenceNumber,
       });
 
-    results.push(inserted);
-    previousHash = hashChain;
-    nextSequence++;
-  }
+      const [inserted] = await tx
+        .insert(auditLog)
+        .values({
+          tenantId,
+          userId: entry.userId ?? null,
+          action: entry.action,
+          entityType: entry.entityType,
+          entityId: entry.entityId ?? null,
+          previousState: entry.previousState ?? null,
+          newState: entry.newState ?? null,
+          metadata: entry.metadata ?? {},
+          ipAddress: entry.ipAddress ?? null,
+          userAgent: entry.userAgent ?? null,
+          timestamp: ts,
+          hashChain,
+          previousHash,
+          sequenceNumber: nextSequence,
+        })
+        .returning({
+          id: auditLog.id,
+          hashChain: auditLog.hashChain,
+          sequenceNumber: auditLog.sequenceNumber,
+        });
 
-  return results;
+      results.push(inserted);
+      previousHash = hashChain;
+      nextSequence++;
+    }
+
+    return results;
+  });
 }
 
-// Re-export computeHash for testing / verification use cases
-export { computeHash as _computeHash };
+// Re-export for testing / verification use cases
+export { computeHash as _computeHash, canonicalTimestamp as _canonicalTimestamp, tenantLockKeys as _tenantLockKeys };

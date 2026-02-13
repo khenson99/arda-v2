@@ -8,6 +8,7 @@ import {
   bigint,
   index,
   uniqueIndex,
+  primaryKey,
 } from 'drizzle-orm/pg-core';
 
 export const auditSchema = pgSchema('audit');
@@ -61,7 +62,7 @@ export const auditLog = auditSchema.table(
 export const auditLogArchive = auditSchema.table(
   'audit_log_archive',
   {
-    id: uuid('id').primaryKey(),           // preserved from audit_log (no defaultRandom — already assigned)
+    id: uuid('id').notNull(),              // preserved from audit_log (no defaultRandom — already assigned)
     tenantId: uuid('tenant_id').notNull(),
     userId: uuid('user_id'),
     action: varchar('action', { length: 100 }).notNull(),
@@ -80,6 +81,8 @@ export const auditLogArchive = auditSchema.table(
     sequenceNumber: bigint('sequence_number', { mode: 'number' }).notNull(),
   },
   (table) => [
+    // Composite PK matches migration DDL: required for range partitioning on timestamp
+    primaryKey({ columns: [table.id, table.timestamp] }),
     index('archive_tenant_time_idx').on(table.tenantId, table.timestamp),
     index('archive_tenant_seq_idx').on(table.tenantId, table.sequenceNumber),
   ]
