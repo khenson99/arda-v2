@@ -19,6 +19,7 @@ import { automationRouter } from './routes/automation.routes.js';
 import { inventoryRouter } from './routes/inventory.routes.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { startQueueRiskScheduler } from './services/queue-risk-scheduler.service.js';
+import { startTransferAutomationListener } from './services/transfer-automation.service.js';
 
 const app = express();
 
@@ -75,6 +76,9 @@ const queueRiskScheduler = startQueueRiskScheduler({
   limit: config.ORDERS_QUEUE_RISK_SCAN_LIMIT,
 });
 void queueRiskScheduler.runOnce();
+
+// Start transfer automation listener
+startTransferAutomationListener(config.REDIS_URL);
 
 // ─── Graceful Shutdown ───────────────────────────────────────────────
 function shutdown(signal: string) {
