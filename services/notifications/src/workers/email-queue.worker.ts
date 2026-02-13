@@ -65,7 +65,7 @@ const BACKOFF_SCHEDULE = [
  * Returns the delay in milliseconds.
  */
 export function calculateBackoffDelay(attemptsMade: number): number {
-  const index = Math.min(attemptsMade - 1, BACKOFF_SCHEDULE.length - 1);
+  const index = Math.min(Math.max(0, attemptsMade - 2), BACKOFF_SCHEDULE.length - 1);
   const { base, jitter } = BACKOFF_SCHEDULE[index];
   // Random jitter in range [-jitter, +jitter]
   const offset = Math.floor(Math.random() * (2 * jitter + 1)) - jitter;
