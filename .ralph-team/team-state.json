@@ -1,8 +1,14 @@
 {
   "tickets": {
     "250": {
-      "status": "in-progress",
-      "agent": "backend-engineer"
+      "status": "pr-open",
+      "agent": "backend-engineer",
+      "pr_number": 382,
+      "reviewed": false,
+      "review_decision": null,
+      "reviewed_at": "",
+      "ci_status": "failing",
+      "notes": "Code complete. Stacked into PR #382. CI: Lint/Typecheck PASS, unit tests PASS for db/auth-utils/auth/catalog/notifications. Kanban/orders/web unit test failures are PRE-EXISTING on main. Migration Safety FAILS due to commented-out DROP statements triggering grep regex — needs `migration-approved` label. Integration Tests still running."
     },
     "251": {
       "status": "pr-open",
@@ -12,19 +18,34 @@
       "review_decision": null,
       "reviewed_at": "",
       "ci_status": "failing",
-      "ci_blocker": "Same 30x TS2769 as #250 — inherits issue since branch stacks on #250"
+      "notes": "Code complete. Same PR #382 as #250. CI status shared."
     },
     "252": {
-      "status": "ready",
+      "status": "pr-open",
       "agent": "backend-engineer",
-      "notes": "Next: writeAuditEntry utility + middleware. Depends on #250 schema. BLOCKED until CI fix lands."
+      "pr_number": 382,
+      "reviewed": false,
+      "review_decision": null,
+      "reviewed_at": "",
+      "ci_status": "failing",
+      "notes": "Code complete. writeAuditEntry + auditContextMiddleware. 33 new tests. Same PR #382. CI status shared."
+    },
+    "253": {
+      "status": "pr-open",
+      "agent": "backend-engineer",
+      "pr_number": 385,
+      "reviewed": false,
+      "review_decision": null,
+      "reviewed_at": "",
+      "ci_status": "pending",
+      "notes": "Code complete. PR #385. Refactored 6 source files to use writeAuditEntry. 9 new integration tests + 10 existing test files updated. 454 tests passing, 0 failures."
     }
   },
   "agents": {
     "architect": {
       "status": "working",
       "current_ticket": null,
-      "iterations": 2
+      "iterations": 4
     },
     "backend": {
       "status": "idle",
@@ -47,10 +68,10 @@
       "iterations": 0
     },
     "backend-engineer": {
-      "status": "working",
-      "current_ticket": 250,
-      "iterations": 2,
-      "last_completed": 251
+      "status": "idle",
+      "current_ticket": null,
+      "iterations": 4,
+      "last_completed": 253
     }
   },
   "sprint": {
@@ -58,7 +79,8 @@
     "total_tickets": 3,
     "completed_tickets": 0,
     "blocked_tickets": 0,
-    "iteration": 2,
-    "focus": "MVP-18 Audit Trail Foundation (T1-T3)"
+    "iteration": 4,
+    "focus": "MVP-18 Audit Trail Foundation (T1-T3)",
+    "notes": "All 3 tickets code-complete on PR #382. CI mostly passing — only PR-specific failure is Migration Safety (commented-out DROP in SQL comments triggers regex). kanban/orders/web failures are pre-existing on main. Need: (1) add migration-approved label to PR #382, (2) optionally remove commented DROP from migration SQL. Then ready for code review."
   }
 }

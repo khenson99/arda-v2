@@ -10,10 +10,9 @@
  */
 
 import { Redis } from 'ioredis';
-import { db, schema } from '@arda/db';
+import { db, writeAuditEntry } from '@arda/db';
 import { createLogger } from '@arda/config';
 import { evaluateRules, buildIdempotencyKey, loadActiveRules } from './rule-evaluator.js';
-
 
 import { IdempotencyManager, ConcurrentExecutionError } from './idempotency-manager.js';
 import { checkGuardrails, recordPOCreated, recordEmailDispatched } from './guardrails.js';
@@ -30,8 +29,6 @@ import type {
 import { DEFAULT_TENANT_LIMITS } from './types.js';
 
 const log = createLogger('automation:orchestrator');
-
-const { auditLog } = schema;
 
 // ─── Kill Switch ─────────────────────────────────────────────────────
 
@@ -437,21 +434,23 @@ export class AutomationOrchestrator {
     details: Record<string, unknown>,
   ): Promise<void> {
     try {
-      await db
-        .insert(auditLog)
-        .values({
-          tenantId,
-          entityType: 'automation_decision',
-          entityId: (details.idempotencyKey as string) ?? 'unknown',
-          action: `automation:${decision}`,
-          newState: JSON.stringify({
-            triggerEvent,
-            decision,
-            ...details,
-            timestamp: new Date().toISOString(),
-          }),
-        })
-        .execute();
+      await writeAuditEntry(db, {
+        tenantId,
+        userId: null,
+        action: 'automation.decision_logged',
+        entityType: 'automation_decision',
+        entityId: (details.idempotencyKey as string) ?? undefined,
+        previousState: null,
+        newState: {
+          triggerEvent,
+          decision,
+          ...details,
+        },
+        metadata: {
+          systemActor: 'automation_orchestrator',
+          source: 'automation',
+        },
+      });
     } catch (err) {
       // Audit failures should not break the pipeline
       log.error({ tenantId, decision, err }, 'Failed to record audit decision');

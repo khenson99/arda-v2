@@ -150,6 +150,14 @@ vi.mock('drizzle-orm', () => ({
 vi.mock('@arda/db', () => ({
   db: dbMock,
   schema: schemaMock,
+  writeAuditEntry: vi.fn(async (_dbOrTx: unknown, entry: Record<string, unknown>) => {
+    testState.insertedAuditRows.push(entry);
+    return { id: 'audit-1', hashChain: 'test-hash', sequenceNumber: 1 };
+  }),
+  writeAuditEntries: vi.fn(async (_dbOrTx: unknown, _tenantId: string, entries: Array<Record<string, unknown>>) => {
+    testState.insertedAuditRows.push(...entries);
+    return entries.map((_, i) => ({ id: `audit-${i + 1}`, hashChain: `test-hash-${i}`, sequenceNumber: i + 1 }));
+  }),
 }));
 
 vi.mock('@arda/events', () => ({

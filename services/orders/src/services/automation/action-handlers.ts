@@ -9,7 +9,7 @@
  * based on the ActionType discriminant.
  */
 
-import { db, schema } from '@arda/db';
+import { db, schema, writeAuditEntry } from '@arda/db';
 import { eq, and } from 'drizzle-orm';
 import { getEventBus } from '@arda/events';
 import { config, createLogger } from '@arda/config';
@@ -32,7 +32,6 @@ const {
   purchaseOrderLines,
   transferOrders,
   kanbanCards,
-  auditLog,
 } = schema;
 
 // ─── Handler Result ──────────────────────────────────────────────────
@@ -137,22 +136,24 @@ async function handleCreatePurchaseOrder(
         })
         .execute();
 
-      // Audit log
-      await tx
-        .insert(auditLog)
-        .values({
-          tenantId: ctx.tenantId,
-          entityType: 'purchase_order',
-          entityId: po.id,
-          action: 'automation_created',
-          newState: JSON.stringify({
-            poNumber: po.poNumber,
-            supplierId: ctx.supplierId,
-            amount: ctx.totalAmount,
-            source: 'automation_orchestrator',
-          }),
-        })
-        .execute();
+      // Audit log — system-initiated automation action
+      await writeAuditEntry(tx, {
+        tenantId: ctx.tenantId,
+        userId: null,
+        action: 'automation.rule_executed',
+        entityType: 'purchase_order',
+        entityId: po.id,
+        previousState: null,
+        newState: {
+          poNumber: po.poNumber,
+          supplierId: ctx.supplierId,
+          amount: ctx.totalAmount,
+        },
+        metadata: {
+          systemActor: 'automation_orchestrator',
+          source: 'automation',
+        },
+      });
 
       return po;
     });
@@ -453,21 +454,21 @@ async function handleEscalate(
     const tenantId = params.tenantId as string;
     const reason = (params.reason as string) ?? 'Automation escalation';
 
-    // Audit log entry
-    await db
-      .insert(auditLog)
-      .values({
-        tenantId,
-        entityType: (params.entityType as string) ?? 'automation',
-        entityId: (params.entityId as string) ?? 'unknown',
-        action: 'automation_escalated',
-        newState: JSON.stringify({
-          reason,
-          source: 'automation_orchestrator',
-          context: params,
-        }),
-      })
-      .execute();
+    // Audit log entry — system-initiated escalation
+    await writeAuditEntry(db, {
+      tenantId,
+      userId: null,
+      action: 'automation.decision_logged',
+      entityType: (params.entityType as string) ?? 'automation',
+      entityId: (params.entityId as string) ?? undefined,
+      previousState: null,
+      newState: { reason, escalated: true },
+      metadata: {
+        systemActor: 'automation_orchestrator',
+        source: 'automation',
+        context: params,
+      },
+    });
 
     // Emit event
     const eventBus = getEventBus(config.REDIS_URL);
