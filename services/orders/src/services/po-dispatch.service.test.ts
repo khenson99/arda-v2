@@ -170,7 +170,7 @@ describe('PODispatchService', () => {
   it('retries on failure and succeeds on second attempt', async () => {
     let callCount = 0;
     const flakyAdapter: EmailAdapter = {
-      send: async (message) => {
+      send: async (_message) => {
         callCount++;
         if (callCount === 1) throw new Error('Temporary failure');
         return { messageId: 'retry-success', success: true };

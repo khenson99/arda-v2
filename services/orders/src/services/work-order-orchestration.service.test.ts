@@ -58,7 +58,7 @@ import {
   WO_VALID_TRANSITIONS,
   ROUTING_STEP_VALID_TRANSITIONS,
 } from '@arda/shared-types';
-import type { WOStatus, RoutingStepStatus } from '@arda/shared-types';
+import type { WOStatus } from '@arda/shared-types';
 
 // ─── WO Status Transition Validation ────────────────────────────────
 describe('WO_VALID_TRANSITIONS', () => {

@@ -38,10 +38,7 @@
  */
 
 import { db, schema } from '@arda/db';
-import { eq, and, sql, gte, lte, desc, asc, count } from 'drizzle-orm';
-import { createLogger } from '@arda/config';
-
-const log = createLogger('production-analytics');
+import { eq, and, sql, gte, lte, asc } from 'drizzle-orm';
 
 const {
   workOrders,

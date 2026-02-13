@@ -24,7 +24,6 @@ import {
   moveToDeadLetterQueue,
 } from '@arda/jobs';
 import type { JobEnvelope } from '@arda/jobs';
-import { config } from '@arda/config';
 import { AutomationOrchestrator } from '../services/automation/index.js';
 import type { AutomationJobPayload, ActionExecutionResult } from '../services/automation/index.js';
 

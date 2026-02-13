@@ -6,7 +6,7 @@
  * and loadActiveRules.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 // Mock the logger so tests don't emit noisy output
 vi.mock('@arda/config', () => ({

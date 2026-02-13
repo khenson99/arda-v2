@@ -4,7 +4,6 @@ import {
   getValidNextStatuses,
   isTerminalStatus,
   PO_TRANSITIONS,
-  type TransitionInput,
 } from './po-lifecycle.service.js';
 import type { POStatus } from '@arda/shared-types';
 

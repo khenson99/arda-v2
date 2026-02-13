@@ -282,7 +282,7 @@ describe('Receiving Service Audit — writeAuditEntry integration', () => {
         return callback(tx);
       });
 
-      const result = await resolveException({
+      await resolveException({
         tenantId: 'tenant-1',
         exceptionId: 'exc-1',
         resolutionType: 'accept_as_is',

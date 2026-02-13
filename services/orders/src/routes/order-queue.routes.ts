@@ -19,7 +19,6 @@ export const orderQueueRouter = Router();
 const {
   kanbanCards,
   kanbanLoops,
-  cardStageTransitions,
   suppliers,
   supplierParts,
   parts,

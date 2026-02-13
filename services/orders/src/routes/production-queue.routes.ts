@@ -30,8 +30,6 @@ import {
 } from '../services/completion-posting.service.js';
 import {
   processCompletionExceptions,
-  handleMaterialShortageHold,
-  checkScrapThreshold,
 } from '../services/production-exception.service.js';
 import { recordMaterialConsumption } from '../services/material-consumption.service.js';
 import { getProductionMetrics } from '../services/production-analytics.service.js';
@@ -511,7 +509,7 @@ productionQueueRouter.post('/:id/complete', async (req, res, next) => {
     let exceptions = null;
     try {
       exceptions = await processCompletionExceptions(tenantId, req.params.id, authReq.user?.sub);
-    } catch (excErr) {
+    } catch {
       // Exception processing is best-effort; don't fail the completion
     }
 
@@ -566,4 +564,3 @@ productionQueueRouter.post('/:id/check-exceptions', async (req, res, next) => {
     next(err);
   }
 });
-

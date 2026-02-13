@@ -1,4 +1,4 @@
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { db, schema, writeAuditEntry } from '@arda/db';
 import { getEventBus } from '@arda/events';
 import { config, createLogger } from '@arda/config';

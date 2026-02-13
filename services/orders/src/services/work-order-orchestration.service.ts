@@ -32,10 +32,8 @@ const {
   workOrders,
   workOrderRoutings,
   kanbanCards,
-  kanbanLoops,
   cardStageTransitions,
   productionQueueEntries,
-  routingTemplates,
 } = schema;
 
 // ─── Types ────────────────────────────────────────────────────────────

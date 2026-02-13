@@ -222,7 +222,7 @@ vi.mock('@arda/shared-types', () => ({
 
 import { createCapacityWindow, allocateCapacity, releaseCapacity } from './capacity-scheduler.service.js';
 import { reportQuantity } from './completion-posting.service.js';
-import { checkScrapThreshold, handleMaterialShortageHold, checkShortCompletion } from './production-exception.service.js';
+import { checkScrapThreshold, handleMaterialShortageHold } from './production-exception.service.js';
 import { recordMaterialConsumption } from './material-consumption.service.js';
 import { adjustQuantity } from './inventory-ledger.service.js';
 

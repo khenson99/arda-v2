@@ -14,13 +14,13 @@
 import { db, schema, writeAuditEntry } from '@arda/db';
 import { eq, and, sql } from 'drizzle-orm';
 import { getEventBus, type InventoryUpdatedEvent } from '@arda/events';
-import { config, createLogger } from '@arda/config';
+import { createLogger } from '@arda/config';
 import { AppError } from '../middleware/error-handler.js';
 import type { InventoryAdjustmentType, InventoryField } from '@arda/shared-types';
 
 const log = createLogger('inventory-ledger');
 
-const { inventoryLedger, facilities } = schema;
+const { inventoryLedger } = schema;
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -69,22 +69,6 @@ export interface AdjustQuantityResult {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────
-
-/**
- * Map a camelCase InventoryField name to the Drizzle column reference.
- */
-function fieldColumn(field: InventoryField) {
-  switch (field) {
-    case 'qtyOnHand':
-      return inventoryLedger.qtyOnHand;
-    case 'qtyReserved':
-      return inventoryLedger.qtyReserved;
-    case 'qtyInTransit':
-      return inventoryLedger.qtyInTransit;
-    default:
-      throw new AppError(400, `Unknown inventory field: ${field}`);
-  }
-}
 
 // ─── Read Operations ──────────────────────────────────────────────────
 
@@ -245,7 +229,6 @@ export async function adjustQuantity(input: AdjustQuantityInput): Promise<Adjust
     }
 
     // Update the specific field
-    const col = fieldColumn(field);
     await tx
       .update(inventoryLedger)
       .set({

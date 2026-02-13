@@ -131,7 +131,7 @@ const { dbMock, resetDbMockCalls } = vi.hoisted(() => {
         if (tableName === 'audit_log') testState.insertedAuditRows.push(...(arr as any));
         return {
           returning: async () =>
-            arr.map((v: any, i: number) => ({
+            arr.map((v: any, _i: number) => ({
               ...v,
               id: `${tableName}-${++insertCounter}`,
             })),

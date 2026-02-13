@@ -6,7 +6,7 @@
  */
 
 import { db, schema, writeAuditEntry } from '@arda/db';
-import { eq, and, asc, sql, lt } from 'drizzle-orm';
+import { eq, and, asc, lt } from 'drizzle-orm';
 import { getEventBus } from '@arda/events';
 import { config, createLogger } from '@arda/config';
 import type { ProductionStepCompletedEvent } from '@arda/events';
@@ -24,8 +24,6 @@ const {
   productionOperationLogs,
   productionQueueEntries,
 } = schema;
-
-type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 // ─── Types ────────────────────────────────────────────────────────────
 

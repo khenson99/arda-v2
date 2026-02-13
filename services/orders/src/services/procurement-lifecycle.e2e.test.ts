@@ -36,7 +36,7 @@ import {
   calculateCriticality,
   type QueueItemInput,
 } from './queue-prioritization.service.js';
-import { generatePODrafts, type PODraft } from './po-generation.service.js';
+import { generatePODrafts } from './po-generation.service.js';
 import { validateTransition, getValidNextStatuses, isTerminalStatus } from './po-lifecycle.service.js';
 import {
   PODispatchService,

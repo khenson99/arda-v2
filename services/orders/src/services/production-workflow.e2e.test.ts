@@ -644,7 +644,6 @@ describe('short completion exception logic', () => {
   it('does not trigger when fully produced', () => {
     const quantityToProduce = 100;
     const quantityProduced = 100;
-    const tolerance = 5;
     const shortfall = quantityToProduce - quantityProduced;
     expect(shortfall).toBe(0);
     expect(shortfall <= 0).toBe(true);

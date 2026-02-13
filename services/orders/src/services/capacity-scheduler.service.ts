@@ -9,17 +9,12 @@
  */
 
 import { db, schema, writeAuditEntry } from '@arda/db';
-import { eq, and, sql, gte, lte, desc, asc } from 'drizzle-orm';
-import { createLogger } from '@arda/config';
+import { eq, and, sql, lte, asc } from 'drizzle-orm';
 import { AppError } from '../middleware/error-handler.js';
-
-const log = createLogger('capacity-scheduler');
 
 const {
   workCenters,
   workCenterCapacityWindows,
-  workOrderRoutings,
-  workOrders,
 } = schema;
 
 // ─── Types ────────────────────────────────────────────────────────────

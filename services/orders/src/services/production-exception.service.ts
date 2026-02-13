@@ -22,7 +22,6 @@ const log = createLogger('production-exception');
 
 const {
   workOrders,
-  workOrderRoutings,
   productionOperationLogs,
   productionQueueEntries,
   kanbanCards,

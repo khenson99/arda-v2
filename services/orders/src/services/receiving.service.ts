@@ -157,7 +157,7 @@ function determineReceiptStatus(
 async function updateOrderAfterReceiving(
   tx: DbTransaction,
   input: ProcessReceiptInput,
-  receiptStatus: string
+  _receiptStatus: string
 ) {
   if (input.orderType === 'purchase_order') {
     // Update PO line received quantities

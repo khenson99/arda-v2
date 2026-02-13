@@ -12,15 +12,13 @@
 import { Redis } from 'ioredis';
 import { db, writeAuditEntry } from '@arda/db';
 import { createLogger } from '@arda/config';
-import { evaluateRules, buildIdempotencyKey, loadActiveRules } from './rule-evaluator.js';
+import { evaluateRules, loadActiveRules } from './rule-evaluator.js';
 
 import { IdempotencyManager, ConcurrentExecutionError } from './idempotency-manager.js';
 import { checkGuardrails, recordPOCreated, recordEmailDispatched } from './guardrails.js';
 import { dispatchAction } from './action-handlers.js';
 import type {
   AutomationJobPayload,
-  AutomationDecision,
-  AutomationAuditEntry,
   ActionExecutionResult,
   GuardrailCheckResult,
   DecisionOutcome,

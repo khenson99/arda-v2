@@ -22,7 +22,6 @@ const log = createLogger('material-consumption');
 
 const {
   workOrders,
-  workOrderRoutings,
   productionOperationLogs,
 } = schema;
 

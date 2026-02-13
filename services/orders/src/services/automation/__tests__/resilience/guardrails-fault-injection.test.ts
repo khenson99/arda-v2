@@ -28,7 +28,6 @@ const {
   mockPipelineExec,
   mockPipelineIncr,
   mockPipelineIncrByFloat,
-  mockPipelineExpire,
   mockPipelineSet,
 } = vi.hoisted(() => {
   const mockPipelineIncr = vi.fn().mockReturnThis();
@@ -53,7 +52,6 @@ const {
     mockPipelineExec,
     mockPipelineIncr,
     mockPipelineIncrByFloat,
-    mockPipelineExpire,
     mockPipelineSet,
   };
 });
