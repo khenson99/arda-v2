@@ -134,7 +134,22 @@ export function createCSVStream(headers: string[]): Transform {
   });
 
   // Chain: input rows → sanitize → format → CSV output
-  return sanitizeTransform.pipe(csvFormatter);
+  // Pipe sanitizeTransform output into csvFormatter, but return
+  // sanitizeTransform so that callers pipe *into* the sanitizer
+  // (not bypassing it by writing directly to csvFormatter).
+  sanitizeTransform.pipe(csvFormatter);
+
+  // Forward csvFormatter errors to sanitizeTransform so callers see them
+  csvFormatter.on('error', (err) => sanitizeTransform.destroy(err));
+
+  // Override the pipe method on sanitizeTransform so that when callers
+  // do `createCSVStream(h).pipe(res)`, it actually pipes csvFormatter → res
+  const originalPipe = sanitizeTransform.pipe.bind(sanitizeTransform);
+  (sanitizeTransform as any).pipe = function <T extends NodeJS.WritableStream>(dest: T, opts?: { end?: boolean }): T {
+    return csvFormatter.pipe(dest, opts);
+  };
+
+  return sanitizeTransform;
 }
 
 // ─── Summary Export Helpers ─────────────────────────────────────────

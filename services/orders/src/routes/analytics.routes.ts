@@ -79,68 +79,9 @@ function buildDateConditions(
   return conditions;
 }
 
-// ─── GET /export/csv/:kpiName — Export KPI Drilldown as CSV ─────────
-
-analyticsRouter.get('/export/csv/:kpiName', async (req, res, next) => {
-  try {
-    const authReq = req as AuthRequest;
-    const tenantId = authReq.user?.tenantId;
-    if (!tenantId) throw new AppError(401, 'Missing tenant context');
-
-    const kpiName = req.params.kpiName;
-    const facilityId = req.query.facilityId as string | undefined;
-    const dateFrom = req.query.dateFrom as string | undefined;
-    const dateTo = req.query.dateTo as string | undefined;
-
-    const context = await buildExportContext(authReq, kpiName);
-    const filename = generateExportFilename(context);
-
-    // Set CSV response headers
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-
-    // Route to appropriate drilldown query based on KPI name
-    let rows: unknown[] = [];
-    let headers: string[] = [];
-
-    switch (kpiName.toLowerCase()) {
-      case 'scrap-rate':
-        ({ rows, headers } = await getScrapRateDrilldown(tenantId, facilityId, dateFrom, dateTo));
-        break;
-
-      case 'cycle-time':
-        ({ rows, headers } = await getCycleTimeDrilldown(tenantId, facilityId, dateFrom, dateTo));
-        break;
-
-      case 'queue-wait-time':
-        ({ rows, headers } = await getQueueWaitTimeDrilldown(tenantId, facilityId, dateFrom, dateTo));
-        break;
-
-      case 'work-center-utilization':
-        ({ rows, headers } = await getWorkCenterUtilizationDrilldown(tenantId, facilityId, dateFrom, dateTo));
-        break;
-
-      case 'throughput':
-        ({ rows, headers } = await getThroughputDrilldown(tenantId, facilityId, dateFrom, dateTo));
-        break;
-
-      default:
-        throw new AppError(400, `Unknown KPI: ${kpiName}`);
-    }
-
-    log.info({ kpiName, rowCount: rows.length, facilityId }, 'Streaming CSV export');
-
-    // Stream the CSV response
-    const csvStream = createCSVStream(headers);
-    const readable = Readable.from(rows);
-
-    readable.pipe(csvStream).pipe(res);
-  } catch (err) {
-    next(err);
-  }
-});
-
 // ─── GET /export/csv/summary — Export KPI Summary ───────────────────
+// NOTE: Registered BEFORE the :kpiName parametric route so Express
+// matches the literal path "/export/csv/summary" first.
 
 analyticsRouter.get('/export/csv/summary', async (req, res, next) => {
   try {
@@ -190,13 +131,94 @@ analyticsRouter.get('/export/csv/summary', async (req, res, next) => {
 
     log.info({ facilityId, kpiCount: rows.length }, 'Streaming KPI summary CSV export');
 
-    // Set CSV response headers
+    // Set CSV response headers AFTER queries succeed to avoid ERR_HTTP_HEADERS_SENT
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 
-    // Stream the CSV response
+    // Stream the CSV response with error handling
     const csvStream = createCSVStream(headers);
     const readable = Readable.from(rows);
+
+    readable.on('error', (err) => { csvStream.destroy(err); });
+    csvStream.on('error', (err) => {
+      log.error({ err }, 'CSV stream error during summary export');
+      if (!res.headersSent) {
+        next(err);
+      } else {
+        res.destroy();
+      }
+    });
+
+    readable.pipe(csvStream).pipe(res);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── GET /export/csv/:kpiName — Export KPI Drilldown as CSV ─────────
+
+analyticsRouter.get('/export/csv/:kpiName', async (req, res, next) => {
+  try {
+    const authReq = req as AuthRequest;
+    const tenantId = authReq.user?.tenantId;
+    if (!tenantId) throw new AppError(401, 'Missing tenant context');
+
+    const kpiName = req.params.kpiName;
+    const facilityId = req.query.facilityId as string | undefined;
+    const dateFrom = req.query.dateFrom as string | undefined;
+    const dateTo = req.query.dateTo as string | undefined;
+
+    const context = await buildExportContext(authReq, kpiName);
+    const filename = generateExportFilename(context);
+
+    // Route to appropriate drilldown query based on KPI name
+    let rows: unknown[] = [];
+    let headers: string[] = [];
+
+    switch (kpiName.toLowerCase()) {
+      case 'scrap-rate':
+        ({ rows, headers } = await getScrapRateDrilldown(tenantId, facilityId, dateFrom, dateTo));
+        break;
+
+      case 'cycle-time':
+        ({ rows, headers } = await getCycleTimeDrilldown(tenantId, facilityId, dateFrom, dateTo));
+        break;
+
+      case 'queue-wait-time':
+        ({ rows, headers } = await getQueueWaitTimeDrilldown(tenantId, facilityId, dateFrom, dateTo));
+        break;
+
+      case 'work-center-utilization':
+        ({ rows, headers } = await getWorkCenterUtilizationDrilldown(tenantId, facilityId, dateFrom, dateTo));
+        break;
+
+      case 'throughput':
+        ({ rows, headers } = await getThroughputDrilldown(tenantId, facilityId, dateFrom, dateTo));
+        break;
+
+      default:
+        throw new AppError(400, `Unknown KPI: ${kpiName}`);
+    }
+
+    log.info({ kpiName, rowCount: rows.length, facilityId }, 'Streaming CSV export');
+
+    // Set CSV response headers AFTER queries succeed to avoid ERR_HTTP_HEADERS_SENT
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    // Stream the CSV response with error handling
+    const csvStream = createCSVStream(headers);
+    const readable = Readable.from(rows);
+
+    readable.on('error', (err) => { csvStream.destroy(err); });
+    csvStream.on('error', (err) => {
+      log.error({ err }, 'CSV stream error during drilldown export');
+      if (!res.headersSent) {
+        next(err);
+      } else {
+        res.destroy();
+      }
+    });
 
     readable.pipe(csvStream).pipe(res);
   } catch (err) {
@@ -341,57 +363,29 @@ async function getQueueWaitTimeDrilldown(
 async function getWorkCenterUtilizationDrilldown(
   tenantId: string,
   facilityId?: string,
-  _dateFrom?: string,
-  _dateTo?: string
+  dateFrom?: string,
+  dateTo?: string
 ) {
-  const conditions = [eq(workOrderRoutings.tenantId, tenantId)];
-
-  if (facilityId) {
-    // Join to work_orders to filter by facility
-    const rows = await db
-      .select({
-        workCenterId: workOrderRoutings.workCenterId,
-        woNumber: workOrders.woNumber,
-        stepNumber: workOrderRoutings.stepNumber,
-        operationName: workOrderRoutings.operationName,
-        estimatedMinutes: workOrderRoutings.estimatedMinutes,
-        actualMinutes: workOrderRoutings.actualMinutes,
-        efficiency: sql<number>`
-          case
-            when ${workOrderRoutings.actualMinutes} > 0
-            then round((${workOrderRoutings.estimatedMinutes}::numeric / ${workOrderRoutings.actualMinutes}) * 100, 2)
-            else null
-          end
-        `,
-        status: workOrderRoutings.status,
-      })
-      .from(workOrderRoutings)
-      .innerJoin(workOrders, eq(workOrderRoutings.workOrderId, workOrders.id))
-      .where(
-        and(
-          eq(workOrderRoutings.tenantId, tenantId),
-          eq(workOrders.facilityId, facilityId)
-        )
-      )
-      .execute();
-
-    const headers = [
-      'workCenterId',
-      'woNumber',
-      'stepNumber',
-      'operationName',
-      'estimatedMinutes',
-      'actualMinutes',
-      'efficiency',
-      'status',
-    ];
-
-    return { rows, headers };
+  // Build date conditions on the joined work_orders table
+  const dateConditions: ReturnType<typeof eq>[] = [];
+  if (dateFrom) {
+    dateConditions.push(gte(workOrders.createdAt, new Date(dateFrom)));
   }
+  if (dateTo) {
+    dateConditions.push(lte(workOrders.createdAt, new Date(dateTo)));
+  }
+
+  // Always JOIN to work_orders to apply date/facility filters consistently
+  const joinConditions = [
+    eq(workOrderRoutings.tenantId, tenantId),
+    ...(facilityId ? [eq(workOrders.facilityId, facilityId)] : []),
+    ...dateConditions,
+  ];
 
   const rows = await db
     .select({
       workCenterId: workOrderRoutings.workCenterId,
+      woNumber: workOrders.woNumber,
       workOrderId: workOrderRoutings.workOrderId,
       stepNumber: workOrderRoutings.stepNumber,
       operationName: workOrderRoutings.operationName,
@@ -407,11 +401,13 @@ async function getWorkCenterUtilizationDrilldown(
       status: workOrderRoutings.status,
     })
     .from(workOrderRoutings)
-    .where(and(...conditions))
+    .innerJoin(workOrders, eq(workOrderRoutings.workOrderId, workOrders.id))
+    .where(and(...joinConditions))
     .execute();
 
   const headers = [
     'workCenterId',
+    'woNumber',
     'workOrderId',
     'stepNumber',
     'operationName',
