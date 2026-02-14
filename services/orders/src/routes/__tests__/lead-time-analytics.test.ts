@@ -157,6 +157,11 @@ vi.mock('../../services/order-number.service.js', () => ({
   getNextTONumber: vi.fn(async () => 'TO-TEST-0001'),
 }));
 
+vi.mock('../../services/transfer-lifecycle.service.js', () => ({
+  validateTransferTransition: vi.fn(() => ({ valid: true, autoFields: {} })),
+  getValidNextTransferStatuses: vi.fn(() => []),
+}));
+
 vi.mock('../../services/source-recommendation.service.js', () => ({
   recommendSources: vi.fn(async () => []),
 }));
@@ -406,7 +411,7 @@ describe('GET /lead-times — aggregate statistics', () => {
     resetDbMockCalls();
   });
 
-  it('returns aggregate stats in correct shape', async () => {
+  it('returns aggregate stats in { data } envelope with transferCount field', async () => {
     testState.dbSelectResults = [
       [
         {
@@ -415,47 +420,38 @@ describe('GET /lead-times — aggregate statistics', () => {
           p90LeadTimeDays: 5.2,
           minLeadTimeDays: 1.5,
           maxLeadTimeDays: 7.8,
-          count: 42,
+          transferCount: 42,
         },
       ],
     ];
 
     const app = createTestApp();
-    const response = await getJson(app, '/to/lead-times');
+    const response = await getJson<{ data: Record<string, unknown> }>(app, '/to/lead-times');
 
     expect(response.status).toBe(200);
-    expect(response.body).toEqual(
+    expect(response.body.data).toEqual(
       expect.objectContaining({
         avgLeadTimeDays: 3.45,
         medianLeadTimeDays: 3,
         p90LeadTimeDays: 5.2,
         minLeadTimeDays: 1.5,
         maxLeadTimeDays: 7.8,
-        count: 42,
+        transferCount: 42,
       })
     );
   });
 
   it('returns nulls when no data exists', async () => {
     testState.dbSelectResults = [
-      [
-        {
-          avgLeadTimeDays: null,
-          medianLeadTimeDays: null,
-          p90LeadTimeDays: null,
-          minLeadTimeDays: null,
-          maxLeadTimeDays: null,
-          count: 0,
-        },
-      ],
+      [undefined], // aggregate returns undefined when no rows match
     ];
 
     const app = createTestApp();
-    const response = await getJson(app, '/to/lead-times');
+    const response = await getJson<{ data: Record<string, unknown> }>(app, '/to/lead-times');
 
     expect(response.status).toBe(200);
-    expect(response.body.count).toBe(0);
-    expect(response.body.avgLeadTimeDays).toBeNull();
+    expect(response.body.data.transferCount).toBe(0);
+    expect(response.body.data.avgLeadTimeDays).toBeNull();
   });
 
   it('accepts optional filter params', async () => {
@@ -467,19 +463,19 @@ describe('GET /lead-times — aggregate statistics', () => {
           p90LeadTimeDays: 3.0,
           minLeadTimeDays: 1.0,
           maxLeadTimeDays: 4.0,
-          count: 10,
+          transferCount: 10,
         },
       ],
     ];
 
     const app = createTestApp();
-    const response = await getJson(
+    const response = await getJson<{ data: Record<string, unknown> }>(
       app,
       `/to/lead-times?sourceFacilityId=${SOURCE_FAC}&partId=${PART_A}&fromDate=2025-01-01&toDate=2025-12-31`
     );
 
     expect(response.status).toBe(200);
-    expect(response.body.count).toBe(10);
+    expect(response.body.data.transferCount).toBe(10);
   });
 
   it('rejects invalid UUID params', async () => {
@@ -498,67 +494,78 @@ describe('GET /lead-times/trend — time-series buckets', () => {
     resetDbMockCalls();
   });
 
-  it('returns trend data in correct shape', async () => {
+  it('returns trend data with { data, summary } envelope', async () => {
     testState.dbSelectResults = [
       [
-        { bucket: '2025-01-01', avgLeadTimeDays: 3.2, count: 5 },
-        { bucket: '2025-01-08', avgLeadTimeDays: 2.8, count: 7 },
+        { date: '2025-01-01', avgLeadTimeDays: 3.2, transferCount: 5 },
+        { date: '2025-01-08', avgLeadTimeDays: 2.8, transferCount: 7 },
       ],
     ];
 
     const app = createTestApp();
-    const response = await getJson<Array<{ bucket: string; avgLeadTimeDays: number; count: number }>>(
+    const response = await getJson<{ data: Array<{ date: string; avgLeadTimeDays: number; transferCount: number }>; summary: Record<string, unknown> }>(
       app,
       '/to/lead-times/trend'
     );
 
     expect(response.status).toBe(200);
-    expect(Array.isArray(response.body)).toBe(true);
-    expect(response.body).toEqual([
-      { bucket: '2025-01-01', avgLeadTimeDays: 3.2, count: 5 },
-      { bucket: '2025-01-08', avgLeadTimeDays: 2.8, count: 7 },
+    expect(Array.isArray(response.body.data)).toBe(true);
+    expect(response.body.data).toEqual([
+      { date: '2025-01-01', avgLeadTimeDays: 3.2, transferCount: 5 },
+      { date: '2025-01-08', avgLeadTimeDays: 2.8, transferCount: 7 },
     ]);
+    expect(response.body.summary).toBeDefined();
+    expect(response.body.summary.totalTransfers).toBe(12);
+    // Weighted avg: (3.2*5 + 2.8*7)/12 ≈ 2.97
+    expect(response.body.summary.overallAvg).toBeCloseTo(2.97, 1);
+    expect(response.body.summary.dateRange).toEqual({ from: '2025-01-01', to: '2025-01-08' });
   });
 
   it('supports day interval', async () => {
     testState.dbSelectResults = [
-      [{ bucket: '2025-01-15', avgLeadTimeDays: 1.5, count: 3 }],
+      [{ date: '2025-01-15', avgLeadTimeDays: 1.5, transferCount: 3 }],
     ];
 
     const app = createTestApp();
-    const response = await getJson<Array<{ bucket: string; avgLeadTimeDays: number; count: number }>>(
+    const response = await getJson<{ data: Array<{ date: string }>; summary: Record<string, unknown> }>(
       app,
       '/to/lead-times/trend?interval=day'
     );
 
     expect(response.status).toBe(200);
-    expect(response.body).toHaveLength(1);
-    expect(response.body[0].bucket).toBe('2025-01-15');
+    expect(response.body.data).toHaveLength(1);
+    expect(response.body.data[0].date).toBe('2025-01-15');
   });
 
   it('supports month interval', async () => {
     testState.dbSelectResults = [
       [
-        { bucket: '2025-01-01', avgLeadTimeDays: 4.0, count: 12 },
-        { bucket: '2025-02-01', avgLeadTimeDays: 3.5, count: 8 },
+        { date: '2025-01-01', avgLeadTimeDays: 4.0, transferCount: 12 },
+        { date: '2025-02-01', avgLeadTimeDays: 3.5, transferCount: 8 },
       ],
     ];
 
     const app = createTestApp();
-    const response = await getJson(app, '/to/lead-times/trend?interval=month');
+    const response = await getJson<{ data: Array<unknown> }>(app, '/to/lead-times/trend?interval=month');
 
     expect(response.status).toBe(200);
-    expect(response.body).toHaveLength(2);
+    expect(response.body.data).toHaveLength(2);
   });
 
-  it('defaults to week interval', async () => {
+  it('returns empty data with zero summary when no rows exist', async () => {
     testState.dbSelectResults = [[]];
 
     const app = createTestApp();
-    const response = await getJson(app, '/to/lead-times/trend');
+    const response = await getJson<{ data: Array<unknown>; summary: { totalTransfers: number; overallAvg: number; dateRange: { from: string; to: string } } }>(
+      app,
+      '/to/lead-times/trend'
+    );
 
     expect(response.status).toBe(200);
-    expect(response.body).toEqual([]);
+    expect(response.body.data).toEqual([]);
+    expect(response.body.summary.totalTransfers).toBe(0);
+    expect(response.body.summary.overallAvg).toBe(0);
+    expect(response.body.summary.dateRange).toEqual({ from: '', to: '' });
   });
 
   it('rejects invalid interval values', async () => {
@@ -577,16 +584,16 @@ describe('GET /lead-times/trend — time-series buckets', () => {
 
   it('accepts all optional filters', async () => {
     testState.dbSelectResults = [
-      [{ bucket: '2025-03-01', avgLeadTimeDays: 2.1, count: 4 }],
+      [{ date: '2025-03-01', avgLeadTimeDays: 2.1, transferCount: 4 }],
     ];
 
     const app = createTestApp();
-    const response = await getJson(
+    const response = await getJson<{ data: Array<unknown> }>(
       app,
       `/to/lead-times/trend?interval=month&sourceFacilityId=${SOURCE_FAC}&destinationFacilityId=${DEST_FAC}&partId=${PART_A}&fromDate=2025-01-01&toDate=2025-12-31`
     );
 
     expect(response.status).toBe(200);
-    expect(response.body).toHaveLength(1);
+    expect(response.body.data).toHaveLength(1);
   });
 });
