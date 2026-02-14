@@ -135,7 +135,10 @@ export async function getTransferQueue(
 
   const draftConditions = [
     eq(transferOrders.tenantId, tenantId),
-    eq(transferOrders.status, 'draft'),
+    or(
+      eq(transferOrders.status, 'draft'),
+      eq(transferOrders.status, 'requested')
+    )!,
   ];
 
   if (filters.destinationFacilityId) {
@@ -144,8 +147,8 @@ export async function getTransferQueue(
   if (filters.sourceFacilityId) {
     draftConditions.push(eq(transferOrders.sourceFacilityId, filters.sourceFacilityId));
   }
-  if (filters.status && filters.status !== 'draft') {
-    // Skip draft TOs if filtering for a different status
+  if (filters.status && filters.status !== 'draft' && filters.status !== 'requested') {
+    // Skip draft/requested TOs if filtering for a different status
     draftConditions.push(sql`false`);
   }
 
