@@ -371,13 +371,13 @@ transferOrdersRouter.get('/lead-times', async (req: AuthRequest, res, next) => {
       .where(and(...conditions));
 
     res.json({
-      data: result ?? {
-        avgLeadTimeDays: null,
-        medianLeadTimeDays: null,
-        p90LeadTimeDays: null,
-        minLeadTimeDays: null,
-        maxLeadTimeDays: null,
-        transferCount: 0,
+      data: {
+        avgLeadTimeDays: result.avgLeadTimeDays ?? null,
+        medianLeadTimeDays: result.medianLeadTimeDays ?? null,
+        p90LeadTimeDays: result.p90LeadTimeDays ?? null,
+        minLeadTimeDays: result.minLeadTimeDays ?? null,
+        maxLeadTimeDays: result.maxLeadTimeDays ?? null,
+        transferCount: result.transferCount ?? 0,
       },
     });
   } catch (error) {
