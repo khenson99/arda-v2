@@ -216,11 +216,10 @@ async function getScrapRateDrilldown(
 
   const rows = await db
     .select({
-      workOrderNumber: workOrders.workOrderNumber,
-      partNumber: workOrders.partNumber,
-      partDescription: workOrders.partDescription,
+      woNumber: workOrders.woNumber,
+      partId: workOrders.partId,
       facilityId: workOrders.facilityId,
-      quantityOrdered: workOrders.quantityOrdered,
+      quantityToProduce: workOrders.quantityToProduce,
       quantityProduced: workOrders.quantityProduced,
       quantityScrapped: workOrders.quantityScrapped,
       scrapRate: sql<number>`
@@ -238,11 +237,10 @@ async function getScrapRateDrilldown(
     .execute();
 
   const headers = [
-    'workOrderNumber',
-    'partNumber',
-    'partDescription',
+    'woNumber',
+    'partId',
     'facilityId',
-    'quantityOrdered',
+    'quantityToProduce',
     'quantityProduced',
     'quantityScrapped',
     'scrapRate',
@@ -266,9 +264,8 @@ async function getCycleTimeDrilldown(
 
   const rows = await db
     .select({
-      workOrderNumber: workOrders.workOrderNumber,
-      partNumber: workOrders.partNumber,
-      partDescription: workOrders.partDescription,
+      woNumber: workOrders.woNumber,
+      partId: workOrders.partId,
       facilityId: workOrders.facilityId,
       actualStartDate: workOrders.actualStartDate,
       actualEndDate: workOrders.actualEndDate,
@@ -282,9 +279,8 @@ async function getCycleTimeDrilldown(
     .execute();
 
   const headers = [
-    'workOrderNumber',
-    'partNumber',
-    'partDescription',
+    'woNumber',
+    'partId',
     'facilityId',
     'actualStartDate',
     'actualEndDate',
@@ -355,9 +351,9 @@ async function getWorkCenterUtilizationDrilldown(
     const rows = await db
       .select({
         workCenterId: workOrderRoutings.workCenterId,
-        workOrderNumber: workOrders.workOrderNumber,
-        stepSequence: workOrderRoutings.stepSequence,
-        operationDescription: workOrderRoutings.operationDescription,
+        woNumber: workOrders.woNumber,
+        stepNumber: workOrderRoutings.stepNumber,
+        operationName: workOrderRoutings.operationName,
         estimatedMinutes: workOrderRoutings.estimatedMinutes,
         actualMinutes: workOrderRoutings.actualMinutes,
         efficiency: sql<number>`
@@ -381,9 +377,9 @@ async function getWorkCenterUtilizationDrilldown(
 
     const headers = [
       'workCenterId',
-      'workOrderNumber',
-      'stepSequence',
-      'operationDescription',
+      'woNumber',
+      'stepNumber',
+      'operationName',
       'estimatedMinutes',
       'actualMinutes',
       'efficiency',
@@ -397,8 +393,8 @@ async function getWorkCenterUtilizationDrilldown(
     .select({
       workCenterId: workOrderRoutings.workCenterId,
       workOrderId: workOrderRoutings.workOrderId,
-      stepSequence: workOrderRoutings.stepSequence,
-      operationDescription: workOrderRoutings.operationDescription,
+      stepNumber: workOrderRoutings.stepNumber,
+      operationName: workOrderRoutings.operationName,
       estimatedMinutes: workOrderRoutings.estimatedMinutes,
       actualMinutes: workOrderRoutings.actualMinutes,
       efficiency: sql<number>`
@@ -417,8 +413,8 @@ async function getWorkCenterUtilizationDrilldown(
   const headers = [
     'workCenterId',
     'workOrderId',
-    'stepSequence',
-    'operationDescription',
+    'stepNumber',
+    'operationName',
     'estimatedMinutes',
     'actualMinutes',
     'efficiency',
@@ -441,11 +437,10 @@ async function getThroughputDrilldown(
 
   const rows = await db
     .select({
-      workOrderNumber: workOrders.workOrderNumber,
-      partNumber: workOrders.partNumber,
-      partDescription: workOrders.partDescription,
+      woNumber: workOrders.woNumber,
+      partId: workOrders.partId,
       facilityId: workOrders.facilityId,
-      quantityOrdered: workOrders.quantityOrdered,
+      quantityToProduce: workOrders.quantityToProduce,
       quantityProduced: workOrders.quantityProduced,
       actualStartDate: workOrders.actualStartDate,
       actualEndDate: workOrders.actualEndDate,
@@ -460,11 +455,10 @@ async function getThroughputDrilldown(
     .execute();
 
   const headers = [
-    'workOrderNumber',
-    'partNumber',
-    'partDescription',
+    'woNumber',
+    'partId',
     'facilityId',
-    'quantityOrdered',
+    'quantityToProduce',
     'quantityProduced',
     'actualStartDate',
     'actualEndDate',
