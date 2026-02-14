@@ -9,6 +9,7 @@ import {
   KpiNotFoundError,
   VALID_KPI_IDS,
 } from '../services/analytics/kpi-engine.js';
+import { computeKpiDrilldown, DRILLDOWN_COLUMNS } from '../services/analytics/kpi-drilldown.js';
 
 const log = createLogger('orders:analytics');
 
@@ -41,6 +42,40 @@ const kpiTrendQuerySchema = z.object({
         .array(z.string().uuid({ message: 'Each facilityId must be a valid UUID' }))
         .optional(),
     ),
+});
+
+const kpiDrilldownQuerySchema = z.object({
+  startDate: z
+    .string()
+    .refine((v) => !isNaN(Date.parse(v)), { message: 'Invalid startDate' }),
+  endDate: z
+    .string()
+    .refine((v) => !isNaN(Date.parse(v)), { message: 'Invalid endDate' }),
+  facilityIds: z
+    .string()
+    .optional()
+    .transform((v) => (v ? v.split(',') : undefined))
+    .pipe(
+      z
+        .array(z.string().uuid({ message: 'Each facilityId must be a valid UUID' }))
+        .optional(),
+    ),
+  page: z
+    .string()
+    .optional()
+    .transform((v) => (v ? Math.max(1, parseInt(v, 10) || 1) : 1)),
+  limit: z
+    .string()
+    .optional()
+    .transform((v) => {
+      const n = v ? parseInt(v, 10) : 25;
+      return Math.min(100, Math.max(1, isNaN(n) ? 25 : n));
+    }),
+  sort: z.string().optional(),
+  sortDir: z
+    .enum(['asc', 'desc'])
+    .optional()
+    .default('desc'),
 });
 
 const kpiQuerySchema = z.object({
@@ -113,6 +148,65 @@ analyticsRouter.get('/kpis', async (req: AuthRequest, res, next) => {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return next(new AppError(400, 'Invalid query parameters'));
+    }
+    next(error);
+  }
+});
+
+// ─── GET /analytics/kpis/:kpiName/drilldown ──────────────────────────
+
+analyticsRouter.get('/kpis/:kpiName/drilldown', async (req: AuthRequest, res, next) => {
+  try {
+    const tenantId = req.user!.tenantId;
+    const kpiName = req.params.kpiName as string;
+
+    if (!VALID_KPI_IDS.includes(kpiName)) {
+      return next(
+        new AppError(
+          400,
+          `Unknown KPI: '${kpiName}'. Valid KPIs: ${VALID_KPI_IDS.join(', ')}`,
+        ),
+      );
+    }
+
+    const parsed = kpiDrilldownQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      return next(new AppError(400, parsed.error.errors.map((e) => e.message).join('; ')));
+    }
+
+    const { startDate: startStr, endDate: endStr, facilityIds, page, limit, sort, sortDir } = parsed.data;
+    const startDate = new Date(startStr);
+    const endDate = new Date(endStr);
+
+    if (endDate <= startDate) {
+      return next(new AppError(400, 'endDate must be after startDate'));
+    }
+
+    // Validate sort column against allowed columns for this KPI
+    const allowedColumns = DRILLDOWN_COLUMNS[kpiName];
+    const resolvedSort = sort && allowedColumns.includes(sort) ? sort : allowedColumns[0];
+
+    log.info(
+      { tenantId, kpiName, page, limit, sort: resolvedSort, sortDir, facilityCount: facilityIds?.length ?? 0 },
+      'Computing KPI drilldown',
+    );
+
+    const result = await computeKpiDrilldown({
+      tenantId,
+      kpiId: kpiName,
+      startDate,
+      endDate,
+      facilityIds,
+      page,
+      limit,
+      sort: resolvedSort,
+      sortDir,
+    });
+
+    res.json({ data: result });
+  } catch (error) {
+    if (error instanceof KpiNotFoundError) {
+      return next(new AppError(400, error.message));
     }
     next(error);
   }
