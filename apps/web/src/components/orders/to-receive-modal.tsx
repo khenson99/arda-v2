@@ -101,7 +101,9 @@ export function TOReceiveModal({
           if (!state) return null;
           return {
             lineId: line.id,
+            orderLineId: line.id,
             quantityReceived: state.quantityReceived,
+            quantityExpected: state.quantityExpected,
           };
         })
         .filter((l): l is NonNullable<typeof l> => l !== null);
