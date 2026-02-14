@@ -171,43 +171,63 @@ export async function getTransferQueue(
         eq(facilities.tenantId, tenantId)
       )
     )
-    .where(and(...draftConditions))
-    .limit(50); // Pre-filter, will sort and slice later
+    .where(and(...draftConditions));
+    // No per-source limit — pagination applied at final sort/slice
+
+  // Batch-load destination facilities and TO lines to eliminate N+1 queries
+  const draftTOIds = draftTOs.map(to => to.id);
+  const draftDestFacilityIds = [...new Set(draftTOs.map(to => to.destinationFacilityId))];
+
+  const [destFacilitiesMap, allTOLines] = await Promise.all([
+    // Batch-load destination facilities
+    draftDestFacilityIds.length > 0
+      ? db
+          .select({ id: facilities.id, name: facilities.name })
+          .from(facilities)
+          .where(
+            and(
+              inArray(facilities.id, draftDestFacilityIds),
+              eq(facilities.tenantId, tenantId)
+            )
+          )
+          .then(rows => new Map(rows.map(r => [r.id, r.name])))
+      : Promise.resolve(new Map<string, string>()),
+    // Batch-load all TO lines
+    draftTOIds.length > 0
+      ? db
+          .select({
+            transferOrderId: transferOrderLines.transferOrderId,
+            partId: transferOrderLines.partId,
+            quantityRequested: transferOrderLines.quantityRequested,
+          })
+          .from(transferOrderLines)
+          .where(
+            and(
+              inArray(transferOrderLines.transferOrderId, draftTOIds),
+              eq(transferOrderLines.tenantId, tenantId)
+            )
+          )
+      : Promise.resolve([]),
+  ]);
+
+  // Group TO lines by transfer order ID
+  const linesByTOId = new Map<string, typeof allTOLines>();
+  for (const line of allTOLines) {
+    const existing = linesByTOId.get(line.transferOrderId) ?? [];
+    existing.push(line);
+    linesByTOId.set(line.transferOrderId, existing);
+  }
 
   for (const draftTO of draftTOs) {
-    // Get destination facility
-    const [destFacility] = await db
-      .select({ name: facilities.name })
-      .from(facilities)
-      .where(
-        and(
-          eq(facilities.id, draftTO.destinationFacilityId),
-          eq(facilities.tenantId, tenantId)
-        )
-      )
-      .limit(1);
-
-    // Get lines to compute total quantity and get partId
-    const lines = await db
-      .select({
-        partId: transferOrderLines.partId,
-        quantityRequested: transferOrderLines.quantityRequested,
-      })
-      .from(transferOrderLines)
-      .where(
-        and(
-          eq(transferOrderLines.transferOrderId, draftTO.id),
-          eq(transferOrderLines.tenantId, tenantId)
-        )
-      );
-
+    const lines = linesByTOId.get(draftTO.id) ?? [];
     if (lines.length === 0) continue;
 
     const totalQty = lines.reduce((sum, line) => sum + line.quantityRequested, 0);
-    const firstPartId = lines[0].partId;
+    const partIds = [...new Set(lines.map(l => l.partId))];
+    const firstPartId = partIds[0];
 
     // Apply partId filter
-    if (filters.partId && !lines.some(line => line.partId === filters.partId)) {
+    if (filters.partId && !partIds.includes(filters.partId)) {
       continue;
     }
 
@@ -244,11 +264,11 @@ export async function getTransferQueue(
       type: 'draft_to',
       transferOrderId: draftTO.id,
       toNumber: draftTO.toNumber,
-      partId: firstPartId,
+      partId: partIds.length > 1 ? `${firstPartId} (+${partIds.length - 1} more)` : firstPartId,
       sourceFacilityId: draftTO.sourceFacilityId,
       sourceFacilityName: draftTO.sourceFacility?.name ?? 'Unknown',
       destinationFacilityId: draftTO.destinationFacilityId,
-      destinationFacilityName: destFacility?.name ?? 'Unknown',
+      destinationFacilityName: destFacilitiesMap.get(draftTO.destinationFacilityId) ?? 'Unknown',
       quantityRequested: totalQty,
       priorityScore,
       isExpedited: draftTO.status === 'requested',
@@ -295,8 +315,29 @@ export async function getTransferQueue(
         eq(facilities.tenantId, tenantId)
       )
     )
-    .where(and(...kanbanConditions))
-    .limit(50);
+    .where(and(...kanbanConditions));
+    // No per-source limit — pagination applied at final sort/slice
+
+  // Batch-load source facility names for Kanban cards
+  const kanbanSourceFacilityIds = [
+    ...new Set(
+      kanbanCards_triggered
+        .map(c => c.loop.sourceFacilityId)
+        .filter((id): id is string => !!id)
+    )
+  ];
+  const kanbanSourceFacMap = kanbanSourceFacilityIds.length > 0
+    ? await db
+        .select({ id: facilities.id, name: facilities.name })
+        .from(facilities)
+        .where(
+          and(
+            inArray(facilities.id, kanbanSourceFacilityIds),
+            eq(facilities.tenantId, tenantId)
+          )
+        )
+        .then(rows => new Map(rows.map(r => [r.id, r.name])))
+    : new Map<string, string>();
 
   for (const card of kanbanCards_triggered) {
     // Apply partId filter
@@ -304,22 +345,9 @@ export async function getTransferQueue(
       continue;
     }
 
-    // Get source facility name
-    let sourceFacilityName = 'Unknown';
-    if (card.loop.sourceFacilityId) {
-      const [sourceFac] = await db
-        .select({ name: facilities.name })
-        .from(facilities)
-        .where(
-          and(
-            eq(facilities.id, card.loop.sourceFacilityId),
-            eq(facilities.tenantId, tenantId)
-          )
-        )
-        .limit(1);
-
-      if (sourceFac) sourceFacilityName = sourceFac.name;
-    }
+    const sourceFacilityName = card.loop.sourceFacilityId
+      ? (kanbanSourceFacMap.get(card.loop.sourceFacilityId) ?? 'Unknown')
+      : 'Unknown';
 
     // Compute days since triggered (proxy for urgency)
     const daysSinceTrigger = Math.floor(
@@ -412,8 +440,8 @@ export async function getTransferQueue(
         eq(facilities.tenantId, tenantId)
       )
     )
-    .where(and(...belowReorderConditions))
-    .limit(50);
+    .where(and(...belowReorderConditions));
+    // No per-source limit — pagination applied at final sort/slice
 
   for (const row of belowReorderRows) {
     const available = row.qtyOnHand - row.qtyReserved;
