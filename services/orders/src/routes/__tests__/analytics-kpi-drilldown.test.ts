@@ -493,7 +493,7 @@ describe('GET /analytics/kpis/:kpiName/drilldown', () => {
 
       // The data query is the second db.execute call (first is count query)
       expect(dbMock.execute).toHaveBeenCalledTimes(2);
-      const dataQueryCall = dbMock.execute.mock.calls[1][0] as { __sqlStrings?: string };
+      const dataQueryCall = (dbMock.execute.mock.calls[1] as unknown[])[0] as { __sqlStrings?: string };
       const queryStr = dataQueryCall.__sqlStrings ?? '';
 
       // Verify tenant isolation on purchase_orders join
@@ -515,7 +515,7 @@ describe('GET /analytics/kpis/:kpiName/drilldown', () => {
       );
 
       expect(dbMock.execute).toHaveBeenCalledTimes(2);
-      const dataQueryCall = dbMock.execute.mock.calls[1][0] as { __sqlStrings?: string };
+      const dataQueryCall = (dbMock.execute.mock.calls[1] as unknown[])[0] as { __sqlStrings?: string };
       const queryStr = dataQueryCall.__sqlStrings ?? '';
 
       expect(queryStr).toContain('s.tenant_id');
@@ -532,7 +532,7 @@ describe('GET /analytics/kpis/:kpiName/drilldown', () => {
       );
 
       expect(dbMock.execute).toHaveBeenCalledTimes(2);
-      const dataQueryCall = dbMock.execute.mock.calls[1][0] as { __sqlStrings?: string };
+      const dataQueryCall = (dbMock.execute.mock.calls[1] as unknown[])[0] as { __sqlStrings?: string };
       const queryStr = dataQueryCall.__sqlStrings ?? '';
 
       expect(queryStr).toContain('p.tenant_id');
@@ -549,7 +549,7 @@ describe('GET /analytics/kpis/:kpiName/drilldown', () => {
       );
 
       expect(dbMock.execute).toHaveBeenCalledTimes(2);
-      const dataQueryCall = dbMock.execute.mock.calls[1][0] as { __sqlStrings?: string };
+      const dataQueryCall = (dbMock.execute.mock.calls[1] as unknown[])[0] as { __sqlStrings?: string };
       const queryStr = dataQueryCall.__sqlStrings ?? '';
 
       expect(queryStr).toContain('p.tenant_id');
@@ -566,7 +566,7 @@ describe('GET /analytics/kpis/:kpiName/drilldown', () => {
       );
 
       expect(dbMock.execute).toHaveBeenCalledTimes(2);
-      const dataQueryCall = dbMock.execute.mock.calls[1][0] as { __sqlStrings?: string };
+      const dataQueryCall = (dbMock.execute.mock.calls[1] as unknown[])[0] as { __sqlStrings?: string };
       const queryStr = dataQueryCall.__sqlStrings ?? '';
 
       expect(queryStr).toContain('p.tenant_id');
@@ -600,7 +600,7 @@ describe('GET /analytics/kpis/:kpiName/drilldown', () => {
       expect(response.body.data.rows[0]).toHaveProperty('facilityName', 'Destination Warehouse');
 
       // Verify the SQL includes the transfer-order join path
-      const dataQueryCall = dbMock.execute.mock.calls[1][0] as { __sqlStrings?: string };
+      const dataQueryCall = (dbMock.execute.mock.calls[1] as unknown[])[0] as { __sqlStrings?: string };
       const queryStr = dataQueryCall.__sqlStrings ?? '';
       expect(queryStr).toContain('transfer_orders');
       expect(queryStr).toContain('destination_facility_id');
@@ -615,7 +615,7 @@ describe('GET /analytics/kpis/:kpiName/drilldown', () => {
         '/analytics/kpis/fill_rate/drilldown?startDate=2026-01-01&endDate=2026-01-31',
       );
 
-      const dataQueryCall = dbMock.execute.mock.calls[1][0] as { __sqlStrings?: string };
+      const dataQueryCall = (dbMock.execute.mock.calls[1] as unknown[])[0] as { __sqlStrings?: string };
       const queryStr = dataQueryCall.__sqlStrings ?? '';
       // Should COALESCE from both PO facility and TO facility
       expect(queryStr).toContain('f_po.name');
