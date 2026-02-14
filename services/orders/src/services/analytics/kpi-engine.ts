@@ -135,10 +135,16 @@ async function computeFillRate(
   // Fill Rate = (receipts where ALL lines have quantityAccepted >= quantityExpected) / total receipts * 100
   // A receipt is "fully filled" when every receipt line accepted the expected quantity.
   const facilityJoin = facilityIds?.length
-    ? sql` AND r.order_id IN (
-        SELECT id FROM orders.purchase_orders WHERE tenant_id = ${tenantId} AND facility_id = ANY(${facilityIds})
-        UNION ALL
-        SELECT id FROM orders.transfer_orders WHERE tenant_id = ${tenantId} AND destination_facility_id = ANY(${facilityIds})
+    ? sql` AND (
+        (r.order_type = 'purchase_order' AND r.order_id IN (
+          SELECT id FROM orders.purchase_orders WHERE tenant_id = ${tenantId} AND facility_id = ANY(${facilityIds})
+        ))
+        OR (r.order_type = 'transfer_order' AND r.order_id IN (
+          SELECT id FROM orders.transfer_orders WHERE tenant_id = ${tenantId} AND destination_facility_id = ANY(${facilityIds})
+        ))
+        OR (r.order_type = 'work_order' AND r.order_id IN (
+          SELECT id FROM orders.work_orders WHERE tenant_id = ${tenantId} AND facility_id = ANY(${facilityIds})
+        ))
       )`
     : sql``;
 
@@ -205,15 +211,17 @@ async function computeSupplierOtd(
 
 async function computeStockoutCount(
   tenantId: string,
-  _startDate: Date,
-  _endDate: Date,
+  startDate: Date,
+  endDate: Date,
   facilityIds?: string[],
 ): Promise<number> {
   // Stockout count = number of distinct part+facility combos where qty_on_hand <= 0
-  // This is a point-in-time snapshot from the inventory ledger.
+  // and the ledger was updated within the given date range.
   const conditions = [
     eq(schema.inventoryLedger.tenantId, tenantId),
     lte(schema.inventoryLedger.qtyOnHand, 0),
+    gte(schema.inventoryLedger.updatedAt, startDate),
+    lt(schema.inventoryLedger.updatedAt, endDate),
   ];
 
   if (facilityIds?.length) {
@@ -275,10 +283,16 @@ async function computeOrderAccuracy(
   // Order Accuracy = (receipt lines with zero defects) / (total receipt lines) * 100
   // A line is accurate when quantityDamaged = 0 AND quantityRejected = 0
   const facilityJoin = facilityIds?.length
-    ? sql` AND r.order_id IN (
-        SELECT id FROM orders.purchase_orders WHERE tenant_id = ${tenantId} AND facility_id = ANY(${facilityIds})
-        UNION ALL
-        SELECT id FROM orders.transfer_orders WHERE tenant_id = ${tenantId} AND destination_facility_id = ANY(${facilityIds})
+    ? sql` AND (
+        (r.order_type = 'purchase_order' AND r.order_id IN (
+          SELECT id FROM orders.purchase_orders WHERE tenant_id = ${tenantId} AND facility_id = ANY(${facilityIds})
+        ))
+        OR (r.order_type = 'transfer_order' AND r.order_id IN (
+          SELECT id FROM orders.transfer_orders WHERE tenant_id = ${tenantId} AND destination_facility_id = ANY(${facilityIds})
+        ))
+        OR (r.order_type = 'work_order' AND r.order_id IN (
+          SELECT id FROM orders.work_orders WHERE tenant_id = ${tenantId} AND facility_id = ANY(${facilityIds})
+        ))
       )`
     : sql``;
 
