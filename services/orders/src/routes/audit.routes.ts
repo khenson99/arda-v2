@@ -724,11 +724,40 @@ function computeExportChecksum(data: string | Buffer): string {
 
 /**
  * Fetch audit entries using the shared filter logic.
+ * When includeArchived is true, queries both audit_log and audit_log_archive
+ * via UNION ALL using the same raw SQL pattern as queryWithArchiveUnion.
  */
 async function fetchAuditEntries(
   tenantId: string,
   filters: AuditFilters,
 ): Promise<unknown[]> {
+  if (filters.includeArchived) {
+    // Use UNION ALL to include archived entries
+    const { fragment: liveWhere, params: liveParams } = buildRawWhereClause(tenantId, filters, 'a');
+    const archiveFilters = { ...filters, actorName: undefined };
+    const { fragment: archiveWhere, params: archiveParams } = buildRawWhereClause(
+      tenantId, archiveFilters, 'a'
+    );
+    const archiveOffset = liveParams.length;
+    const reindexedArchiveWhere = archiveWhere.replace(
+      /\$(\d+)/g,
+      (_, n) => `$${parseInt(n) + archiveOffset}`
+    );
+    const allParams = [...liveParams, ...archiveParams];
+
+    const dataSql = `
+      SELECT * FROM (
+        SELECT a.* FROM audit.audit_log a WHERE ${liveWhere}
+        UNION ALL
+        SELECT a.* FROM audit.audit_log_archive a WHERE ${reindexedArchiveWhere}
+      ) combined
+      ORDER BY "timestamp" DESC
+    `;
+
+    const rows = await db.execute(sql.raw(buildParameterizedQuery(dataSql, allParams)));
+    return rows as unknown[];
+  }
+
   const conditions = buildAuditConditions(tenantId, filters);
   const joinUsers = needsUserJoin(filters);
 
@@ -751,11 +780,39 @@ async function fetchAuditEntries(
 
 /**
  * Count audit entries matching the given filters (for threshold check).
+ * When includeArchived is true, counts from both audit_log and audit_log_archive
+ * via UNION ALL.
  */
 async function countAuditEntries(
   tenantId: string,
   filters: AuditFilters,
 ): Promise<number> {
+  if (filters.includeArchived) {
+    // Use UNION ALL to count archived entries too
+    const { fragment: liveWhere, params: liveParams } = buildRawWhereClause(tenantId, filters, 'a');
+    const archiveFilters = { ...filters, actorName: undefined };
+    const { fragment: archiveWhere, params: archiveParams } = buildRawWhereClause(
+      tenantId, archiveFilters, 'a'
+    );
+    const archiveOffset = liveParams.length;
+    const reindexedArchiveWhere = archiveWhere.replace(
+      /\$(\d+)/g,
+      (_, n) => `$${parseInt(n) + archiveOffset}`
+    );
+    const allParams = [...liveParams, ...archiveParams];
+
+    const countSql = `
+      SELECT CAST(COUNT(*) AS INTEGER) AS count FROM (
+        SELECT a.id FROM audit.audit_log a WHERE ${liveWhere}
+        UNION ALL
+        SELECT a.id FROM audit.audit_log_archive a WHERE ${reindexedArchiveWhere}
+      ) combined
+    `;
+
+    const rows = await db.execute(sql.raw(buildParameterizedQuery(countSql, allParams)));
+    return (rows as any)[0]?.count ?? 0;
+  }
+
   const conditions = buildAuditConditions(tenantId, filters);
   const joinUsers = needsUserJoin(filters);
 

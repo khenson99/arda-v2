@@ -10,7 +10,7 @@ const log = createLogger('audit-export-jobs');
 
 export type ExportJobStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
-export type ExportFormat = 'csv' | 'json' | 'pdf';
+export type ExportFormat = 'csv' | 'json';
 
 export interface ExportJobFilters {
   action?: string;
@@ -206,7 +206,7 @@ export async function processExportJob(
 
     // Write to file
     ensureExportDir();
-    const ext = job.format === 'pdf' ? 'pdf' : job.format;
+    const ext = job.format;
     const fileName = `export-${job.jobId}.${ext}`;
     const filePath = join(EXPORT_DIR, fileName);
 
