@@ -233,12 +233,18 @@ const receiveLinesSchema = z.object({
   ).min(1),
 });
 
+/** Validate an ISO-8601 date or datetime string and reject invalid values with 400 */
+const isoDateString = z.string().refine(
+  (val) => !isNaN(new Date(val).getTime()) && /^\d{4}-\d{2}-\d{2}/.test(val),
+  { message: 'Must be a valid ISO-8601 date (YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss.sssZ)' }
+);
+
 const leadTimeQuerySchema = z.object({
   sourceFacilityId: z.string().uuid().optional(),
   destinationFacilityId: z.string().uuid().optional(),
   partId: z.string().uuid().optional(),
-  dateFrom: z.string().optional(),
-  dateTo: z.string().optional(),
+  dateFrom: isoDateString.optional(),
+  dateTo: isoDateString.optional(),
 });
 
 const leadTimeTrendQuerySchema = leadTimeQuerySchema.extend({

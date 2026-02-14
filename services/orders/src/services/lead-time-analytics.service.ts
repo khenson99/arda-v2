@@ -187,12 +187,17 @@ export async function getLeadTimeTrend(
   const conditions = buildLeadTimeConditions(baseQuery);
 
   // Map granularity to date_trunc argument
+  // Use sql.raw() for the truncation literal since it's always one of three
+  // hardcoded values validated by the Zod enum — this produces a proper SQL
+  // literal (e.g. DATE_TRUNC('week', ...)) instead of a parameterized bind,
+  // which allows the query planner to optimize the DATE_TRUNC call.
   const truncArg = granularity === 'day' ? 'day' : granularity === 'month' ? 'month' : 'week';
+  const truncLiteral = sql.raw(`'${truncArg}'`);
 
   const results = await db
     .select({
       period: sql<string>`
-        TO_CHAR(DATE_TRUNC(${truncArg}, ${leadTimeHistory.receivedAt}), 'YYYY-MM-DD')
+        TO_CHAR(DATE_TRUNC(${truncLiteral}, ${leadTimeHistory.receivedAt}), 'YYYY-MM-DD')
       `,
       avgLeadTimeDays: sql<number>`
         ROUND(AVG(${leadTimeHistory.leadTimeDays})::numeric, 2)
@@ -207,8 +212,8 @@ export async function getLeadTimeTrend(
     })
     .from(leadTimeHistory)
     .where(and(...conditions))
-    .groupBy(sql`DATE_TRUNC(${truncArg}, ${leadTimeHistory.receivedAt})`)
-    .orderBy(sql`DATE_TRUNC(${truncArg}, ${leadTimeHistory.receivedAt}) ASC`)
+    .groupBy(sql`DATE_TRUNC(${truncLiteral}, ${leadTimeHistory.receivedAt})`)
+    .orderBy(sql`DATE_TRUNC(${truncLiteral}, ${leadTimeHistory.receivedAt}) ASC`)
     .execute();
 
   return results.map((row) => ({

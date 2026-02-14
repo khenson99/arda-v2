@@ -3565,6 +3565,27 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "lt_hist_analytics_idx": {
+          "name": "lt_hist_analytics_idx",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "received_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {

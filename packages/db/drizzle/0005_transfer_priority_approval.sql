@@ -98,6 +98,7 @@ CREATE INDEX "lt_hist_tenant_idx" ON "orders"."lead_time_history" USING btree ("
 CREATE INDEX "lt_hist_route_idx" ON "orders"."lead_time_history" USING btree ("tenant_id","source_facility_id","destination_facility_id");--> statement-breakpoint
 CREATE INDEX "lt_hist_part_idx" ON "orders"."lead_time_history" USING btree ("part_id");--> statement-breakpoint
 CREATE INDEX "lt_hist_to_idx" ON "orders"."lead_time_history" USING btree ("transfer_order_id");--> statement-breakpoint
+CREATE INDEX "lt_hist_analytics_idx" ON "orders"."lead_time_history" USING btree ("tenant_id","received_at");--> statement-breakpoint
 CREATE INDEX "notif_deliveries_tenant_idx" ON "notifications"."notification_deliveries" USING btree ("tenant_id");--> statement-breakpoint
 CREATE INDEX "notif_deliveries_user_status_idx" ON "notifications"."notification_deliveries" USING btree ("user_id","status");--> statement-breakpoint
 CREATE INDEX "notif_deliveries_notification_idx" ON "notifications"."notification_deliveries" USING btree ("notification_id");--> statement-breakpoint
