@@ -141,28 +141,23 @@ export function useTransferOrders(token: string, onUnauthorized: () => void) {
       setDestinationInventory([]);
 
       try {
-        const [detailRes, transRes, auditRes] = await Promise.all([
+        const emptyInvPage = { data: [] as InventoryLedgerEntry[], pagination: { page: 1, pageSize: 200, total: 0, totalPages: 0 } };
+
+        // Run all five requests in parallel — facility IDs are available from the order param
+        const [detailRes, transRes, auditRes, sourceInvRes, destInvRes] = await Promise.all([
           fetchTransferOrder(token, order.id),
           fetchTransferOrderTransitions(token, order.id),
           fetchTransferOrderAudit(token, order.id),
+          fetchInventoryByFacility(token, order.sourceFacilityId, { pageSize: 200 }).catch(() => emptyInvPage),
+          fetchInventoryByFacility(token, order.destinationFacilityId, { pageSize: 200 }).catch(() => emptyInvPage),
         ]);
         if (!isMountedRef.current) return;
 
-        const orderDetail = detailRes.data;
-        setSelectedOrder(orderDetail);
+        setSelectedOrder(detailRes.data);
         setValidTransitions(transRes.data.validTransitions);
         setAuditEntries(auditRes.data);
-
-        // Fetch inventory for source and destination facilities
-        const [sourceInvRes, destInvRes] = await Promise.all([
-          fetchInventoryByFacility(token, orderDetail.sourceFacilityId, { pageSize: 200 }).catch(() => ({ data: [] })),
-          fetchInventoryByFacility(token, orderDetail.destinationFacilityId, { pageSize: 200 }).catch(() => ({ data: [] })),
-        ]);
-
-        if (isMountedRef.current) {
-          setSourceInventory(sourceInvRes.data);
-          setDestinationInventory(destInvRes.data);
-        }
+        setSourceInventory(sourceInvRes.data);
+        setDestinationInventory(destInvRes.data);
       } catch (err) {
         if (!isMountedRef.current) return;
         if (isUnauthorized(err)) {

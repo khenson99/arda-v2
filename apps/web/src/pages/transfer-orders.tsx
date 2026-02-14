@@ -669,8 +669,6 @@ function DetailView({
       {order.lines && order.lines.length > 0 && (
         <TransferOrderInventoryImpact
           lines={order.lines}
-          sourceFacilityId={order.sourceFacilityId}
-          destinationFacilityId={order.destinationFacilityId}
           sourceFacilityName={order.sourceFacilityName ?? null}
           destinationFacilityName={order.destinationFacilityName ?? null}
           sourceInventory={sourceInventory}

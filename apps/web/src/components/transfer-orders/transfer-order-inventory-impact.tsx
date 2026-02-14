@@ -6,8 +6,6 @@ import { ArrowRight, TrendingUp, TrendingDown } from "lucide-react";
 
 interface TransferOrderInventoryImpactProps {
   lines: TransferOrderLine[];
-  sourceFacilityId: string;
-  destinationFacilityId: string;
   sourceFacilityName: string | null;
   destinationFacilityName: string | null;
   sourceInventory: InventoryLedgerEntry[];
@@ -27,7 +25,7 @@ interface LineImpact {
   destAfterReceiveQty: number | null;
 }
 
-function calculateLineImpacts(
+export function calculateLineImpacts(
   lines: TransferOrderLine[],
   sourceInventory: InventoryLedgerEntry[],
   destinationInventory: InventoryLedgerEntry[]

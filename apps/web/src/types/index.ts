@@ -656,19 +656,6 @@ export interface TransferAuditEntry {
   timestamp: string;
 }
 
-export interface TransferLineInventoryImpact {
-  lineId: string;
-  partId: string;
-  partName: string | null;
-  quantityRequested: number;
-  quantityShipped: number;
-  quantityReceived: number;
-  sourceBeforeQty: number | null;
-  sourceAfterQty: number | null;
-  destinationBeforeQty: number | null;
-  destinationAfterQty: number | null;
-}
-
 /* ── Transfer Queue ───────────────────────────────────────────── */
 
 export type TransferQueuePriority = "critical" | "high" | "medium" | "low";

@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
 import { OrderStatusBadge } from "@/components/order-history/order-status-badge";
-import type { TransferAuditEntry, TOStatus } from "@/types";
+import type { TransferAuditEntry } from "@/types";
 import { cn } from "@/lib/utils";
 import { Clock, User } from "lucide-react";
 
@@ -9,7 +9,7 @@ interface TransferOrderTimelineProps {
   auditEntries: TransferAuditEntry[];
 }
 
-interface TimelineEntry {
+export interface TimelineEntry {
   id: string;
   fromStatus: string | null;
   toStatus: string;
@@ -19,7 +19,7 @@ interface TimelineEntry {
   durationMs: number | null;
 }
 
-function parseAuditEntries(entries: TransferAuditEntry[]): TimelineEntry[] {
+export function parseAuditEntries(entries: TransferAuditEntry[]): TimelineEntry[] {
   // Filter for status change events and created event
   const statusEvents = entries.filter(
     (e) => e.action === "transfer_order.status_changed" || e.action === "transfer_order.created"
@@ -67,8 +67,9 @@ function parseAuditEntries(entries: TransferAuditEntry[]): TimelineEntry[] {
   return timeline;
 }
 
-function formatDuration(ms: number | null): string {
-  if (!ms) return "—";
+export function formatDuration(ms: number | null): string {
+  if (ms === null) return "—";
+  if (ms === 0) return "0s";
 
   const seconds = Math.floor(ms / 1000);
   const minutes = Math.floor(seconds / 60);
