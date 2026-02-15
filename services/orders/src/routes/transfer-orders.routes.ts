@@ -14,6 +14,7 @@ import {
   getValidNextTransferStatuses,
 } from '../services/transfer-lifecycle.service.js';
 import { recommendSources } from '../services/source-recommendation.service.js';
+import { getTransferQueue } from '../services/transfer-queue.service.js';
 
 export const transferOrdersRouter = Router();
 const { transferOrders, transferOrderLines, leadTimeHistory } = schema;
@@ -286,6 +287,63 @@ transferOrdersRouter.get('/', async (req: AuthRequest, res, next) => {
   }
 });
 
+// ─── Transfer Queue ──────────────────────────────────────────────────
+
+const transferQueueSchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(20),
+  destinationFacilityId: z.string().uuid().optional(),
+  sourceFacilityId: z.string().uuid().optional(),
+  status: z.enum(['draft', 'requested', 'triggered', 'below_reorder']).optional(),
+  partId: z.string().uuid().optional(),
+  minPriorityScore: z.coerce.number().optional(),
+  maxPriorityScore: z.coerce.number().optional(),
+});
+
+// GET /queue - Get aggregated transfer queue with prioritized recommendations
+// NOTE: This route MUST be registered before /:id routes
+transferOrdersRouter.get('/queue', async (req: AuthRequest, res, next) => {
+  try {
+    const params = transferQueueSchema.parse(req.query);
+    const tenantId = req.user!.tenantId;
+
+    if (!tenantId) {
+      throw new AppError(401, 'Unauthorized');
+    }
+
+    const offset = (params.page - 1) * params.limit;
+
+    const result = await getTransferQueue({
+      tenantId,
+      filters: {
+        destinationFacilityId: params.destinationFacilityId,
+        sourceFacilityId: params.sourceFacilityId,
+        status: params.status,
+        partId: params.partId,
+        minPriorityScore: params.minPriorityScore,
+        maxPriorityScore: params.maxPriorityScore,
+      },
+      limit: params.limit,
+      offset,
+    });
+
+    res.json({
+      data: result.items,
+      pagination: {
+        page: params.page,
+        limit: params.limit,
+        total: result.total,
+        totalPages: Math.ceil(result.total / params.limit),
+      },
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return next(new AppError(400, 'Invalid query parameters'));
+    }
+    next(error);
+  }
+});
+
 // ─── Source Recommendation ──────────────────────────────────────────────
 
 const sourceRecommendationSchema = z.object({
@@ -325,12 +383,24 @@ transferOrdersRouter.get('/recommendations/source', async (req: AuthRequest, res
 
 // ─── Lead-Time Analytics ─────────────────────────────────────────────────
 
+/** Coerce a query-string value to a Date, rejecting anything that produces an Invalid Date. */
+const zDateString = z
+  .string()
+  .transform((val, ctx) => {
+    const d = new Date(val);
+    if (Number.isNaN(d.getTime())) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid date' });
+      return z.NEVER;
+    }
+    return d;
+  });
+
 const leadTimeFilterSchema = z.object({
   sourceFacilityId: z.string().uuid().optional(),
   destinationFacilityId: z.string().uuid().optional(),
   partId: z.string().uuid().optional(),
-  fromDate: z.string().optional(),
-  toDate: z.string().optional(),
+  fromDate: zDateString.optional(),
+  toDate: zDateString.optional(),
 });
 
 // GET /lead-times — aggregate lead-time statistics
@@ -352,10 +422,10 @@ transferOrdersRouter.get('/lead-times', async (req: AuthRequest, res, next) => {
       conditions.push(eq(leadTimeHistory.partId, filters.partId));
     }
     if (filters.fromDate) {
-      conditions.push(gte(leadTimeHistory.receivedAt, new Date(filters.fromDate)));
+      conditions.push(gte(leadTimeHistory.receivedAt, filters.fromDate));
     }
     if (filters.toDate) {
-      conditions.push(lte(leadTimeHistory.receivedAt, new Date(filters.toDate)));
+      conditions.push(lte(leadTimeHistory.receivedAt, filters.toDate));
     }
 
     const [result] = await db
@@ -371,13 +441,13 @@ transferOrdersRouter.get('/lead-times', async (req: AuthRequest, res, next) => {
       .where(and(...conditions));
 
     res.json({
-      data: result ?? {
-        avgLeadTimeDays: null,
-        medianLeadTimeDays: null,
-        p90LeadTimeDays: null,
-        minLeadTimeDays: null,
-        maxLeadTimeDays: null,
-        transferCount: 0,
+      data: {
+        avgLeadTimeDays: result.avgLeadTimeDays ?? null,
+        medianLeadTimeDays: result.medianLeadTimeDays ?? null,
+        p90LeadTimeDays: result.p90LeadTimeDays ?? null,
+        minLeadTimeDays: result.minLeadTimeDays ?? null,
+        maxLeadTimeDays: result.maxLeadTimeDays ?? null,
+        transferCount: result.transferCount ?? 0,
       },
     });
   } catch (error) {
@@ -411,10 +481,10 @@ transferOrdersRouter.get('/lead-times/trend', async (req: AuthRequest, res, next
       conditions.push(eq(leadTimeHistory.partId, filters.partId));
     }
     if (filters.fromDate) {
-      conditions.push(gte(leadTimeHistory.receivedAt, new Date(filters.fromDate)));
+      conditions.push(gte(leadTimeHistory.receivedAt, filters.fromDate));
     }
     if (filters.toDate) {
-      conditions.push(lte(leadTimeHistory.receivedAt, new Date(filters.toDate)));
+      conditions.push(lte(leadTimeHistory.receivedAt, filters.toDate));
     }
 
     // Bucket expression — use sql.raw for the interval literal since date_trunc
