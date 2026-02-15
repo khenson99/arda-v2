@@ -7,6 +7,7 @@ import {
   writeAuthAuditEntry,
   type AuthAuditContext,
 } from './auth-audit.js';
+import { initializeUserNotificationPreferences } from './notification-preference-init.js';
 
 const log = createLogger('auth:user-management');
 
@@ -99,6 +100,9 @@ export async function inviteUser(input: InviteUserInput, auditCtx?: AuthAuditCon
     ipAddress: auditCtx?.ipAddress,
     userAgent: auditCtx?.userAgent,
   });
+
+  // Initialize default notification preferences (fire-and-forget; errors logged internally)
+  void initializeUserNotificationPreferences(tenantId, newUser.id);
 
   // TODO: Send invitation email
 

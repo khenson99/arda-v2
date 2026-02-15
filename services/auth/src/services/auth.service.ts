@@ -17,6 +17,7 @@ import {
   writeAuthAuditEntry,
   type AuthAuditContext,
 } from './auth-audit.js';
+import { initializeUserNotificationPreferences } from './notification-preference-init.js';
 
 const { users, tenants, refreshTokens, oauthAccounts, passwordResetTokens } = schema;
 const PASSWORD_RESET_EXPIRY_MINUTES = 60;
@@ -436,6 +437,9 @@ export async function register(input: RegisterInput, auditCtx?: AuthAuditContext
 
     return { tenant, user };
   });
+
+  // Initialize default notification preferences (fire-and-forget; errors logged internally)
+  void initializeUserNotificationPreferences(result.tenant.id, result.user.id);
 
   // Generate tokens
   const tokens = await createTokenPair(result.user.id, result.tenant.id, result.user.email, result.user.role);
@@ -968,6 +972,9 @@ export async function handleGoogleOAuth(profile: {
 
     return { tenant, user };
   });
+
+  // Initialize default notification preferences (fire-and-forget; errors logged internally)
+  void initializeUserNotificationPreferences(result.tenant.id, result.user.id);
 
   const tokens = await createTokenPair(
     result.user.id,
