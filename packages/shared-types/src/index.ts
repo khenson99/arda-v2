@@ -546,6 +546,8 @@ export const WS_EVENT_TYPES = [
   'connected',
   'pong',
   'error',
+  'replay_complete',
+  'resync_required',
   // Core lifecycle + order events
   'card:stage_changed',
   'card:triggered',
@@ -615,6 +617,19 @@ export interface RealtimeErrorPayload {
   retryable?: boolean;
 }
 
+export interface RealtimeReplayCompletePayload {
+  replayedCount: number;
+  lastEventId: string;
+  protocolVersion?: RealtimeProtocolVersion;
+}
+
+export interface RealtimeResyncRequiredPayload {
+  reason: 'stale_last_event_id' | 'replay_failed';
+  lastEventId?: string;
+  replayTtlMs?: number;
+  protocolVersion?: RealtimeProtocolVersion;
+}
+
 export interface RealtimeSubscribeLoopPayload {
   loopId: string;
   protocolVersion?: RealtimeProtocolVersion;
@@ -625,11 +640,21 @@ export interface RealtimeUnsubscribeLoopPayload {
   loopId: string;
 }
 
-export type RealtimeControlEventType = 'connected' | 'pong' | 'error';
+export type RealtimeControlEventType =
+  | 'connected'
+  | 'pong'
+  | 'error'
+  | 'replay_complete'
+  | 'resync_required';
 
 export interface RealtimeControlEvent {
   type: RealtimeControlEventType;
-  payload: RealtimeConnectedPayload | RealtimePongPayload | RealtimeErrorPayload;
+  payload:
+    | RealtimeConnectedPayload
+    | RealtimePongPayload
+    | RealtimeErrorPayload
+    | RealtimeReplayCompletePayload
+    | RealtimeResyncRequiredPayload;
 }
 
 // Compile-time coverage: ensures every WSEventType has a mapped key.
@@ -637,6 +662,8 @@ export const WS_EVENT_TYPE_COVERAGE: Record<WSEventType, true> = {
   connected: true,
   pong: true,
   error: true,
+  replay_complete: true,
+  resync_required: true,
   'card:stage_changed': true,
   'card:triggered': true,
   'po:status_changed': true,
