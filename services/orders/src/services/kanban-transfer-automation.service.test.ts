@@ -258,7 +258,11 @@ describe('autoCreateTransferOrder', () => {
   });
 
   describe('successful TO creation', () => {
-    let mockTx: ReturnType<typeof mockTransaction>;
+    let mockTx: {
+      insert: ReturnType<typeof vi.fn>;
+      update: ReturnType<typeof vi.fn>;
+      execute: ReturnType<typeof vi.fn>;
+    };
 
     beforeEach(() => {
       // Set up card + loop queries
