@@ -672,6 +672,8 @@ export const leadTimeHistory = ordersSchema.table(
     ),
     index('lt_hist_part_idx').on(table.partId),
     index('lt_hist_to_idx').on(table.transferOrderId),
+    // Covers analytics date-range queries filtered by tenant
+    index('lt_hist_tenant_received_idx').on(table.tenantId, table.receivedAt),
   ]
 );
 

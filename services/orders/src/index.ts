@@ -17,8 +17,11 @@ import { receivingRouter } from './routes/receiving.routes.js';
 import { productionQueueRouter } from './routes/production-queue.routes.js';
 import { automationRouter } from './routes/automation.routes.js';
 import { inventoryRouter } from './routes/inventory.routes.js';
+import { analyticsRouter } from './routes/analytics.routes.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { startQueueRiskScheduler } from './services/queue-risk-scheduler.service.js';
+import { startTransferAutomationListener, type TransferAutomationListener } from './services/transfer-automation-listener.js';
+import { getEventBus } from '@arda/events';
 
 const app = express();
 
@@ -59,6 +62,7 @@ app.use('/receiving', receivingRouter);
 app.use('/production-queue', productionQueueRouter);
 app.use('/automation', automationRouter);
 app.use('/inventory', inventoryRouter);
+app.use('/analytics', analyticsRouter);
 
 app.use(errorHandler);
 
@@ -76,10 +80,25 @@ const queueRiskScheduler = startQueueRiskScheduler({
 });
 void queueRiskScheduler.runOnce();
 
+// ─── Transfer Automation Listener ────────────────────────────────────
+let transferListener: TransferAutomationListener | null = null;
+
+if (config.REDIS_URL) {
+  const eventBus = getEventBus(config.REDIS_URL);
+  startTransferAutomationListener(eventBus)
+    .then((listener) => {
+      transferListener = listener;
+    })
+    .catch((err) => {
+      log.error({ err }, 'Failed to start transfer automation listener');
+    });
+}
+
 // ─── Graceful Shutdown ───────────────────────────────────────────────
 function shutdown(signal: string) {
   log.info({ signal }, 'Shutting down gracefully');
   queueRiskScheduler.stop();
+  void transferListener?.stop();
   server.close(() => {
     log.info('HTTP server closed');
     process.exit(0);
