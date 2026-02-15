@@ -21,6 +21,10 @@
     "./audit-writer": {
       "types": "./dist/audit-writer.d.ts",
       "import": "./dist/audit-writer.js"
+    },
+    "./seeds/billing-plans": {
+      "types": "./dist/seeds/billing-plans.d.ts",
+      "import": "./dist/seeds/billing-plans.js"
     }
   },
   "scripts": {
