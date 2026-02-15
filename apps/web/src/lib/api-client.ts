@@ -1810,6 +1810,53 @@ export async function fetchTransferQueue(
   return apiRequest(`/api/orders/transfer-orders/queue${suffix}`, { token });
 }
 
+export async function fetchLeadTimeSummary(
+  token: string,
+  params?: {
+    page?: number;
+    pageSize?: number;
+    dateFrom?: string;
+    dateTo?: string;
+    sourceFacilityId?: string;
+    destinationFacilityId?: string;
+    partId?: string;
+  },
+): Promise<{
+  data: import("@/types").LeadTimeSummaryRow[];
+  pagination: { page: number; pageSize: number; total: number; totalPages: number };
+}> {
+  const qs = new URLSearchParams();
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.pageSize) qs.set("pageSize", String(params.pageSize));
+  if (params?.dateFrom) qs.set("dateFrom", params.dateFrom);
+  if (params?.dateTo) qs.set("dateTo", params.dateTo);
+  if (params?.sourceFacilityId) qs.set("sourceFacilityId", params.sourceFacilityId);
+  if (params?.destinationFacilityId) qs.set("destinationFacilityId", params.destinationFacilityId);
+  if (params?.partId) qs.set("partId", params.partId);
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return apiRequest(`/api/transfer-orders/lead-times${suffix}`, { token });
+}
+
+export async function fetchLeadTimeTrend(
+  token: string,
+  params?: {
+    dateFrom?: string;
+    dateTo?: string;
+    sourceFacilityId?: string;
+    destinationFacilityId?: string;
+    partId?: string;
+  },
+): Promise<{ data: import("@/types").LeadTimeTrendPoint[] }> {
+  const qs = new URLSearchParams();
+  if (params?.dateFrom) qs.set("dateFrom", params.dateFrom);
+  if (params?.dateTo) qs.set("dateTo", params.dateTo);
+  if (params?.sourceFacilityId) qs.set("sourceFacilityId", params.sourceFacilityId);
+  if (params?.destinationFacilityId) qs.set("destinationFacilityId", params.destinationFacilityId);
+  if (params?.partId) qs.set("partId", params.partId);
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return apiRequest(`/api/transfer-orders/lead-times/trend${suffix}`, { token });
+}
+
 export async function fetchInventoryByFacility(
   token: string,
   facilityId: string,
