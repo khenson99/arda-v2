@@ -419,6 +419,33 @@ export interface PrintJobSummary {
 // ─── Billing ──────────────────────────────────────────────────────────
 export type PlanId = 'free' | 'starter' | 'pro' | 'enterprise';
 
+export const PLAN_IDS = ['free', 'starter', 'pro', 'enterprise'] as const;
+
+export type SubscriptionStatus =
+  | 'trialing'
+  | 'active'
+  | 'past_due'
+  | 'canceled'
+  | 'unpaid'
+  | 'paused';
+
+export const SUBSCRIPTION_STATUSES = [
+  'trialing',
+  'active',
+  'past_due',
+  'canceled',
+  'unpaid',
+  'paused',
+] as const;
+
+export type BillingInterval = 'monthly' | 'annual';
+
+export const BILLING_INTERVALS = ['monthly', 'annual'] as const;
+
+export type InvoiceStatus = 'draft' | 'open' | 'paid' | 'void' | 'uncollectible';
+
+export const INVOICE_STATUSES = ['draft', 'open', 'paid', 'void', 'uncollectible'] as const;
+
 export interface PlanFeatures {
   multiLocation: boolean;
   productionKanban: boolean;
@@ -431,6 +458,9 @@ export interface PlanFeatures {
   customBranding: boolean;
   prioritySupport: boolean;
 }
+
+/** Represents -1 as unlimited for plan limits (Enterprise tier). */
+export const UNLIMITED = -1 as const;
 
 // ─── Production Types ────────────────────────────────────────────────
 export type WOHoldReason =
