@@ -2,11 +2,11 @@ import { Server as HttpServer } from 'http';
 import { Server as SocketServer, type Socket } from 'socket.io';
 import { verifyAccessToken, type JwtPayload } from '@arda/auth-utils';
 import { config, createLogger } from '@arda/config';
-import { getEventBus, type ArdaEvent } from '@arda/events';
+import { getEventBus } from '@arda/events';
 import { db, schema } from '@arda/db';
 import { eq, and } from 'drizzle-orm';
 import type { RealtimeProtocolVersion } from '@arda/shared-types';
-import { mapBackendEventToWSEvent } from './event-mapper.js';
+import { BackpressureBridge, type LiveEmission } from './backpressure.js';
 import { ReplayService } from './replay-service.js';
 
 interface AuthenticatedSocket extends Socket {
@@ -20,49 +20,6 @@ type ReplayMode = 'replaying' | 'flushing' | 'live';
 interface ReplayHandshakeOptions {
   lastEventId?: string;
   protocolVersion?: RealtimeProtocolVersion;
-}
-
-interface TenantRoomEmitter {
-  to: (room: string) => { emit: (eventName: string, payload: unknown) => void };
-}
-
-interface MappingLogger {
-  debug: (context: Record<string, unknown>, message: string) => void;
-}
-
-interface SocketEventEmitter {
-  emit: (eventName: string, payload: unknown) => void;
-}
-
-export function emitMappedTenantEvent(
-  io: TenantRoomEmitter,
-  room: string,
-  event: ArdaEvent,
-  logger: MappingLogger = log,
-): boolean {
-  const mapped = mapBackendEventToWSEvent(event);
-  if (!mapped) {
-    logger.debug({ eventType: event.type }, 'Ignoring non-forwarded backend event');
-    return false;
-  }
-
-  io.to(room).emit(mapped.type, mapped);
-  return true;
-}
-
-export function emitMappedSocketEvent(
-  socket: SocketEventEmitter,
-  event: ArdaEvent,
-  logger: MappingLogger = log,
-): boolean {
-  const mapped = mapBackendEventToWSEvent(event);
-  if (!mapped) {
-    logger.debug({ eventType: event.type }, 'Ignoring non-forwarded backend event');
-    return false;
-  }
-
-  socket.emit(mapped.type, mapped);
-  return true;
 }
 
 function parseOptionalString(value: unknown): string | undefined {
@@ -103,6 +60,7 @@ export function setupWebSocket(httpServer: HttpServer, redisUrl: string): Socket
   });
 
   const eventBus = getEventBus(redisUrl);
+  const backpressureBridge = new BackpressureBridge(eventBus);
   const replayService = new ReplayService(redisUrl);
 
   // Auth middleware — verify JWT from handshake
@@ -124,9 +82,10 @@ export function setupWebSocket(httpServer: HttpServer, redisUrl: string): Socket
     const user = (socket as AuthenticatedSocket).user;
     const tenantId = user.tenantId;
     const replayHandshake = parseReplayHandshakeOptions(socket.handshake.auth);
-    const bufferedLiveEvents: ArdaEvent[] = [];
+    const bufferedLiveEmissions: LiveEmission[] = [];
     let replayMode: ReplayMode = replayHandshake.lastEventId ? 'replaying' : 'live';
     let disconnected = false;
+    let detachSubscriber: (() => Promise<void>) | null = null;
 
     log.info({ userId: user.sub, tenantId }, 'Client connected');
 
@@ -134,39 +93,48 @@ export function setupWebSocket(httpServer: HttpServer, redisUrl: string): Socket
     const tenantRoom = `tenant:${tenantId}`;
     socket.join(tenantRoom);
 
-    const emitLiveEvent = (event: ArdaEvent): void => {
+    const emitLive = (emission: LiveEmission): void => {
       if (disconnected) return;
-      emitMappedSocketEvent(socket, event);
+      socket.emit(emission.eventName, emission.payload);
     };
 
-    const flushBufferedLiveEvents = (): void => {
+    const flushBufferedLiveEmissions = (): void => {
       replayMode = 'flushing';
-      while (bufferedLiveEvents.length > 0) {
-        const pending = bufferedLiveEvents.splice(0, bufferedLiveEvents.length);
-        for (const event of pending) {
-          emitLiveEvent(event);
+      while (bufferedLiveEmissions.length > 0) {
+        const pending = bufferedLiveEmissions.splice(0, bufferedLiveEmissions.length);
+        for (const emission of pending) {
+          emitLive(emission);
         }
       }
       replayMode = 'live';
     };
 
-    // Subscribe to tenant events and buffer until replay is complete.
-    const handler = (event: ArdaEvent) => {
-      if (replayMode === 'live') {
-        emitLiveEvent(event);
-        return;
-      }
-      bufferedLiveEvents.push(event);
-    };
-
-    void eventBus.subscribeTenant(tenantId, handler).catch((err) => {
-      log.error({ err, tenantId, userId: user.sub }, 'Failed to subscribe tenant event stream');
-      socket.emit('error', {
-        message: 'Failed to subscribe to realtime stream',
-        code: 'REALTIME_SUBSCRIBE_FAILED',
-        retryable: true,
+    void backpressureBridge
+      .attachSubscriber(tenantId, {
+        id: socket.id,
+        emit: (emission) => {
+          if (replayMode === 'live') {
+            emitLive(emission);
+            return;
+          }
+          bufferedLiveEmissions.push(emission);
+        },
+      })
+      .then((detach) => {
+        if (disconnected) {
+          void detach();
+          return;
+        }
+        detachSubscriber = detach;
+      })
+      .catch((err) => {
+        log.error({ err, tenantId, userId: user.sub }, 'Failed to subscribe tenant event stream');
+        socket.emit('error', {
+          message: 'Failed to subscribe to realtime stream',
+          code: 'REALTIME_SUBSCRIBE_FAILED',
+          retryable: true,
+        });
       });
-    });
 
     // Send welcome message
     socket.emit('connected', {
@@ -210,7 +178,7 @@ export function setupWebSocket(httpServer: HttpServer, redisUrl: string): Socket
           }
         })
         .finally(() => {
-          flushBufferedLiveEvents();
+          flushBufferedLiveEmissions();
         });
     }
 
@@ -246,7 +214,9 @@ export function setupWebSocket(httpServer: HttpServer, redisUrl: string): Socket
     socket.on('disconnect', () => {
       disconnected = true;
       log.info({ userId: user.sub }, 'Client disconnected');
-      void eventBus.unsubscribeTenant(tenantId, handler);
+      if (detachSubscriber) {
+        void detachSubscriber();
+      }
     });
   });
 
