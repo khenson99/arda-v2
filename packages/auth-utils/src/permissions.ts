@@ -137,6 +137,9 @@ export const ROLE_PERMISSIONS: Record<Exclude<UserRole, 'tenant_admin'>, Readonl
     Permission.CATALOG_IMPORTS_READ,
     Permission.CATALOG_IMPORTS_CREATE,
     Permission.CATALOG_IMPORTS_REVIEW,
+    // Catalog AI Config — manage AI provider settings
+    Permission.CATALOG_AI_CONFIG_READ,
+    Permission.CATALOG_AI_CONFIG_UPDATE,
     // Notifications — own
     Permission.NOTIFICATIONS_READ,
     Permission.NOTIFICATIONS_UPDATE,
@@ -182,6 +185,9 @@ export const ROLE_PERMISSIONS: Record<Exclude<UserRole, 'tenant_admin'>, Readonl
     Permission.CATALOG_IMPORTS_CREATE,
     Permission.CATALOG_IMPORTS_REVIEW,
     Permission.CATALOG_IMPORTS_APPLY,
+    // Catalog AI Config — manage AI provider settings
+    Permission.CATALOG_AI_CONFIG_READ,
+    Permission.CATALOG_AI_CONFIG_UPDATE,
     // Notifications — own
     Permission.NOTIFICATIONS_READ,
     Permission.NOTIFICATIONS_UPDATE,

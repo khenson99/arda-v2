@@ -11,8 +11,10 @@ import {
   index,
   uniqueIndex,
   pgEnum,
+  foreignKey,
+  check,
 } from 'drizzle-orm/pg-core';
-import { relations } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 
 export const catalogSchema = pgSchema('catalog');
 
@@ -328,14 +330,12 @@ export const importItems = catalogSchema.table(
   {
     id: uuid('id').defaultRandom().primaryKey(),
     tenantId: uuid('tenant_id').notNull(),
-    importJobId: uuid('import_job_id')
-      .notNull()
-      .references(() => importJobs.id, { onDelete: 'cascade' }),
+    importJobId: uuid('import_job_id').notNull(),
     rowNumber: integer('row_number').notNull(),
     rawData: jsonb('raw_data').$type<Record<string, unknown>>().notNull(),
     normalizedData: jsonb('normalized_data').$type<Record<string, unknown>>(),
     disposition: importItemDispositionEnum('disposition').notNull().default('new'),
-    matchedPartId: uuid('matched_part_id').references(() => parts.id, { onDelete: 'set null' }),
+    matchedPartId: uuid('matched_part_id'),
     validationErrors: jsonb('validation_errors').$type<Array<{ field: string; message: string }>>(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -345,6 +345,17 @@ export const importItems = catalogSchema.table(
     index('import_items_job_idx').on(table.importJobId),
     index('import_items_job_disposition_idx').on(table.importJobId, table.disposition),
     index('import_items_matched_part_idx').on(table.matchedPartId),
+    // Composite FKs enforce tenant isolation — cross-tenant references are impossible
+    foreignKey({
+      name: 'import_items_job_tenant_fk',
+      columns: [table.importJobId, table.tenantId],
+      foreignColumns: [importJobs.id, importJobs.tenantId],
+    }).onDelete('cascade'),
+    foreignKey({
+      name: 'import_items_part_tenant_fk',
+      columns: [table.matchedPartId, table.tenantId],
+      foreignColumns: [parts.id, parts.tenantId],
+    }).onDelete('set null'),
   ]
 );
 
@@ -354,12 +365,8 @@ export const importMatches = catalogSchema.table(
   {
     id: uuid('id').defaultRandom().primaryKey(),
     tenantId: uuid('tenant_id').notNull(),
-    importItemId: uuid('import_item_id')
-      .notNull()
-      .references(() => importItems.id, { onDelete: 'cascade' }),
-    existingPartId: uuid('existing_part_id')
-      .notNull()
-      .references(() => parts.id, { onDelete: 'cascade' }),
+    importItemId: uuid('import_item_id').notNull(),
+    existingPartId: uuid('existing_part_id').notNull(),
     matchScore: numeric('match_score', { precision: 5, scale: 4 }).notNull(),
     matchMethod: varchar('match_method', { length: 50 }).notNull(),
     matchDetails: jsonb('match_details').$type<Record<string, unknown>>(),
@@ -373,6 +380,17 @@ export const importMatches = catalogSchema.table(
     index('import_matches_item_idx').on(table.importItemId),
     index('import_matches_existing_part_idx').on(table.existingPartId),
     index('import_matches_score_idx').on(table.importItemId, table.matchScore),
+    // Composite FKs enforce tenant isolation — cross-tenant references are impossible
+    foreignKey({
+      name: 'import_matches_item_tenant_fk',
+      columns: [table.importItemId, table.tenantId],
+      foreignColumns: [importItems.id, importItems.tenantId],
+    }).onDelete('cascade'),
+    foreignKey({
+      name: 'import_matches_part_tenant_fk',
+      columns: [table.existingPartId, table.tenantId],
+      foreignColumns: [parts.id, parts.tenantId],
+    }).onDelete('cascade'),
   ]
 );
 
@@ -398,6 +416,11 @@ export const aiProviderConfig = catalogSchema.table(
     uniqueIndex('ai_provider_config_tenant_op_idx').on(
       table.tenantId,
       table.operationType
+    ),
+    // Enabled configurations must have an API key to prevent runtime failures
+    check(
+      'ai_provider_config_enabled_key_chk',
+      sql`${table.isEnabled} = false OR ${table.apiKeyEncrypted} IS NOT NULL`
     ),
   ]
 );
