@@ -118,7 +118,9 @@ const DEFAULT_SORT: Record<string, { column: string; dir: 'asc' | 'desc' }> = {
 
 function resolveSortColumn(kpiId: string, sort: string): string {
   const mapping = SORT_COLUMNS[kpiId];
-  return mapping?.[sort] ?? Object.values(mapping)[0];
+  const defaultCol = DEFAULT_SORT[kpiId]?.column ?? '1';
+  if (!mapping) return defaultCol;
+  return mapping[sort] ?? mapping[defaultCol] ?? Object.values(mapping)[0];
 }
 
 // ─── Fill Rate Drilldown ──────────────────────────────────────────────
@@ -156,24 +158,11 @@ async function drilldownFillRate(filters: DrilldownFilters): Promise<DrilldownRe
       r.order_type AS "orderType",
       r.order_id::text AS "orderId",
       count(rl.id)::int AS "totalLines",
-      count(rl.id) FILTER (
-        WHERE rl.id NOT IN (
-          SELECT rl2.id FROM orders.receipt_lines rl2
-          WHERE rl2.tenant_id = ${tenantId}
-            AND rl2.receipt_id = r.id
-            AND rl2.quantity_accepted < rl2.quantity_expected
-        )
-      )::int AS "fullLines",
+      sum(CASE WHEN rl.quantity_accepted >= rl.quantity_expected THEN 1 ELSE 0 END)::int AS "fullLines",
       CASE WHEN count(rl.id) > 0
         THEN round(
-          count(rl.id) FILTER (
-            WHERE rl.id NOT IN (
-              SELECT rl2.id FROM orders.receipt_lines rl2
-              WHERE rl2.tenant_id = ${tenantId}
-                AND rl2.receipt_id = r.id
-                AND rl2.quantity_accepted < rl2.quantity_expected
-            )
-          )::numeric / count(rl.id) * 100, 2
+          sum(CASE WHEN rl.quantity_accepted >= rl.quantity_expected THEN 1 ELSE 0 END)::numeric
+            / count(rl.id) * 100, 2
         )::float
         ELSE 0
       END AS "fillRatePercent",
@@ -409,7 +398,7 @@ async function drilldownOrderAccuracy(filters: DrilldownFilters): Promise<Drilld
       rl.quantity_accepted AS "quantityAccepted",
       rl.quantity_damaged AS "quantityDamaged",
       rl.quantity_rejected AS "quantityRejected",
-      (rl.quantity_damaged = 0 AND rl.quantity_rejected = 0) AS "isAccurate",
+      (rl.quantity_accepted = rl.quantity_expected AND rl.quantity_damaged = 0 AND rl.quantity_rejected = 0) AS "isAccurate",
       r.created_at AS "createdAt"
     FROM orders.receipt_lines rl
     JOIN orders.receipts r ON r.id = rl.receipt_id
