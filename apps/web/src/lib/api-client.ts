@@ -47,6 +47,8 @@ import type {
   TransferQueueItem,
   SourceRecommendation,
   InventoryLedgerEntry,
+  CrossLocationMatrixResponse,
+  CrossLocationSummary,
   Receipt,
   ReceivingMetrics,
   ReceivingException,
@@ -1808,6 +1810,53 @@ export async function fetchTransferQueue(
   return apiRequest(`/api/orders/transfer-orders/queue${suffix}`, { token });
 }
 
+export async function fetchLeadTimeSummary(
+  token: string,
+  params?: {
+    page?: number;
+    pageSize?: number;
+    dateFrom?: string;
+    dateTo?: string;
+    sourceFacilityId?: string;
+    destinationFacilityId?: string;
+    partId?: string;
+  },
+): Promise<{
+  data: import("@/types").LeadTimeSummaryRow[];
+  pagination: { page: number; pageSize: number; total: number; totalPages: number };
+}> {
+  const qs = new URLSearchParams();
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.pageSize) qs.set("pageSize", String(params.pageSize));
+  if (params?.dateFrom) qs.set("dateFrom", params.dateFrom);
+  if (params?.dateTo) qs.set("dateTo", params.dateTo);
+  if (params?.sourceFacilityId) qs.set("sourceFacilityId", params.sourceFacilityId);
+  if (params?.destinationFacilityId) qs.set("destinationFacilityId", params.destinationFacilityId);
+  if (params?.partId) qs.set("partId", params.partId);
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return apiRequest(`/api/transfer-orders/lead-times${suffix}`, { token });
+}
+
+export async function fetchLeadTimeTrend(
+  token: string,
+  params?: {
+    dateFrom?: string;
+    dateTo?: string;
+    sourceFacilityId?: string;
+    destinationFacilityId?: string;
+    partId?: string;
+  },
+): Promise<{ data: import("@/types").LeadTimeTrendPoint[] }> {
+  const qs = new URLSearchParams();
+  if (params?.dateFrom) qs.set("dateFrom", params.dateFrom);
+  if (params?.dateTo) qs.set("dateTo", params.dateTo);
+  if (params?.sourceFacilityId) qs.set("sourceFacilityId", params.sourceFacilityId);
+  if (params?.destinationFacilityId) qs.set("destinationFacilityId", params.destinationFacilityId);
+  if (params?.partId) qs.set("partId", params.partId);
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return apiRequest(`/api/transfer-orders/lead-times/trend${suffix}`, { token });
+}
+
 export async function fetchInventoryByFacility(
   token: string,
   facilityId: string,
@@ -1818,6 +1867,25 @@ export async function fetchInventoryByFacility(
   if (params?.pageSize) qs.set("pageSize", String(params.pageSize));
   const suffix = qs.toString() ? `?${qs.toString()}` : "";
   return apiRequest(`/api/orders/inventory/facilities/${encodeURIComponent(facilityId)}/inventory${suffix}`, { token });
+}
+
+/* ── Cross-Location Inventory ────────────────────────────────── */
+
+export async function fetchCrossLocationMatrix(
+  token: string,
+  params?: { page?: number; pageSize?: number; partId?: string; facilityId?: string },
+): Promise<CrossLocationMatrixResponse> {
+  const qs = new URLSearchParams();
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.pageSize) qs.set("pageSize", String(params.pageSize));
+  if (params?.partId) qs.set("partId", params.partId);
+  if (params?.facilityId) qs.set("facilityId", params.facilityId);
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return apiRequest(`/api/inventory/cross-location${suffix}`, { token });
+}
+
+export async function fetchCrossLocationSummary(token: string): Promise<CrossLocationSummary> {
+  return apiRequest("/api/inventory/cross-location/summary", { token });
 }
 
 /* ── Receiving ────────────────────────────────────────────────── */

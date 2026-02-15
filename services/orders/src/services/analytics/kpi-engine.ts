@@ -1,5 +1,5 @@
 import { db, schema } from '@arda/db';
-import { eq, and, sql, gte, lte, lt, isNotNull } from 'drizzle-orm';
+import { eq, and, sql, gte, lt, isNotNull } from 'drizzle-orm';
 import { createLogger } from '@arda/config';
 
 const log = createLogger('orders:kpi-engine');
@@ -36,6 +36,32 @@ export interface KpiResult {
   lastUpdated: string;
 }
 
+export interface KpiTrendDataPoint {
+  date: string;
+  value: number;
+  facilityId?: string;
+  facilityName?: string;
+}
+
+export interface KpiTrendResult {
+  kpiId: string;
+  period: number;
+  bucket: 'daily' | 'weekly';
+  startDate: string;
+  endDate: string;
+  dataPoints: KpiTrendDataPoint[];
+  facilities: Array<{ id: string; name: string }>;
+}
+
+export interface TrendFilters {
+  tenantId: string;
+  kpiId: string;
+  startDate: Date;
+  endDate: Date;
+  bucket: 'daily' | 'weekly';
+  facilityIds?: string[];
+}
+
 // ─── KPI Metadata ──────────────────────────────────────────────────────
 
 const KPI_META: Record<
@@ -48,6 +74,8 @@ const KPI_META: Record<
   avg_cycle_time: { unit: 'hrs', isNegativeGood: true, threshold: 72 },
   order_accuracy: { unit: '%', isNegativeGood: false, threshold: 98 },
 };
+
+export const VALID_KPI_IDS = Object.keys(KPI_META);
 
 // ─── Helpers ───────────────────────────────────────────────────────────
 
@@ -106,11 +134,18 @@ async function computeFillRate(
 ): Promise<number> {
   // Fill Rate = (receipts where ALL lines have quantityAccepted >= quantityExpected) / total receipts * 100
   // A receipt is "fully filled" when every receipt line accepted the expected quantity.
+  // Only count receipts with a known order_type (purchase_order, transfer_order, work_order).
   const facilityJoin = facilityIds?.length
-    ? sql` AND r.order_id IN (
-        SELECT id FROM orders.purchase_orders WHERE tenant_id = ${tenantId} AND facility_id = ANY(${facilityIds})
-        UNION ALL
-        SELECT id FROM orders.transfer_orders WHERE tenant_id = ${tenantId} AND destination_facility_id = ANY(${facilityIds})
+    ? sql` AND (
+        (r.order_type = 'purchase_order' AND r.order_id IN (
+          SELECT id FROM orders.purchase_orders WHERE tenant_id = ${tenantId} AND facility_id = ANY(${facilityIds})
+        ))
+        OR (r.order_type = 'transfer_order' AND r.order_id IN (
+          SELECT id FROM orders.transfer_orders WHERE tenant_id = ${tenantId} AND destination_facility_id = ANY(${facilityIds})
+        ))
+        OR (r.order_type = 'work_order' AND r.order_id IN (
+          SELECT id FROM orders.work_orders WHERE tenant_id = ${tenantId} AND facility_id = ANY(${facilityIds})
+        ))
       )`
     : sql``;
 
@@ -128,6 +163,7 @@ async function computeFillRate(
     FROM orders.receipts r
     JOIN orders.receipt_lines rl ON rl.receipt_id = r.id
     WHERE r.tenant_id = ${tenantId}
+      AND r.order_type IN ('purchase_order', 'transfer_order', 'work_order')
       AND r.created_at >= ${startDate.toISOString()}::timestamptz
       AND r.created_at < ${endDate.toISOString()}::timestamptz
       ${facilityJoin}
@@ -177,31 +213,38 @@ async function computeSupplierOtd(
 
 async function computeStockoutCount(
   tenantId: string,
-  _startDate: Date,
-  _endDate: Date,
+  startDate: Date,
+  endDate: Date,
   facilityIds?: string[],
 ): Promise<number> {
-  // Stockout count = number of distinct part+facility combos where qty_on_hand <= 0
-  // This is a point-in-time snapshot from the inventory ledger.
-  const conditions = [
-    eq(schema.inventoryLedger.tenantId, tenantId),
-    lte(schema.inventoryLedger.qtyOnHand, 0),
-  ];
+  // Stockout count = number of distinct stockout *events* within the date range.
+  // A stockout event is an audit log entry where an inventory_ledger record
+  // transitioned from qty_on_hand > 0 to qty_on_hand <= 0.
+  // This uses the audit log instead of a point-in-time ledger snapshot so that
+  // the result is properly time-windowed.
+  const facilityFilter = facilityIds?.length
+    ? sql` AND a.entity_id IN (
+        SELECT il.id FROM locations.inventory_ledger il
+        WHERE il.tenant_id = ${tenantId}
+          AND il.facility_id = ANY(${facilityIds})
+      )`
+    : sql``;
 
-  if (facilityIds?.length) {
-    conditions.push(
-      sql`${schema.inventoryLedger.facilityId} = ANY(${facilityIds})` as ReturnType<typeof eq>,
-    );
-  }
+  const result = await db.execute(sql`
+    SELECT count(*)::int AS stockout_events
+    FROM audit.audit_log a
+    WHERE a.tenant_id = ${tenantId}
+      AND a.entity_type = 'inventory_ledger'
+      AND a.action IN ('inventory.adjusted', 'inventory.ledger_updated')
+      AND a.timestamp >= ${startDate.toISOString()}::timestamptz
+      AND a.timestamp < ${endDate.toISOString()}::timestamptz
+      AND (a.previous_state->>'qtyOnHand')::int > 0
+      AND (a.new_state->>'qtyOnHand')::int <= 0
+      ${facilityFilter}
+  `);
 
-  const result = await db
-    .select({
-      stockouts: sql<number>`count(*)::int`,
-    })
-    .from(schema.inventoryLedger)
-    .where(and(...conditions));
-
-  return result[0]?.stockouts ?? 0;
+  const rows = result as unknown as Array<{ stockout_events: number }>;
+  return rows[0]?.stockout_events ?? 0;
 }
 
 async function computeAvgCycleTime(
@@ -246,11 +289,18 @@ async function computeOrderAccuracy(
 ): Promise<number> {
   // Order Accuracy = (receipt lines with zero defects) / (total receipt lines) * 100
   // A line is accurate when quantityDamaged = 0 AND quantityRejected = 0
+  // Only count receipts with a known order_type (purchase_order, transfer_order, work_order).
   const facilityJoin = facilityIds?.length
-    ? sql` AND r.order_id IN (
-        SELECT id FROM orders.purchase_orders WHERE tenant_id = ${tenantId} AND facility_id = ANY(${facilityIds})
-        UNION ALL
-        SELECT id FROM orders.transfer_orders WHERE tenant_id = ${tenantId} AND destination_facility_id = ANY(${facilityIds})
+    ? sql` AND (
+        (r.order_type = 'purchase_order' AND r.order_id IN (
+          SELECT id FROM orders.purchase_orders WHERE tenant_id = ${tenantId} AND facility_id = ANY(${facilityIds})
+        ))
+        OR (r.order_type = 'transfer_order' AND r.order_id IN (
+          SELECT id FROM orders.transfer_orders WHERE tenant_id = ${tenantId} AND destination_facility_id = ANY(${facilityIds})
+        ))
+        OR (r.order_type = 'work_order' AND r.order_id IN (
+          SELECT id FROM orders.work_orders WHERE tenant_id = ${tenantId} AND facility_id = ANY(${facilityIds})
+        ))
       )`
     : sql``;
 
@@ -263,6 +313,7 @@ async function computeOrderAccuracy(
     FROM orders.receipt_lines rl
     JOIN orders.receipts r ON r.id = rl.receipt_id
     WHERE rl.tenant_id = ${tenantId}
+      AND r.order_type IN ('purchase_order', 'transfer_order', 'work_order')
       AND r.created_at >= ${startDate.toISOString()}::timestamptz
       AND r.created_at < ${endDate.toISOString()}::timestamptz
       ${facilityJoin}
@@ -360,4 +411,144 @@ export async function computeAllKpis(filters: KpiFilters): Promise<KpiResult[]> 
   );
 
   return results;
+}
+
+// ─── Trend Computation ──────────────────────────────────────────────
+
+/**
+ * Build date buckets for trend data. Each bucket is a contiguous time range.
+ * Daily: one bucket per day. Weekly: one bucket per 7 days.
+ */
+function buildTrendBuckets(
+  startDate: Date,
+  endDate: Date,
+  bucket: 'daily' | 'weekly',
+): { bucketStart: Date; bucketEnd: Date; date: string }[] {
+  const buckets: { bucketStart: Date; bucketEnd: Date; date: string }[] = [];
+  const stepMs = bucket === 'daily' ? 86_400_000 : 7 * 86_400_000;
+
+  let current = new Date(startDate);
+  while (current < endDate) {
+    const bucketEnd = new Date(Math.min(current.getTime() + stepMs, endDate.getTime()));
+    buckets.push({
+      bucketStart: new Date(current),
+      bucketEnd,
+      date: current.toISOString().slice(0, 10), // YYYY-MM-DD
+    });
+    current = bucketEnd;
+  }
+
+  return buckets;
+}
+
+/**
+ * Look up facility names for the given IDs.
+ */
+async function lookupFacilities(
+  tenantId: string,
+  facilityIds: string[],
+): Promise<Array<{ id: string; name: string }>> {
+  if (!facilityIds.length) return [];
+
+  const result = await db.execute(sql`
+    SELECT id, name
+    FROM locations.facilities
+    WHERE tenant_id = ${tenantId}
+      AND id = ANY(${facilityIds})
+    ORDER BY name
+  `);
+
+  return (result as unknown as Array<{ id: string; name: string }>);
+}
+
+/**
+ * Compute a time-series trend for a single KPI over a date range.
+ * Supports facility overlays: when facilityIds are provided, each data point
+ * is computed per-facility, allowing frontend to render multi-line overlays.
+ */
+export async function computeKpiTrend(filters: TrendFilters): Promise<KpiTrendResult> {
+  const { tenantId, kpiId, startDate, endDate, bucket, facilityIds } = filters;
+  const startTime = Date.now();
+
+  const computeFn = KPI_COMPUTE_FNS[kpiId];
+  if (!computeFn) {
+    throw new KpiNotFoundError(kpiId);
+  }
+
+  const buckets = buildTrendBuckets(startDate, endDate, bucket);
+  const hasFacilityOverlay = facilityIds && facilityIds.length > 1;
+
+  let dataPoints: KpiTrendDataPoint[];
+  let facilities: Array<{ id: string; name: string }> = [];
+
+  if (hasFacilityOverlay) {
+    // Compute per-facility overlays: one series per facility
+    facilities = await lookupFacilities(tenantId, facilityIds);
+    const facilityMap = new Map(facilities.map((f) => [f.id, f.name]));
+
+    dataPoints = (
+      await Promise.all(
+        facilityIds.map(async (facId) => {
+          const points = await Promise.all(
+            buckets.map(async (b) => {
+              const value = await computeFn(tenantId, b.bucketStart, b.bucketEnd, [facId]);
+              return {
+                date: b.date,
+                value,
+                facilityId: facId,
+                facilityName: facilityMap.get(facId) ?? facId,
+              };
+            }),
+          );
+          return points;
+        }),
+      )
+    ).flat();
+
+    // Sort overlay points chronologically, then by facilityId for deterministic ordering
+    dataPoints.sort((a, b) => {
+      const dateCmp = a.date.localeCompare(b.date);
+      if (dateCmp !== 0) return dateCmp;
+      return (a.facilityId ?? '').localeCompare(b.facilityId ?? '');
+    });
+  } else {
+    // Single aggregate series (optionally filtered to one facility)
+    dataPoints = await Promise.all(
+      buckets.map(async (b) => {
+        const value = await computeFn(tenantId, b.bucketStart, b.bucketEnd, facilityIds);
+        return { date: b.date, value };
+      }),
+    );
+
+    if (facilityIds?.length === 1) {
+      facilities = await lookupFacilities(tenantId, facilityIds);
+    }
+  }
+
+  const durationMs = Date.now() - startTime;
+  const periodDays = Math.round((endDate.getTime() - startDate.getTime()) / 86_400_000);
+  log.info(
+    { tenantId, kpiId, periodDays, bucket, pointCount: dataPoints.length, durationMs },
+    'KPI trend computation complete',
+  );
+
+  return {
+    kpiId,
+    period: periodDays,
+    bucket,
+    startDate: startDate.toISOString().slice(0, 10),
+    endDate: endDate.toISOString().slice(0, 10),
+    dataPoints,
+    facilities,
+  };
+}
+
+// ─── Error Types ────────────────────────────────────────────────────
+
+export class KpiNotFoundError extends Error {
+  public readonly code = 'KPI_NOT_FOUND';
+  constructor(kpiId: string) {
+    super(`Unknown KPI: '${kpiId}'. Valid KPIs: ${VALID_KPI_IDS.join(', ')}`);
+    this.name = 'KpiNotFoundError';
+  }
 }

@@ -98,6 +98,43 @@ export type NotificationType =
   | 'production_hold'
   | 'automation_escalated';
 
+export type NotificationChannel = 'in_app' | 'email' | 'webhook';
+export type NotificationApiChannel = 'inApp' | 'email' | 'webhook';
+
+/** Maps API channel names to database column values. */
+export const API_TO_DB_CHANNEL: Record<NotificationApiChannel, NotificationChannel> = {
+  inApp: 'in_app',
+  email: 'email',
+  webhook: 'webhook',
+} as const;
+
+/** Maps database channel values to API channel names. */
+export const DB_TO_API_CHANNEL: Record<NotificationChannel, NotificationApiChannel> = {
+  in_app: 'inApp',
+  email: 'email',
+  webhook: 'webhook',
+} as const;
+
+/**
+ * Canonical system-level default notification preferences.
+ * Single source of truth — imported by both the notifications and auth services.
+ */
+export const NOTIFICATION_DEFAULT_PREFERENCES: Record<NotificationType, Record<NotificationApiChannel, boolean>> = {
+  card_triggered: { inApp: true, email: false, webhook: false },
+  po_created: { inApp: true, email: true, webhook: false },
+  po_sent: { inApp: true, email: false, webhook: false },
+  po_received: { inApp: true, email: true, webhook: false },
+  stockout_warning: { inApp: true, email: true, webhook: false },
+  relowisa_recommendation: { inApp: true, email: false, webhook: false },
+  exception_alert: { inApp: true, email: true, webhook: true },
+  wo_status_change: { inApp: true, email: false, webhook: false },
+  transfer_status_change: { inApp: true, email: false, webhook: false },
+  system_alert: { inApp: true, email: true, webhook: false },
+  receiving_completed: { inApp: true, email: true, webhook: false },
+  production_hold: { inApp: true, email: true, webhook: false },
+  automation_escalated: { inApp: true, email: true, webhook: true },
+};
+
 export type DeliveryStatus =
   | 'pending'
   | 'sent'
@@ -797,4 +834,82 @@ export interface LeadTimeFilters {
   partId?: string;
   dateFrom?: string; // ISO date string
   dateTo?: string; // ISO date string
+}
+
+// ─── Import Pipeline Types (MVP-21) ────────────────────────────────
+
+export type ImportJobStatus =
+  | 'pending'
+  | 'parsing'
+  | 'matching'
+  | 'review'
+  | 'applying'
+  | 'completed'
+  | 'failed'
+  | 'cancelled';
+
+export type ImportSourceType =
+  | 'csv'
+  | 'xlsx'
+  | 'google_sheets'
+  | 'manual_entry';
+
+export type ImportItemDisposition =
+  | 'new'
+  | 'duplicate'
+  | 'update'
+  | 'skip'
+  | 'error';
+
+export type AiOperationType =
+  | 'field_mapping'
+  | 'deduplication'
+  | 'categorization'
+  | 'enrichment'
+  | 'validation';
+
+export type AiProviderLogStatus =
+  | 'pending'
+  | 'success'
+  | 'error'
+  | 'timeout';
+
+// ─── Import Job State Transitions ───────────────────────────────────
+export const IMPORT_JOB_VALID_TRANSITIONS: Record<ImportJobStatus, ImportJobStatus[]> = {
+  pending: ['parsing', 'cancelled'],
+  parsing: ['matching', 'failed'],
+  matching: ['review', 'failed'],
+  review: ['applying', 'cancelled'],
+  applying: ['completed', 'failed'],
+  completed: [],
+  failed: [],
+  cancelled: [],
+};
+
+// ─── Import Pipeline Interfaces ─────────────────────────────────────
+export interface ImportJobSummary {
+  id: string;
+  tenantId: string;
+  status: ImportJobStatus;
+  sourceType: ImportSourceType;
+  fileName: string;
+  totalRows: number;
+  processedRows: number;
+  newItems: number;
+  duplicateItems: number;
+  updatedItems: number;
+  skippedItems: number;
+  errorItems: number;
+  createdByUserId: string;
+  createdAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+}
+
+export interface ImportMatchResult {
+  importItemId: string;
+  existingPartId: string | null;
+  matchScore: number;
+  matchMethod: string;
+  disposition: ImportItemDisposition;
 }

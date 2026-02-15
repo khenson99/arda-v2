@@ -688,6 +688,53 @@ export interface SourceRecommendation {
   score: number;
 }
 
+/* ── Lead-Time Analytics ────────────────────────────────────────── */
+
+export interface LeadTimeSummaryRow {
+  routeKey: string;
+  sourceFacilityId: string;
+  sourceFacilityName: string;
+  destinationFacilityId: string;
+  destinationFacilityName: string;
+  partId: string | null;
+  partNumber: string | null;
+  partName: string | null;
+  avgLeadTimeDays: number;
+  medianLeadTimeDays: number;
+  p90LeadTimeDays: number;
+  minLeadTimeDays: number;
+  maxLeadTimeDays: number;
+  transferCount: number;
+}
+
+export interface LeadTimeTrendPoint {
+  date: string;
+  avgLeadTimeDays: number;
+  transferCount: number;
+}
+
+export interface LeadTimeFilters {
+  dateFrom?: string;
+  dateTo?: string;
+  sourceFacilityId?: string;
+  destinationFacilityId?: string;
+  partId?: string;
+}
+
+export interface LeadTimeSummaryResponse {
+  data: LeadTimeSummaryRow[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export interface LeadTimeTrendResponse {
+  data: LeadTimeTrendPoint[];
+}
+
 /* ── Inventory Ledger ─────────────────────────────────────────── */
 
 export interface InventoryLedgerEntry {
@@ -702,6 +749,42 @@ export interface InventoryLedgerEntry {
   reorderPoint: number | null;
   reorderQty: number | null;
   updatedAt: string;
+}
+
+/* ── Cross-Location Inventory ────────────────────────────────── */
+
+export interface CrossLocationMatrixCell {
+  facilityId: string;
+  facilityName: string;
+  partId: string;
+  partNumber: string;
+  partName: string;
+  qtyOnHand: number;
+  qtyReserved: number;
+  qtyInTransit: number;
+  available: number;
+  reorderPoint: number | null;
+  isBelowReorder: boolean;
+  isNearReorder: boolean;
+}
+
+export interface CrossLocationMatrixResponse {
+  data: CrossLocationMatrixCell[];
+  facilities: Array<{ id: string; name: string }>;
+  parts: Array<{ id: string; partNumber: string; name: string }>;
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export interface CrossLocationSummary {
+  totalInTransitValue: number;
+  pendingTransferCount: number;
+  averageNetworkLeadTime: number;
+  facilitiesBelowReorder: number;
 }
 
 /* ── Receiving ───────────────────────────────────────────────── */
