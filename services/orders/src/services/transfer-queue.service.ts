@@ -2,17 +2,17 @@
  * Transfer Queue Service
  *
  * Aggregates actionable transfer needs from three sources:
- *   1. Draft TOs (status = draft)
+ *   1. Draft/Requested TOs (status = draft | requested)
  *   2. Kanban-triggered transfer requests (cards in 'triggered' stage)
  *   3. Inventory rows below reorder point
  *
  * Each queue item includes:
  *   - Priority score (computed from days-below-reorder-point, Kanban urgency, expedite flags)
- *   - Recommended source facilities (inline)
+ *   - Recommended source facilities (inline, fetched only for the paginated result set)
  */
 
 import { db, schema } from '@arda/db';
-import { eq, and, lt, sql, inArray, or } from 'drizzle-orm';
+import { eq, and, sql, inArray, or } from 'drizzle-orm';
 import { createLogger } from '@arda/config';
 import { recommendSources, type RecommendSourcesInput } from './source-recommendation.service.js';
 import type { SourceRecommendation } from '@arda/shared-types';
@@ -30,21 +30,21 @@ const {
 
 // ─── Types ────────────────────────────────────────────────────────────
 
+export type TransferQueueStatus = 'draft' | 'requested' | 'triggered' | 'below_reorder';
+
 export interface TransferQueueFilters {
   destinationFacilityId?: string;
   sourceFacilityId?: string;
-  status?: string;
+  status?: TransferQueueStatus;
   partId?: string;
   minPriorityScore?: number;
   maxPriorityScore?: number;
 }
 
 export interface TransferQueueItem {
-  // Core identification
   id: string;
   type: 'draft_to' | 'kanban_trigger' | 'below_reorder';
 
-  // Transfer details
   transferOrderId?: string;
   toNumber?: string;
   kanbanCardId?: string;
@@ -54,29 +54,23 @@ export interface TransferQueueItem {
   /** Number of distinct parts/lines on this queue item (> 1 for multi-line TOs). */
   lineCount?: number;
 
-  // Facilities
   sourceFacilityId?: string;
   sourceFacilityName?: string;
   destinationFacilityId: string;
   destinationFacilityName: string;
 
-  // Quantities
   quantityRequested: number;
   availableQty?: number;
 
-  // Priority
   priorityScore: number;
   daysBelowReorder?: number;
   isExpedited: boolean;
 
-  // Status
   status: string;
 
-  // Timestamps
   createdAt: string;
   requestedDate?: string;
 
-  // Inline recommendations
   recommendedSources: SourceRecommendation[];
 }
 
@@ -95,18 +89,17 @@ const WEIGHT_EXPEDITE = 0.2;
 
 /**
  * Compute priority score for a queue item.
- * - daysBelowReorder: normalized (0-1) based on how long below reorder
+ * - daysBelowReorder: normalized (0-1) based on how long below reorder (max 30 days)
  * - kanbanUrgency: 1 if Kanban-triggered, 0 otherwise
  * - expedite: 1 if expedited/requested status, 0 otherwise
  *
  * Returns score in range 0-100
  */
-function computePriorityScore(input: {
+export function computePriorityScore(input: {
   daysBelowReorder: number;
   isKanbanTriggered: boolean;
   isExpedited: boolean;
 }): number {
-  // Normalize days below reorder: assume max 30 days for scale
   const maxDays = 30;
   const daysScore = Math.min(input.daysBelowReorder / maxDays, 1);
 
@@ -170,19 +163,48 @@ async function batchRecommendSources(
   return results;
 }
 
+// ─── Internal candidate type (no recommendations yet) ────────────────
+
+interface QueueCandidate {
+  id: string;
+  type: 'draft_to' | 'kanban_trigger' | 'below_reorder';
+  transferOrderId?: string;
+  toNumber?: string;
+  kanbanCardId?: string;
+  partId: string;
+  lineCount?: number;
+  sourceFacilityId?: string;
+  sourceFacilityName?: string;
+  destinationFacilityId: string;
+  destinationFacilityName: string;
+  quantityRequested: number;
+  availableQty?: number;
+  priorityScore: number;
+  daysBelowReorder?: number;
+  isExpedited: boolean;
+  status: string;
+  createdAt: string;
+  requestedDate?: string;
+  /** For below_reorder / kanban items, the minQty hint for recommendations */
+  _recMinQty?: number;
+}
+
 // ─── Main Function ────────────────────────────────────────────────────
 
 /**
  * Get transfer queue aggregating draft TOs, Kanban triggers, and below-reorder inventory.
+ *
+ * Performance strategy: build all candidate items first (without recommendations),
+ * apply global sort + pagination, then fetch recommendations only for the paginated slice.
  */
 export async function getTransferQueue(
   input: GetTransferQueueInput
 ): Promise<{ items: TransferQueueItem[]; total: number }> {
   const { tenantId, filters = {}, limit = 20, offset = 0 } = input;
 
-  const items: TransferQueueItem[] = [];
+  const candidates: QueueCandidate[] = [];
 
-  // ─── 1. Draft Transfer Orders ────────────────────────────────────────
+  // ─── 1. Draft/Requested Transfer Orders ───────────────────────────────
 
   const draftConditions = [
     eq(transferOrders.tenantId, tenantId),
@@ -199,7 +221,6 @@ export async function getTransferQueue(
     draftConditions.push(eq(transferOrders.sourceFacilityId, filters.sourceFacilityId));
   }
   if (filters.status && filters.status !== 'draft' && filters.status !== 'requested') {
-    // Skip draft/requested TOs if filtering for a different status
     draftConditions.push(sql`false`);
   }
 
@@ -224,14 +245,12 @@ export async function getTransferQueue(
       )
     )
     .where(and(...draftConditions));
-    // No per-source limit — pagination applied at final sort/slice
 
-  // Batch-load destination facilities and TO lines to eliminate N+1 queries
+  // Batch-load destination facilities and TO lines
   const draftTOIds = draftTOs.map(to => to.id);
   const draftDestFacilityIds = [...new Set(draftTOs.map(to => to.destinationFacilityId))];
 
   const [destFacilitiesMap, allTOLines] = await Promise.all([
-    // Batch-load destination facilities
     draftDestFacilityIds.length > 0
       ? db
           .select({ id: facilities.id, name: facilities.name })
@@ -244,7 +263,6 @@ export async function getTransferQueue(
           )
           .then(rows => new Map(rows.map(r => [r.id, r.name])))
       : Promise.resolve(new Map<string, string>()),
-    // Batch-load all TO lines
     draftTOIds.length > 0
       ? db
           .select({
@@ -270,16 +288,6 @@ export async function getTransferQueue(
     linesByTOId.set(line.transferOrderId, existing);
   }
 
-  // Pre-compute filtered draft TOs with their line data for batch recommendation
-  const draftTOsWithLines: Array<{
-    draftTO: (typeof draftTOs)[number];
-    lines: typeof allTOLines;
-    partIds: string[];
-    firstPartId: string;
-    totalQty: number;
-    isExpedited: boolean;
-  }> = [];
-
   for (const draftTO of draftTOs) {
     const lines = linesByTOId.get(draftTO.id) ?? [];
     if (lines.length === 0) continue;
@@ -288,35 +296,18 @@ export async function getTransferQueue(
     const partIds = [...new Set(lines.map(l => l.partId))];
     const firstPartId = partIds[0];
 
-    // Apply partId filter
     if (filters.partId && !partIds.includes(filters.partId)) {
       continue;
     }
 
-    // Fix #1: Determine expedited status from the TO's priorityScore field
-    // rather than comparing status to 'requested' (which is about workflow state,
-    // not urgency). A non-zero priorityScore indicates the TO was flagged as expedited.
-    const isExpedited = Number(draftTO.priorityScore ?? 0) > 0;
+    const isExpedited = draftTO.status === 'requested' || Number(draftTO.priorityScore ?? 0) > 0;
 
-    draftTOsWithLines.push({ draftTO, lines, partIds, firstPartId, totalQty, isExpedited });
-  }
-
-  // Fix #3: Batch-load source recommendations for all draft TOs at once
-  const draftRecommendationRequests = draftTOsWithLines.map(({ draftTO, firstPartId }) => ({
-    destinationFacilityId: draftTO.destinationFacilityId,
-    partId: firstPartId,
-  }));
-  const draftRecsMap = await batchRecommendSources(tenantId, draftRecommendationRequests);
-
-  for (const { draftTO, partIds, firstPartId, totalQty, isExpedited } of draftTOsWithLines) {
-    // Compute priority score (drafts have low urgency unless expedited)
     const priorityScore = computePriorityScore({
       daysBelowReorder: 0,
       isKanbanTriggered: false,
       isExpedited,
     });
 
-    // Apply priority filter
     if (filters.minPriorityScore !== undefined && priorityScore < filters.minPriorityScore) {
       continue;
     }
@@ -324,16 +315,11 @@ export async function getTransferQueue(
       continue;
     }
 
-    // Look up pre-fetched recommendations
-    const recKey = `${draftTO.destinationFacilityId}::${firstPartId}`;
-    const recommendedSources = draftRecsMap.get(recKey) ?? [];
-
-    items.push({
+    candidates.push({
       id: draftTO.id,
       type: 'draft_to',
       transferOrderId: draftTO.id,
       toNumber: draftTO.toNumber,
-      // Fix #2: Always use a valid UUID for partId; expose lineCount for multi-line TOs
       partId: firstPartId,
       lineCount: partIds.length > 1 ? partIds.length : undefined,
       sourceFacilityId: draftTO.sourceFacilityId,
@@ -346,7 +332,6 @@ export async function getTransferQueue(
       status: draftTO.status,
       createdAt: draftTO.createdAt.toISOString(),
       requestedDate: draftTO.requestedDate?.toISOString(),
-      recommendedSources,
     });
   }
 
@@ -387,9 +372,8 @@ export async function getTransferQueue(
       )
     )
     .where(and(...kanbanConditions));
-    // No per-source limit — pagination applied at final sort/slice
 
-  // Batch-load source facility names for Kanban cards
+  // Batch-load source facility names
   const kanbanSourceFacilityIds = [
     ...new Set(
       kanbanCards_triggered
@@ -410,40 +394,25 @@ export async function getTransferQueue(
         .then(rows => new Map(rows.map(r => [r.id, r.name])))
     : new Map<string, string>();
 
-  // Pre-filter Kanban cards and batch-load recommendations
-  const filteredKanbanCards = kanbanCards_triggered.filter(card => {
+  for (const card of kanbanCards_triggered) {
     if (filters.partId && card.loop.partId !== filters.partId) {
-      return false;
+      continue;
     }
-    return true;
-  });
 
-  // Fix #3: Batch-load source recommendations for all Kanban cards at once
-  const kanbanRecommendationRequests = filteredKanbanCards.map(card => ({
-    destinationFacilityId: card.loop.facilityId,
-    partId: card.loop.partId,
-    minQty: card.loop.orderQuantity,
-  }));
-  const kanbanRecsMap = await batchRecommendSources(tenantId, kanbanRecommendationRequests);
-
-  for (const card of filteredKanbanCards) {
     const sourceFacilityName = card.loop.sourceFacilityId
       ? (kanbanSourceFacMap.get(card.loop.sourceFacilityId) ?? 'Unknown')
       : 'Unknown';
 
-    // Compute days since triggered (proxy for urgency)
     const daysSinceTrigger = Math.floor(
       (Date.now() - card.currentStageEnteredAt.getTime()) / (1000 * 60 * 60 * 24)
     );
 
-    // Compute priority score
     const priorityScore = computePriorityScore({
       daysBelowReorder: daysSinceTrigger,
       isKanbanTriggered: true,
       isExpedited: false,
     });
 
-    // Apply priority filter
     if (filters.minPriorityScore !== undefined && priorityScore < filters.minPriorityScore) {
       continue;
     }
@@ -451,11 +420,7 @@ export async function getTransferQueue(
       continue;
     }
 
-    // Look up pre-fetched recommendations
-    const recKey = `${card.loop.facilityId}::${card.loop.partId}`;
-    const recommendedSources = kanbanRecsMap.get(recKey) ?? [];
-
-    items.push({
+    candidates.push({
       id: card.cardId,
       type: 'kanban_trigger',
       kanbanCardId: card.cardId,
@@ -470,127 +435,155 @@ export async function getTransferQueue(
       isExpedited: false,
       status: 'triggered',
       createdAt: card.currentStageEnteredAt.toISOString(),
-      recommendedSources,
+      _recMinQty: card.loop.orderQuantity,
     });
   }
 
   // ─── 3. Inventory Below Reorder Point ─────────────────────────────────
 
-  const belowReorderConditions = [
-    eq(inventoryLedger.tenantId, tenantId),
-    sql`${inventoryLedger.qtyOnHand} < ${inventoryLedger.reorderPoint}`,
-    sql`${inventoryLedger.reorderPoint} > 0`, // Only where reorder point is set
-  ];
+  const skipBelowReorder =
+    !!filters.status && filters.status !== 'below_reorder';
 
-  if (filters.destinationFacilityId) {
-    belowReorderConditions.push(eq(inventoryLedger.facilityId, filters.destinationFacilityId));
-  }
-  if (filters.partId) {
-    belowReorderConditions.push(eq(inventoryLedger.partId, filters.partId));
-  }
-  if (filters.status && filters.status !== 'below_reorder') {
-    belowReorderConditions.push(sql`false`);
-  }
+  if (!skipBelowReorder) {
+    const belowReorderConditions = [
+      eq(inventoryLedger.tenantId, tenantId),
+      sql`${inventoryLedger.qtyOnHand} < ${inventoryLedger.reorderPoint}`,
+      sql`${inventoryLedger.reorderPoint} > 0`,
+    ];
 
-  const belowReorderRows = await db
-    .select({
-      id: inventoryLedger.id,
-      partId: inventoryLedger.partId,
-      facilityId: inventoryLedger.facilityId,
-      qtyOnHand: inventoryLedger.qtyOnHand,
-      qtyReserved: inventoryLedger.qtyReserved,
-      reorderPoint: inventoryLedger.reorderPoint,
-      reorderQty: inventoryLedger.reorderQty,
-      updatedAt: inventoryLedger.updatedAt,
-      facility: facilities,
-    })
-    .from(inventoryLedger)
-    .leftJoin(
-      facilities,
-      and(
-        eq(inventoryLedger.facilityId, facilities.id),
-        eq(facilities.tenantId, tenantId)
+    if (filters.destinationFacilityId) {
+      belowReorderConditions.push(eq(inventoryLedger.facilityId, filters.destinationFacilityId));
+    }
+    if (filters.partId) {
+      belowReorderConditions.push(eq(inventoryLedger.partId, filters.partId));
+    }
+
+    const belowReorderRows = await db
+      .select({
+        id: inventoryLedger.id,
+        partId: inventoryLedger.partId,
+        facilityId: inventoryLedger.facilityId,
+        qtyOnHand: inventoryLedger.qtyOnHand,
+        qtyReserved: inventoryLedger.qtyReserved,
+        reorderPoint: inventoryLedger.reorderPoint,
+        reorderQty: inventoryLedger.reorderQty,
+        updatedAt: inventoryLedger.updatedAt,
+        facility: facilities,
+      })
+      .from(inventoryLedger)
+      .leftJoin(
+        facilities,
+        and(
+          eq(inventoryLedger.facilityId, facilities.id),
+          eq(facilities.tenantId, tenantId)
+        )
       )
-    )
-    .where(and(...belowReorderConditions));
-    // No per-source limit — pagination applied at final sort/slice
+      .where(and(...belowReorderConditions));
 
-  // Fix #3: Batch-load source recommendations for all below-reorder rows at once
-  const belowReorderRecommendationRequests = belowReorderRows.map(row => ({
-    destinationFacilityId: row.facilityId,
-    partId: row.partId,
-    minQty: row.reorderQty || (row.reorderPoint - row.qtyOnHand),
-  }));
-  const belowReorderRecsMap = await batchRecommendSources(tenantId, belowReorderRecommendationRequests);
+    for (const row of belowReorderRows) {
+      const available = row.qtyOnHand - row.qtyReserved;
+      const deficit = row.reorderPoint - row.qtyOnHand;
 
-  for (const row of belowReorderRows) {
-    const available = row.qtyOnHand - row.qtyReserved;
-    const deficit = row.reorderPoint - row.qtyOnHand;
-
-    // Estimate days below reorder (assume updated daily, rough heuristic)
-    const daysSinceUpdate = Math.floor(
-      (Date.now() - row.updatedAt.getTime()) / (1000 * 60 * 60 * 24)
-    );
-    const daysBelowReorder = Math.max(daysSinceUpdate, 1);
-
-    // Compute priority score
-    const priorityScore = computePriorityScore({
-      daysBelowReorder,
-      isKanbanTriggered: false,
-      isExpedited: false,
-    });
-
-    // Apply priority filter
-    if (filters.minPriorityScore !== undefined && priorityScore < filters.minPriorityScore) {
-      continue;
-    }
-    if (filters.maxPriorityScore !== undefined && priorityScore > filters.maxPriorityScore) {
-      continue;
-    }
-
-    // Look up pre-fetched recommendations
-    const recKey = `${row.facilityId}::${row.partId}`;
-    const recommendedSources = belowReorderRecsMap.get(recKey) ?? [];
-
-    // Fix #4: Apply sourceFacilityId filter to below_reorder items.
-    // Since below_reorder rows don't have a source facility, filter by checking
-    // whether the requested source facility appears in the recommended sources.
-    if (filters.sourceFacilityId) {
-      const matchesSource = recommendedSources.some(
-        rec => rec.facilityId === filters.sourceFacilityId
+      const daysSinceUpdate = Math.floor(
+        (Date.now() - row.updatedAt.getTime()) / (1000 * 60 * 60 * 24)
       );
-      if (!matchesSource) continue;
-    }
+      const daysBelowReorder = Math.max(daysSinceUpdate, 1);
 
-    items.push({
-      id: row.id,
-      type: 'below_reorder',
-      partId: row.partId,
-      destinationFacilityId: row.facilityId,
-      destinationFacilityName: row.facility?.name ?? 'Unknown',
-      quantityRequested: row.reorderQty || deficit,
-      availableQty: available,
-      priorityScore,
-      daysBelowReorder,
-      isExpedited: false,
-      status: 'below_reorder',
-      createdAt: row.updatedAt.toISOString(),
-      recommendedSources,
-    });
+      const priorityScore = computePriorityScore({
+        daysBelowReorder,
+        isKanbanTriggered: false,
+        isExpedited: false,
+      });
+
+      if (filters.minPriorityScore !== undefined && priorityScore < filters.minPriorityScore) {
+        continue;
+      }
+      if (filters.maxPriorityScore !== undefined && priorityScore > filters.maxPriorityScore) {
+        continue;
+      }
+
+      candidates.push({
+        id: row.id,
+        type: 'below_reorder',
+        partId: row.partId,
+        destinationFacilityId: row.facilityId,
+        destinationFacilityName: row.facility?.name ?? 'Unknown',
+        quantityRequested: row.reorderQty || deficit,
+        availableQty: available,
+        priorityScore,
+        daysBelowReorder,
+        isExpedited: false,
+        status: 'below_reorder',
+        createdAt: row.updatedAt.toISOString(),
+        _recMinQty: row.reorderQty || deficit,
+      });
+    }
   }
 
-  // ─── 4. Sort by Priority (descending) + Secondary Sort ────────────────
+  // ─── 3b. Filter below_reorder by sourceFacilityId if set ────────────
+  // Below-reorder items have no intrinsic source facility, so we batch-load
+  // recommendations and keep only those whose recommended sources include
+  // the filtered facility.
 
-  items.sort((a, b) => {
+  if (filters.sourceFacilityId) {
+    const belowReorderCandidates = candidates.filter(c => c.type === 'below_reorder');
+
+    if (belowReorderCandidates.length > 0) {
+      const brRecRequests = belowReorderCandidates.map(c => ({
+        destinationFacilityId: c.destinationFacilityId,
+        partId: c.partId,
+        minQty: c._recMinQty,
+      }));
+
+      const brRecsMap = await batchRecommendSources(tenantId, brRecRequests);
+
+      const matchingIds = new Set<string>();
+      for (const c of belowReorderCandidates) {
+        const recKey = `${c.destinationFacilityId}::${c.partId}`;
+        const recs = brRecsMap.get(recKey) ?? [];
+        if (recs.some(r => r.facilityId === filters.sourceFacilityId)) {
+          matchingIds.add(c.id);
+        }
+      }
+
+      // Remove below_reorder candidates that don't match the source facility filter
+      for (let i = candidates.length - 1; i >= 0; i--) {
+        if (candidates[i].type === 'below_reorder' && !matchingIds.has(candidates[i].id)) {
+          candidates.splice(i, 1);
+        }
+      }
+    }
+  }
+
+  // ─── 4. Sort by Priority (descending) + Stable Secondary Sort ─────────
+
+  candidates.sort((a, b) => {
     if (b.priorityScore !== a.priorityScore) {
       return b.priorityScore - a.priorityScore;
     }
-    // Secondary sort by created date (oldest first)
     return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
   });
 
-  const total = items.length;
-  const paginatedItems = items.slice(offset, offset + limit);
+  const total = candidates.length;
+  const paginatedCandidates = candidates.slice(offset, offset + limit);
 
-  return { items: paginatedItems, total };
+  // ─── 5. Fetch recommendations only for the paginated slice ────────────
+
+  const recRequests = paginatedCandidates.map(c => ({
+    destinationFacilityId: c.destinationFacilityId,
+    partId: c.partId,
+    minQty: c._recMinQty,
+  }));
+
+  const recsMap = await batchRecommendSources(tenantId, recRequests);
+
+  const items: TransferQueueItem[] = paginatedCandidates.map(c => {
+    const recKey = `${c.destinationFacilityId}::${c.partId}`;
+    const recommendedSources = recsMap.get(recKey) ?? [];
+
+    const { _recMinQty, ...rest } = c;
+    return { ...rest, recommendedSources };
+  });
+
+  return { items, total };
 }

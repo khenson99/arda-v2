@@ -294,7 +294,7 @@ const transferQueueSchema = z.object({
   limit: z.coerce.number().int().positive().max(100).default(20),
   destinationFacilityId: z.string().uuid().optional(),
   sourceFacilityId: z.string().uuid().optional(),
-  status: z.string().optional(),
+  status: z.enum(['draft', 'requested', 'triggered', 'below_reorder']).optional(),
   partId: z.string().uuid().optional(),
   minPriorityScore: z.coerce.number().optional(),
   maxPriorityScore: z.coerce.number().optional(),
