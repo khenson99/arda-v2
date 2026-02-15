@@ -3,7 +3,6 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   Activity,
   ArrowUpDown,
-  Bell,
   Boxes,
   CircleHelp,
   ClipboardList,
@@ -21,6 +20,7 @@ import {
 } from 'lucide-react';
 import { Button, Input, Toaster } from '@/components/ui';
 import { ImportContextProvider, AddItemsFab, ModuleDialog } from '@/components/order-pulse';
+import { NotificationBell } from '@/components/notifications';
 import { CommandPalette } from '@/components/command-palette';
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
 import { useShopFloorMode } from '@/hooks/use-shop-floor-mode';
@@ -186,14 +186,10 @@ export function AppShell({ session, onSignOut }: AppShellProps) {
                     Support
                   </a>
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="relative h-8 w-8 text-muted-foreground"
-                >
-                  <Bell className="h-4 w-4" />
-                  <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-primary" />
-                </Button>
+                <NotificationBell
+                  token={session.tokens.accessToken}
+                  onUnauthorized={onSignOut}
+                />
                 <Button variant="outline" size="sm" onClick={onSignOut}>
                   <LogOut className="h-4 w-4" />
                   <span className="hidden lg:inline">Sign out</span>
