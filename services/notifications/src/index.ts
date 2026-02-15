@@ -12,6 +12,16 @@ import { unsubscribeRouter } from './routes/unsubscribe.routes.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { startEventListener } from './services/event-listener.js';
 import { createEmailQueue, createEmailWorker } from './workers/email-queue.worker.js';
+import {
+  createRetentionCleanupQueue,
+  createRetentionCleanupWorker,
+  scheduleRetentionCleanupJob,
+} from './workers/retention-cleanup.worker.js';
+import {
+  createBounceRateMonitorQueue,
+  createBounceRateMonitorWorker,
+  scheduleBounceRateMonitorJob,
+} from './workers/bounce-rate-monitor.worker.js';
 
 const log = createLogger('notifications');
 
@@ -71,6 +81,20 @@ const server = app.listen(PORT, () => {
 const emailQueue = createEmailQueue(config.REDIS_URL);
 const emailWorker = createEmailWorker(config.REDIS_URL);
 
+// Start retention cleanup queue, worker, and schedule
+const retentionCleanupQueue = createRetentionCleanupQueue(config.REDIS_URL);
+const retentionCleanupWorker = createRetentionCleanupWorker(config.REDIS_URL);
+scheduleRetentionCleanupJob(retentionCleanupQueue).catch((err) => {
+  log.error({ err }, 'Failed to schedule retention cleanup job');
+});
+
+// Start bounce rate monitor queue, worker, and schedule
+const bounceRateMonitorQueue = createBounceRateMonitorQueue(config.REDIS_URL);
+const bounceRateMonitorWorker = createBounceRateMonitorWorker(config.REDIS_URL);
+scheduleBounceRateMonitorJob(bounceRateMonitorQueue).catch((err) => {
+  log.error({ err }, 'Failed to schedule bounce rate monitor job');
+});
+
 // Start event listener with dispatch context
 startEventListener(config.REDIS_URL, { emailQueue }).catch((err) => {
   log.error({ err }, 'Failed to start event listener');
@@ -104,6 +128,22 @@ async function shutdown(signal: string) {
     await emailWorker.close();
     await emailQueue.close();
     log.info('Email queue and worker closed');
+  } catch {
+    // Queue/worker may not be fully initialized
+  }
+
+  try {
+    await retentionCleanupWorker.close();
+    await retentionCleanupQueue.close();
+    log.info('Retention cleanup queue and worker closed');
+  } catch {
+    // Queue/worker may not be fully initialized
+  }
+
+  try {
+    await bounceRateMonitorWorker.close();
+    await bounceRateMonitorQueue.close();
+    log.info('Bounce rate monitor queue and worker closed');
   } catch {
     // Queue/worker may not be fully initialized
   }
