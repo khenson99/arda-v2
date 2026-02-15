@@ -548,6 +548,8 @@ export const WS_EVENT_TYPES = [
   'error',
   'replay_complete',
   'resync_required',
+  'backpressure_warning',
+  'event_batch',
   // Core lifecycle + order events
   'card:stage_changed',
   'card:triggered',
@@ -630,6 +632,20 @@ export interface RealtimeResyncRequiredPayload {
   protocolVersion?: RealtimeProtocolVersion;
 }
 
+export interface RealtimeBackpressureWarningPayload {
+  tenantId: string;
+  droppedCount: number;
+  maxBufferSize: number;
+  timestamp: string;
+}
+
+export interface RealtimeEventBatchPayload<T = unknown> {
+  tenantId: string;
+  events: WSEvent<T>[];
+  count: number;
+  timestamp: string;
+}
+
 export interface RealtimeSubscribeLoopPayload {
   loopId: string;
   protocolVersion?: RealtimeProtocolVersion;
@@ -645,7 +661,8 @@ export type RealtimeControlEventType =
   | 'pong'
   | 'error'
   | 'replay_complete'
-  | 'resync_required';
+  | 'resync_required'
+  | 'backpressure_warning';
 
 export interface RealtimeControlEvent {
   type: RealtimeControlEventType;
@@ -654,7 +671,8 @@ export interface RealtimeControlEvent {
     | RealtimePongPayload
     | RealtimeErrorPayload
     | RealtimeReplayCompletePayload
-    | RealtimeResyncRequiredPayload;
+    | RealtimeResyncRequiredPayload
+    | RealtimeBackpressureWarningPayload;
 }
 
 // Compile-time coverage: ensures every WSEventType has a mapped key.
@@ -664,6 +682,8 @@ export const WS_EVENT_TYPE_COVERAGE: Record<WSEventType, true> = {
   error: true,
   replay_complete: true,
   resync_required: true,
+  backpressure_warning: true,
+  event_batch: true,
   'card:stage_changed': true,
   'card:triggered': true,
   'po:status_changed': true,
